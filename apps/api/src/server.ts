@@ -4,6 +4,7 @@ import { MongoOperationalStore } from '@kcc/persistence';
 import { buildApp } from './application';
 import { MongoDecisionLifecycleStore } from './decision-lifecycle-store';
 import { MongoGitHubConnectionStore } from './github-connection-store';
+import { GitHubRestClient } from './github-provider-client';
 import { MongoGitHubRepositoryStore } from './github-repository-store';
 import { MongoEncryptedIntegrationSecretStore } from './integration-secret-store';
 import { MongoLocalIdentityStore } from './local-identity-store';
@@ -16,6 +17,7 @@ const operationalStore = new MongoOperationalStore(mongo.db());
 const operationalAuditStore = new MongoOperationalAuditStore(mongo, mongo.db());
 const decisionLifecycleStore = new MongoDecisionLifecycleStore(mongo, mongo.db());
 const githubRepositoryStore = new MongoGitHubRepositoryStore(mongo, mongo.db());
+const githubProviderClient = new GitHubRestClient(config.KCC_GITHUB_API_BASE_URL);
 const integrationSecretStore = config.KCC_INTEGRATION_SECRET_KEY
   ? new MongoEncryptedIntegrationSecretStore(mongo.db(), config.KCC_INTEGRATION_SECRET_KEY)
   : undefined;
@@ -73,6 +75,7 @@ const app = buildApp({
   milestoneStore: operationalStore,
   decisionLifecycleStore,
   githubRepositoryStore,
+  githubProviderClient,
   ...(githubConnectionStore ? { githubConnectionStore } : {}),
   ...(localAuthProvider
     ? {
