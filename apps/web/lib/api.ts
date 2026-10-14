@@ -62,6 +62,18 @@ export type DecisionSummary = {
   supersedesId?: string;
 };
 
+export type TimelineEventSummary = {
+  id: string;
+  type: string;
+  actorUserId?: string;
+  entityType: string;
+  entityId: string;
+  summary: string;
+  source: string;
+  occurredAt: string;
+  metadata: Record<string, unknown>;
+};
+
 export type TodayResponse = {
   scope: 'workspace' | 'private';
   range: { start: string; end: string };
@@ -81,6 +93,7 @@ export type TodayResponse = {
 export type ProjectsResponse = { projects: ProjectSummary[] };
 export type MilestonesResponse = { milestones: MilestoneSummary[] };
 export type DecisionsResponse = { decisions: DecisionSummary[] };
+export type TimelineResponse = { events: TimelineEventSummary[] };
 
 export function apiBaseUrl(): string {
   return (
@@ -139,4 +152,12 @@ export async function getMilestones(
 export async function getDecisions(token: string): Promise<DecisionSummary[] | null> {
   const response = await authenticatedGet<DecisionsResponse>('/v1/decisions', token);
   return response?.decisions ?? null;
+}
+
+export async function getTimeline(
+  token: string,
+  scope: 'workspace' | 'private',
+): Promise<TimelineEventSummary[] | null> {
+  const response = await authenticatedGet<TimelineResponse>(`/v1/timeline?scope=${scope}`, token);
+  return response?.events ?? null;
 }

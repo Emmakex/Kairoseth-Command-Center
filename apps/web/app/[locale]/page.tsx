@@ -5,11 +5,13 @@ import { DecisionPanel } from '../../components/decision-panel';
 import { MilestonePanel } from '../../components/milestone-panel';
 import { OperationalPanels } from '../../components/operational-panels';
 import { QuickCapturePanel } from '../../components/quick-capture-panel';
+import { TimelinePanel } from '../../components/timeline-panel';
 import {
   getDecisions,
   getMilestones,
   getProjects,
   getSession,
+  getTimeline,
   getToday,
   readSessionToken,
 } from '../../lib/api';
@@ -36,12 +38,13 @@ export default async function CommandCenterPage({
 
   const { scope: requestedScope, result } = await searchParams;
   const scope = requestedScope === 'private' ? 'private' : 'workspace';
-  const [session, today, projects, milestones, decisions] = await Promise.all([
+  const [session, today, projects, milestones, decisions, timeline] = await Promise.all([
     getSession(token),
     getToday(token, scope),
     getProjects(token, scope),
     getMilestones(token, scope),
     scope === 'workspace' ? getDecisions(token) : Promise.resolve(null),
+    getTimeline(token, scope),
   ]);
   if (!session) redirect(`/${locale}/login`);
 
@@ -143,6 +146,12 @@ export default async function CommandCenterPage({
             <p className="empty-state">{copy.decisionWorkspaceOnly}</p>
           </article>
         )}
+        <TimelinePanel
+          locale={locale}
+          copy={copy}
+          timeZone={session.user.timezone}
+          events={timeline}
+        />
       </section>
     </main>
   );
