@@ -1,5 +1,9 @@
 import { z } from 'zod';
 
+function optionalSecret(schema: z.ZodString) {
+  return z.preprocess((value) => (value === '' ? undefined : value), schema.optional());
+}
+
 const apiSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   KCC_API_HOST: z.string().default('0.0.0.0'),
@@ -7,8 +11,8 @@ const apiSchema = z.object({
   MONGODB_URI: z.string().min(1).default('mongodb://localhost:27017/kairoseth_command_center'),
   KCC_AUTH_MODE: z.enum(['local', 'external', 'disabled']).default('local'),
   KCC_LOCAL_ADMIN_EMAIL: z.string().min(3).max(320).default('admin@kcc.local'),
-  KCC_LOCAL_ADMIN_PASSWORD: z.string().min(12).max(1024).optional(),
-  KCC_LOCAL_AUTH_SECRET: z.string().min(32).max(4096).optional(),
+  KCC_LOCAL_ADMIN_PASSWORD: optionalSecret(z.string().min(12).max(1024)),
+  KCC_LOCAL_AUTH_SECRET: optionalSecret(z.string().min(32).max(4096)),
   KCC_LOCAL_ADMIN_DISPLAY_NAME: z.string().min(1).max(160).default('Local Owner'),
   KCC_LOCAL_LOCALE: z.enum(['es', 'en']).default('es'),
   KCC_LOCAL_TIMEZONE: z.string().min(1).max(120).default('Europe/Madrid'),
