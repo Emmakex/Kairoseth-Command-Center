@@ -1,4 +1,6 @@
 import http from 'node:http';
+import process from 'node:process';
+import { URL } from 'node:url';
 
 const port = Number(process.env.PORT || 8080);
 const expectedToken = process.env.KCC_GITHUB_MOCK_TOKEN;
@@ -45,5 +47,5 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(port, '0.0.0.0', () => {
-  console.log(`GitHub mock listening on ${port}`);
+  process.stdout.write(`GitHub mock listening on ${port}\n`);
 });
