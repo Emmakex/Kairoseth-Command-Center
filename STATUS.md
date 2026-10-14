@@ -3,7 +3,7 @@
 **Current phase:** Phase 3 — Operational core  
 **Product:** Kairoseth Command Center  
 **Category:** Kairoseth Software  
-**Status:** First operational vertical slice implemented on `feat/phase-3-operational-core`; CI validation pending.
+**Status:** First operational vertical slice validated in PR #3; Phase 3 remains in progress.
 
 ## Completed / Completado
 
@@ -21,7 +21,7 @@
 - [x] Cross-tenant/private negative tests.
 - [x] Phase 2 merged in PR #2 with full CI/Docker gate green.
 
-### Phase 3 — implemented in current slice
+### Phase 3 — first validated slice
 - [x] Expanded operational domain for Projects, Milestones, Tasks, Alerts, Decisions and Timeline events.
 - [x] Added `TodaySummary` domain model.
 - [x] Added portable `@kcc/persistence` package.
@@ -37,14 +37,21 @@
 - [x] Added API tests proving client-supplied workspace/user IDs cannot escape the authenticated scope.
 - [x] Added private-vs-workspace Today separation tests.
 - [x] Wired Mongo operational store into the API runtime and Docker build.
+- [x] Tightened Today so Projects, Tasks and Alerts each require their corresponding read capability.
 
-## Validation pending / Validación pendiente
+## Validation / Validación
 
-- [ ] Open Phase 3 PR.
-- [ ] lint/typecheck/tests/build green.
-- [ ] dependency audit green.
-- [ ] secret scan green.
-- [ ] Docker Compose smoke green with `@kcc/persistence`.
+PR #3 CI run #16 passed the first Phase 3 slice quality gate after fixing the strict Mongo scope-filter typing issue without weakening TypeScript:
+
+- [x] lint.
+- [x] TypeScript validation.
+- [x] automated tests.
+- [x] production build.
+- [x] dependency audit.
+- [x] secret scan.
+- [x] Docker Compose build/runtime smoke test.
+- [x] API readiness/liveness smoke test.
+- [x] ES/EN web route smoke test.
 
 ## Phase 3 still pending / Pendiente de la fase 3
 
@@ -65,19 +72,20 @@
 4. Product entitlement and capability checks are both enforced.
 5. Mongo queries always include the scope boundary.
 6. System/integration scope cannot be created through manual project/task endpoints.
+7. Today only aggregates data categories for which the session has explicit read capability.
 
 ## Next / Siguiente
 
-1. Open the Phase 3 PR and run the full quality gate.
-2. Fix any strict typing/persistence issues without relaxing scope checks.
-3. Add update/completion flows for Projects and Tasks.
-4. Add Alerts, Decisions and Timeline.
-5. Build Quick Capture and the first ES/EN Today UI against the operational API.
+1. Merge PR #3 when the documentation-only follow-up CI remains green.
+2. Continue Phase 3 with task/project lifecycle updates and Milestones.
+3. Add Alerts, Decisions and Timeline.
+4. Build Quick Capture and the first ES/EN Today UI against the operational API.
+5. Add a safe standalone local-auth/bootstrap flow.
 6. Close Phase 3 only when the product is useful manually without GitHub or another external integration.
 
 ## Current blockers / Bloqueos actuales
 
-None documented. CI validation for the first Phase 3 slice is pending.
+None.
 
 ## Operating rule
 
