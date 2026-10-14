@@ -72,6 +72,41 @@ jobs:
           curl --fail --silent http://localhost:3000/es >/dev/null
           curl --fail --silent http://localhost:3000/en >/dev/null
 
+      - name: Smoke test Mongo transactions and audit outbox
+        run: |
+          test "$(docker compose exec -T mongo mongosh --quiet --eval 'print(rs.status().ok)')" = "1"
+          docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval '
+            const now = new Date().toISOString();
+            db.audit_outbox.insertOne({
+              id: "ci-outbox-event",
+              event: {
+                id: "ci-timeline-event",
+                scope: { kind: "workspace", workspaceId: "ci-workspace" },
+                type: "ci.audit",
+                entityType: "system",
+                entityId: "ci",
+                summary: "CI audit outbox smoke",
+                source: "ci",
+                occurredAt: now,
+                metadata: {}
+              },
+              status: "pending",
+              attempts: 0,
+              availableAt: now,
+              createdAt: now,
+              updatedAt: now
+            });
+          '
+          for attempt in {1..20}; do
+            count="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval 'print(db.timeline_events.countDocuments({id:"ci-timeline-event"}))')"
+            if [ "$count" = "1" ]; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose logs worker
+          exit 1
+
       - name: Show service state on failure
         if: failure()
         run: |
