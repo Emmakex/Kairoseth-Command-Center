@@ -40,6 +40,15 @@ Durable record of a product/project decision.
 
 Key fields: `id`, `workspaceId`, `projectId?`, `title`, `context`, `decision`, `status`, `supersedesId?`, `madeBy`, `madeAt`.
 
+Decision lifecycle states are `active`, `superseded` and `reversed`. New decisions start as `active`. A decision may transition from `active` to exactly one terminal lifecycle state:
+
+- `superseded`: another decision explicitly replaces it;
+- `reversed`: the decision is withdrawn without a replacement.
+
+A decision is workspace-only. When `projectId` is present, the referenced project must resolve inside the same authenticated workspace. When `supersedesId` is present, the referenced decision must also resolve inside the same workspace and still be `active`. A replacement inherits the previous decision's `projectId` when no project is explicitly supplied. If both decisions declare a project, the projects must match.
+
+Lifecycle transitions emit server-authored Timeline events. A reversal requires a human-readable reason in the mutation request; the reason is retained in the audit event rather than mutating the original decision text.
+
 ### TimelineEvent
 Immutable or append-oriented normalized event representing meaningful activity.
 
