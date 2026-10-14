@@ -1,0 +1,96 @@
+services:
+  mongo:
+    image: mongo:8.0
+    restart: unless-stopped
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    volumes:
+      - work-manager-mongo-data:/data/db
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mongosh --quiet --eval \"try { print(rs.status().ok) } catch (e) { print(rs.initiate({_id:'rs0',members:[{_id:0,host:'mongo:27017'}]}).ok) }\" | grep 1",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - backend
+
+  api:
+    build:
+      context: .
+      dockerfile: deployment/docker/api.Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      KCC_API_HOST: 0.0.0.0
+      KCC_API_PORT: 4000
+      MONGODB_URI: mongodb://mongo:27017/kairoseth_command_center?replicaSet=rs0&directConnection=true
+      KCC_AUTH_MODE: local
+      KCC_LOCAL_ADMIN_EMAIL: ${KCC_LOCAL_ADMIN_EMAIL:?Set KCC_LOCAL_ADMIN_EMAIL}
+      KCC_LOCAL_ADMIN_PASSWORD: ${KCC_LOCAL_ADMIN_PASSWORD:?Set KCC_LOCAL_ADMIN_PASSWORD}
+      KCC_LOCAL_AUTH_SECRET: ${KCC_LOCAL_AUTH_SECRET:?Set KCC_LOCAL_AUTH_SECRET to at least 32 random characters}
+      KCC_LOCAL_ADMIN_DISPLAY_NAME: ${KCC_LOCAL_ADMIN_DISPLAY_NAME:-Owner}
+      KCC_LOCAL_LOCALE: ${KCC_LOCAL_LOCALE:-es}
+      KCC_LOCAL_TIMEZONE: ${KCC_LOCAL_TIMEZONE:-Europe/Madrid}
+      KCC_LOCAL_USER_ID: ${KCC_LOCAL_USER_ID:-local-owner}
+      KCC_LOCAL_WORKSPACE_ID: ${KCC_LOCAL_WORKSPACE_ID:-local-workspace}
+      KCC_LOCAL_WORKSPACE_NAME: ${KCC_LOCAL_WORKSPACE_NAME:-Work Manager}
+      KCC_LOCAL_SESSION_TTL_SECONDS: ${KCC_LOCAL_SESSION_TTL_SECONDS:-43200}
+    depends_on:
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:4000/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    ports:
+      - "127.0.0.1:${KCC_API_HOST_PORT:-4000}:4000"
+    networks:
+      - backend
+
+  worker:
+    build:
+      context: .
+      dockerfile: deployment/docker/worker.Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      KCC_WORKER_POLL_MS: ${KCC_WORKER_POLL_MS:-5000}
+      MONGODB_URI: mongodb://mongo:27017/kairoseth_command_center?replicaSet=rs0&directConnection=true
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - backend
+
+  web:
+    build:
+      context: .
+      dockerfile: deployment/docker/web.Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      KCC_API_INTERNAL_URL: http://api:4000
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${KCC_WEB_BIND_ADDRESS:-127.0.0.1}:${KCC_WEB_PORT:-3000}:3000"
+    networks:
+      - backend
+      - frontend
+
+networks:
+  frontend:
+  backend:
+    internal: true
+
+volumes:
+  work-manager-mongo-data:
