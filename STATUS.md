@@ -1,9 +1,9 @@
 # Project status / Estado del proyecto
 
-**Current phase:** Phase 2 — Identity, workspaces and permissions complete  
+**Current phase:** Phase 3 — Operational core  
 **Product:** Kairoseth Command Center  
 **Category:** Kairoseth Software  
-**Status:** Phase 2 exit gate passed on PR #2; ready to merge and begin Phase 3.
+**Status:** First operational vertical slice validated in PR #3; Phase 3 remains in progress.
 
 ## Completed / Completado
 
@@ -11,79 +11,77 @@
 - [x] Product, architecture, portability, tenancy, security and commercial model documented.
 
 ### Phase 1 — Core shell
-- [x] Portable pnpm monorepo.
-- [x] Web + API + worker.
-- [x] Shared packages and adapter boundaries.
-- [x] ES/EN from the first UI route.
-- [x] MongoDB-ready local runtime.
-- [x] Health/readiness endpoints.
-- [x] Docker Compose stack.
-- [x] CI, dependency audit, secret scan and Docker smoke validation.
-- [x] Phase 1 merged to `main` in PR #1.
+- [x] Portable monorepo, web/API/worker, ES/EN, Docker and CI baseline.
+- [x] Phase 1 merged in PR #1.
 
 ### Phase 2 — Identity, workspaces and permissions
-- [x] `User`, `Workspace` and `Membership` domain entities.
-- [x] Workspace types/status and membership lifecycle.
-- [x] Role presets: `platform_admin`, `owner`, `admin`, `member`.
-- [x] Capability-based server-side authorization.
-- [x] Product entitlement checks.
-- [x] Strict workspace scope enforcement.
-- [x] Strict private-user scope enforcement.
-- [x] `platform_admin` restricted to the Kairoseth workspace context.
-- [x] Session context includes locale/timezone, membership, role, capabilities and entitlements.
-- [x] Portable `AuthProvider` and `SessionCredentialResolver` contracts.
-- [x] Local auth adapter contract.
-- [x] Kairoseth Identity adapter contract.
-- [x] Protected `GET /v1/session` server-side session resolver.
-- [x] Cross-tenant negative authorization tests.
-- [x] Private-scope negative authorization tests.
-- [x] Suspended membership negative test.
-- [x] Invalid credential/session API tests.
+- [x] Server-side session context, workspaces, membership, RBAC/capabilities, product entitlements.
+- [x] Strict workspace and private-user boundaries.
+- [x] Local/Kairoseth Identity adapter contracts.
+- [x] Cross-tenant/private negative tests.
+- [x] Phase 2 merged in PR #2 with full CI/Docker gate green.
+
+### Phase 3 — first validated slice
+- [x] Expanded operational domain for Projects, Milestones, Tasks, Alerts, Decisions and Timeline events.
+- [x] Added `TodaySummary` domain model.
+- [x] Added portable `@kcc/persistence` package.
+- [x] Added scoped `OperationalStore` interface.
+- [x] Added MongoDB implementation with tenant/private-aware filters and indexes.
+- [x] Added project creation/listing API.
+- [x] Added task creation/listing API.
+- [x] Added first `/v1/today` aggregate endpoint.
+- [x] Added user-timezone-aware local day boundaries for Today.
+- [x] Server derives workspace/private scope from the authenticated session instead of trusting client IDs.
+- [x] Added Command Center entitlement checks to operational endpoints.
+- [x] Added `alerts.read`, `decisions.read/write` and `timeline.read` capabilities.
+- [x] Added API tests proving client-supplied workspace/user IDs cannot escape the authenticated scope.
+- [x] Added private-vs-workspace Today separation tests.
+- [x] Wired Mongo operational store into the API runtime and Docker build.
+- [x] Tightened Today so Projects, Tasks and Alerts each require their corresponding read capability.
 
 ## Validation / Validación
 
-PR #2 CI run #10 passed the complete Phase 2 quality gate after one strict-TypeScript fix:
+PR #3 CI run #16 passed the first Phase 3 slice quality gate after fixing the strict Mongo scope-filter typing issue without weakening TypeScript:
 
-- [x] install.
 - [x] lint.
 - [x] TypeScript validation.
-- [x] automated tests, including tenant/private negative tests.
+- [x] automated tests.
 - [x] production build.
 - [x] dependency audit.
 - [x] secret scan.
 - [x] Docker Compose build/runtime smoke test.
-- [x] API/web baseline smoke tests.
+- [x] API readiness/liveness smoke test.
+- [x] ES/EN web route smoke test.
 
-The first CI attempt exposed an `exactOptionalPropertyTypes` mismatch in the API auth request object. It was fixed by omitting absent credential fields rather than weakening the TypeScript configuration.
+## Phase 3 still pending / Pendiente de la fase 3
 
-## Security invariants verified
+- [ ] Milestone persistence/API.
+- [ ] Alert creation/acknowledge/resolve flow.
+- [ ] Decision log persistence/API.
+- [ ] Timeline write/read flow.
+- [ ] Quick capture.
+- [ ] Task/project status updates and completion workflow.
+- [ ] First useful Today UI connected to the API.
+- [ ] Local manual-use authentication/bootstrap suitable for standalone mode.
 
-1. UI role selection never grants authorization.
-2. A workspace administrator cannot cross tenant boundaries.
-3. Workspace ownership/admin does not reveal another user's private data.
-4. Product access can require entitlement in addition to authorization.
-5. `platform_admin` is not a portable customer role and is valid only in Kairoseth-hosted context.
-6. Protected API responses never expose credentials or raw tokens.
+## Security invariants
+
+1. Manual APIs never accept a raw tenant/user ID as authorization scope.
+2. `scope=workspace` resolves only to the active authenticated workspace.
+3. `scope=private` resolves only to the authenticated user.
+4. Product entitlement and capability checks are both enforced.
+5. Mongo queries always include the scope boundary.
+6. System/integration scope cannot be created through manual project/task endpoints.
+7. Today only aggregates data categories for which the session has explicit read capability.
 
 ## Next / Siguiente
 
-1. Merge PR #2 into `main`.
-2. Start Phase 3 — Operational core.
-3. Implement persistence/repository boundaries for Projects, Milestones, Tasks, Alerts, Timeline and Decisions.
-4. Add Personal/private reminders using the same strict private scope.
-5. Build the first useful `Today` vertical slice and quick capture.
-6. Close Phase 3 only when the product is useful manually with no external integration.
-
-## Phase 2 exit gate
-
-**PASSED.**
-
-- session context is resolved server-side;
-- workspace membership and role/capability authorization pass;
-- cross-tenant negative tests pass;
-- private-scope negative tests pass;
-- local/Kairoseth identity adapter contracts remain portable;
-- CI/security/Docker gates are green.
+1. Merge PR #3 when the documentation-only follow-up CI remains green.
+2. Continue Phase 3 with task/project lifecycle updates and Milestones.
+3. Add Alerts, Decisions and Timeline.
+4. Build Quick Capture and the first ES/EN Today UI against the operational API.
+5. Add a safe standalone local-auth/bootstrap flow.
+6. Close Phase 3 only when the product is useful manually without GitHub or another external integration.
 
 ## Current blockers / Bloqueos actuales
 

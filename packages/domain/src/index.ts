@@ -9,8 +9,11 @@ export type WorkspaceStatus = 'active' | 'suspended' | 'archived';
 export type MembershipRole = 'platform_admin' | 'owner' | 'admin' | 'member';
 export type MembershipStatus = 'invited' | 'active' | 'suspended' | 'revoked';
 export type ProjectStatus = 'planned' | 'active' | 'blocked' | 'done' | 'archived';
+export type MilestoneStatus = 'planned' | 'active' | 'done' | 'cancelled';
 export type TaskStatus = 'todo' | 'in_progress' | 'blocked' | 'done' | 'cancelled';
 export type AlertSeverity = 'info' | 'warning' | 'urgent' | 'critical';
+export type AlertStatus = 'open' | 'acknowledged' | 'resolved' | 'dismissed';
+export type DecisionStatus = 'active' | 'superseded' | 'reversed';
 
 export interface User {
   id: string;
@@ -48,8 +51,24 @@ export interface Project {
   id: string;
   scope: Scope;
   name: string;
+  description?: string;
   status: ProjectStatus;
   progress: number;
+  ownerUserId?: string;
+  startAt?: string;
+  dueAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Milestone {
+  id: string;
+  scope: Scope;
+  projectId: string;
+  title: string;
+  status: MilestoneStatus;
+  weight: number;
+  dueAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -59,9 +78,12 @@ export interface Task {
   scope: Scope;
   projectId?: string;
   title: string;
+  description?: string;
   status: TaskStatus;
   priority: number;
+  assigneeIds: string[];
   dueAt?: string;
+  completedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -69,13 +91,61 @@ export interface Task {
 export interface Alert {
   id: string;
   scope: Scope;
+  projectId?: string;
   title: string;
+  message?: string;
   severity: AlertSeverity;
+  status: AlertStatus;
+  fingerprint?: string;
   acknowledgedAt?: string;
+  resolvedAt?: string;
   createdAt: string;
+  updatedAt: string;
+}
+
+export interface Decision {
+  id: string;
+  scope: Extract<Scope, { kind: 'workspace' }>;
+  projectId?: string;
+  title: string;
+  context?: string;
+  decision: string;
+  status: DecisionStatus;
+  madeBy: string;
+  madeAt: string;
+  supersedesId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TimelineEvent {
+  id: string;
+  scope: Scope;
+  type: string;
+  actorUserId?: string;
+  entityType: string;
+  entityId: string;
+  summary: string;
+  source: string;
+  occurredAt: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface TodaySummary {
+  openTasks: number;
+  dueToday: number;
+  blockedTasks: number;
+  openAlerts: number;
+  urgentAlerts: number;
+  activeProjects: number;
 }
 
 export function clampProgress(value: number): number {
   if (!Number.isFinite(value)) return 0;
+  return Math.min(100, Math.max(0, Math.round(value)));
+}
+
+export function normalizePriority(value: number): number {
+  if (!Number.isFinite(value)) return 50;
   return Math.min(100, Math.max(0, Math.round(value)));
 }

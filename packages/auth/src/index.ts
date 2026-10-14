@@ -7,7 +7,11 @@ export type Capability =
   | 'projects.write'
   | 'tasks.read'
   | 'tasks.write'
+  | 'alerts.read'
   | 'alerts.manage'
+  | 'decisions.read'
+  | 'decisions.write'
+  | 'timeline.read'
   | 'integrations.manage'
   | 'billing.manage'
   | 'internal.development.read'
@@ -47,7 +51,11 @@ const ROLE_CAPABILITIES: Record<Exclude<MembershipRole, 'platform_admin'>, reado
     'projects.write',
     'tasks.read',
     'tasks.write',
+    'alerts.read',
     'alerts.manage',
+    'decisions.read',
+    'decisions.write',
+    'timeline.read',
     'integrations.manage',
     'billing.manage',
   ],
@@ -58,10 +66,21 @@ const ROLE_CAPABILITIES: Record<Exclude<MembershipRole, 'platform_admin'>, reado
     'projects.write',
     'tasks.read',
     'tasks.write',
+    'alerts.read',
     'alerts.manage',
+    'decisions.read',
+    'decisions.write',
+    'timeline.read',
     'integrations.manage',
   ],
-  member: ['projects.read', 'tasks.read', 'tasks.write'],
+  member: [
+    'projects.read',
+    'tasks.read',
+    'tasks.write',
+    'alerts.read',
+    'decisions.read',
+    'timeline.read',
+  ],
 };
 
 export function buildWorkspaceSession(input: {
