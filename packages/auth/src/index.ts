@@ -5,6 +5,8 @@ export type Capability =
   | 'members.manage'
   | 'projects.read'
   | 'projects.write'
+  | 'milestones.read'
+  | 'milestones.write'
   | 'tasks.read'
   | 'tasks.write'
   | 'alerts.read'
@@ -49,6 +51,8 @@ const ROLE_CAPABILITIES: Record<Exclude<MembershipRole, 'platform_admin'>, reado
     'members.manage',
     'projects.read',
     'projects.write',
+    'milestones.read',
+    'milestones.write',
     'tasks.read',
     'tasks.write',
     'alerts.read',
@@ -64,6 +68,8 @@ const ROLE_CAPABILITIES: Record<Exclude<MembershipRole, 'platform_admin'>, reado
     'members.manage',
     'projects.read',
     'projects.write',
+    'milestones.read',
+    'milestones.write',
     'tasks.read',
     'tasks.write',
     'alerts.read',
@@ -75,6 +81,7 @@ const ROLE_CAPABILITIES: Record<Exclude<MembershipRole, 'platform_admin'>, reado
   ],
   member: [
     'projects.read',
+    'milestones.read',
     'tasks.read',
     'tasks.write',
     'alerts.read',

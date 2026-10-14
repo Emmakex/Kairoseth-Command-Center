@@ -5,6 +5,8 @@ import type {
   AlertSeverity,
   AlertStatus,
   Decision,
+  Milestone,
+  MilestoneStatus,
   Project,
   ProjectStatus,
   Scope,
@@ -65,6 +67,19 @@ export interface AppendTimelineInput {
   metadata?: Record<string, unknown>;
 }
 
+export interface CreateMilestoneInput {
+  scope: Scope;
+  projectId: string;
+  title: string;
+  weight: number;
+  dueAt?: string;
+}
+
+export interface MilestoneMutationResult {
+  milestone: Milestone;
+  projectProgress: number | null;
+}
+
 export interface OperationalStore {
   createProject(input: CreateProjectInput): Promise<Project>;
   listProjects(scope: Scope): Promise<Project[]>;
@@ -87,12 +102,29 @@ export interface OperationalStore {
   getTodaySummary(scope: Scope, day: { start: string; end: string }): Promise<TodaySummary>;
 }
 
+export interface MilestoneStore {
+  createMilestone(input: CreateMilestoneInput): Promise<MilestoneMutationResult | null>;
+  listMilestones(scope: Scope, projectId?: string): Promise<Milestone[]>;
+  updateMilestoneStatus(
+    scope: Scope,
+    milestoneId: string,
+    status: MilestoneStatus,
+  ): Promise<MilestoneMutationResult | null>;
+  appendTimeline(input: AppendTimelineInput): Promise<TimelineEvent>;
+}
+
 function scopeFilter(scope: Scope): { scope: Scope } {
   return { scope };
 }
 
-export class MongoOperationalStore implements OperationalStore {
+function normalizeWeight(value: number): number {
+  if (!Number.isFinite(value)) return 1;
+  return Math.min(100, Math.max(1, Math.round(value)));
+}
+
+export class MongoOperationalStore implements OperationalStore, MilestoneStore {
   private readonly projects: Collection<Project>;
+  private readonly milestones: Collection<Milestone>;
   private readonly tasks: Collection<Task>;
   private readonly alerts: Collection<Alert>;
   private readonly decisions: Collection<Decision>;
@@ -100,6 +132,7 @@ export class MongoOperationalStore implements OperationalStore {
 
   constructor(db: Db) {
     this.projects = db.collection<Project>('projects');
+    this.milestones = db.collection<Milestone>('milestones');
     this.tasks = db.collection<Task>('tasks');
     this.alerts = db.collection<Alert>('alerts');
     this.decisions = db.collection<Decision>('decisions');
@@ -109,6 +142,14 @@ export class MongoOperationalStore implements OperationalStore {
   async ensureIndexes(): Promise<void> {
     await Promise.all([
       this.projects.createIndex({ 'scope.kind': 1, 'scope.workspaceId': 1, 'scope.userId': 1, updatedAt: -1 }),
+      this.milestones.createIndex({
+        'scope.kind': 1,
+        'scope.workspaceId': 1,
+        'scope.userId': 1,
+        projectId: 1,
+        status: 1,
+        dueAt: 1,
+      }),
       this.tasks.createIndex({ 'scope.kind': 1, 'scope.workspaceId': 1, 'scope.userId': 1, status: 1, dueAt: 1 }),
       this.alerts.createIndex({ 'scope.kind': 1, 'scope.workspaceId': 1, 'scope.userId': 1, status: 1, severity: 1 }),
       this.decisions.createIndex({ 'scope.workspaceId': 1, madeAt: -1 }),
@@ -160,6 +201,70 @@ export class MongoOperationalStore implements OperationalStore {
 
     if (result.matchedCount === 0) return null;
     return this.projects.findOne({ ...scopeFilter(scope), id: projectId });
+  }
+
+  private async recalculateProjectProgress(scope: Scope, projectId: string): Promise<number | null> {
+    const project = await this.projects.findOne({ ...scopeFilter(scope), id: projectId });
+    if (!project) return null;
+
+    const milestones = await this.milestones.find({ ...scopeFilter(scope), projectId }).toArray();
+    const included = milestones.filter((milestone) => milestone.status !== 'cancelled');
+    const totalWeight = included.reduce((total, milestone) => total + normalizeWeight(milestone.weight), 0);
+    const completedWeight = included
+      .filter((milestone) => milestone.status === 'done')
+      .reduce((total, milestone) => total + normalizeWeight(milestone.weight), 0);
+    const progress = totalWeight === 0 ? 0 : clampProgress((completedWeight / totalWeight) * 100);
+
+    await this.projects.updateOne(
+      { ...scopeFilter(scope), id: projectId },
+      { $set: { progress, updatedAt: new Date().toISOString() } },
+    );
+    return progress;
+  }
+
+  async createMilestone(input: CreateMilestoneInput): Promise<MilestoneMutationResult | null> {
+    const project = await this.projects.findOne({ ...scopeFilter(input.scope), id: input.projectId });
+    if (!project) return null;
+
+    const now = new Date().toISOString();
+    const milestone: Milestone = {
+      id: randomUUID(),
+      scope: input.scope,
+      projectId: input.projectId,
+      title: input.title.trim(),
+      status: 'planned',
+      weight: normalizeWeight(input.weight),
+      createdAt: now,
+      updatedAt: now,
+      ...(input.dueAt ? { dueAt: input.dueAt } : {}),
+    };
+
+    await this.milestones.insertOne(milestone);
+    const projectProgress = await this.recalculateProjectProgress(input.scope, input.projectId);
+    return { milestone, projectProgress };
+  }
+
+  async listMilestones(scope: Scope, projectId?: string): Promise<Milestone[]> {
+    return this.milestones
+      .find({ ...scopeFilter(scope), ...(projectId ? { projectId } : {}) })
+      .sort({ dueAt: 1, createdAt: 1 })
+      .toArray();
+  }
+
+  async updateMilestoneStatus(
+    scope: Scope,
+    milestoneId: string,
+    status: MilestoneStatus,
+  ): Promise<MilestoneMutationResult | null> {
+    const now = new Date().toISOString();
+    const query = { ...scopeFilter(scope), id: milestoneId };
+    const result = await this.milestones.updateOne(query, { $set: { status, updatedAt: now } });
+    if (result.matchedCount === 0) return null;
+
+    const milestone = await this.milestones.findOne(query);
+    if (!milestone) return null;
+    const projectProgress = await this.recalculateProjectProgress(scope, milestone.projectId);
+    return { milestone, projectProgress };
   }
 
   async createTask(input: CreateTaskInput): Promise<Task> {
