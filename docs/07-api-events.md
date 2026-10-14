@@ -21,12 +21,24 @@
 /api/v1/tasks
 /api/v1/alerts
 /api/v1/decisions
+/api/v1/decision-lifecycle
 /api/v1/timeline
 /api/v1/integrations
 /api/v1/webhooks
 ```
 
 Private resources may use dedicated endpoints or scope filters, but the security boundary must remain explicit.
+
+## Decision lifecycle
+
+The validated manual lifecycle is workspace-only and derives the workspace from the authenticated session. Browser and API clients never select a raw workspace identifier.
+
+- `POST /v1/decision-lifecycle` creates an active decision, optionally linked to a project in the same workspace and optionally replacing an active decision from the same workspace.
+- `PATCH /v1/decision-lifecycle/:id/reverse` reverses an active decision and requires a reversal reason.
+
+Project references are resolved server-side inside the authenticated workspace. `supersedesId` must identify an active same-workspace decision. Lifecycle updates use conditional `active` transitions so repeated or racing terminal transitions fail rather than silently overwriting history.
+
+The older `/v1/decisions` create route remains a compatibility surface during Phase 3 cleanup. New managed clients must use the lifecycle route for project-linked, superseding or reversing operations. Transaction/outbox hardening remains required before Phase 3 closes so multi-write Decision + Timeline operations become atomic/recoverable.
 
 ## Error envelope
 
@@ -68,7 +80,7 @@ Internal events should follow a normalized envelope:
 - `milestone.completed`
 - `task.created|updated|blocked|completed`
 - `alert.opened|acknowledged|resolved`
-- `decision.created|superseded`
+- `decision.created|superseded|reversed`
 - `integration.connected|degraded|disconnected`
 - `repository.sync.completed|failed`
 - `membership.created|updated|revoked`
