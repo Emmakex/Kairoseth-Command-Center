@@ -1,9 +1,22 @@
 # 00 — Product definition / Definición de producto
 
+## Naming / Naming comercial
+
+`Kairoseth Command Center` remains the **technical/internal project and repository name**. It is not the public commercial product name.
+
+Reserved commercial names for publication:
+
+- **ES:** Gestor de Trabajo
+- **EN:** Work Manager
+
+Product naming rule: public Kairoseth products use an independent commercial product name. **Do not prefix the product name with `Kairoseth`.** Kairoseth is the vendor/catalog brand and may appear separately as attribution (for example, “by Kairoseth”), navigation or publisher metadata.
+
+SEO descriptors, headings and metadata are localized independently from the commercial name. The current search territory includes task management, project management, work management and team/workflow organization; commercial publication must preserve the ES/EN distinction.
+
 ## EN
 
 ### Purpose
-Kairoseth Command Center is a software product that centralizes operational work and personal organization in one intelligent control surface. It combines projects, tasks, alerts, decisions, timelines, integrations and user-private reminders.
+Work Manager (`Kairoseth Command Center` internally) is a software product that centralizes operational work and personal organization in one intelligent control surface. It combines projects, tasks, alerts, decisions, timelines, integrations and user-private reminders.
 
 ### Positioning
 It is **not** a generic to-do list and **not** a hard-coded Kairoseth admin dashboard. It is an autonomous product that can be:
@@ -42,7 +55,7 @@ Kairoseth **Software**.
 ## ES
 
 ### Propósito
-Kairoseth Command Center es un producto de software que centraliza trabajo operativo y organización personal en una única superficie inteligente de control. Reúne proyectos, tareas, alertas, decisiones, timeline, integraciones y recordatorios privados del usuario.
+Gestor de Trabajo (`Kairoseth Command Center` internamente) es un producto de software que centraliza trabajo operativo y organización personal en una única superficie inteligente de control. Reúne proyectos, tareas, alertas, decisiones, timeline, integraciones y recordatorios privados del usuario.
 
 ### Posicionamiento
 No es una simple lista de tareas ni un dashboard administrativo inseparable de Kairoseth. Es un producto autónomo que puede:
@@ -70,3 +83,4 @@ Kairoseth **Software**.
 - Progreso basado en datos, no porcentajes inventados.
 - Inteligencia explicable y revisable.
 - ES/EN desde el inicio.
+- Nombre comercial del producto independiente de la marca Kairoseth.

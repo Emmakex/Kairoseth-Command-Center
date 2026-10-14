@@ -37,6 +37,30 @@ The worker logs `audit_outbox.tick` with claimed, delivered and failed counts. T
 
 The CI Docker gate exercises both workspace and private scopes: it performs a real Decision lifecycle mutation and a private Quick Capture mutation, then waits for their Timeline events to be delivered by the worker and verifies the corresponding outbox records reach `delivered`.
 
+## Persistent standalone identity smoke
+
+A reusable Docker smoke is provided at:
+
+```text
+deployment/docker/smoke-local-identities.sh
+```
+
+It runs against a live API/DB stack and verifies the full standalone multi-user lifecycle:
+
+1. authenticate the persisted bootstrap owner;
+2. create a real `member` through the protected member-management API;
+3. authenticate the new member;
+4. prove the member receives `403 forbidden` when attempting member administration;
+5. prove the owner cannot be demoted through member-management routes;
+6. change the member password through the authenticated self-service route;
+7. prove the pre-change bearer token becomes invalid immediately;
+8. prove the old password no longer authenticates;
+9. authenticate with the new password and resolve a fresh session.
+
+The dedicated `Local identities smoke` GitHub Actions workflow starts the portable Docker stack and runs this script on pull requests and on `main`, independently of the general CI workflow. This keeps the multi-user release gate explicit and avoids mixing identity lifecycle checks into the transactional-audit smoke.
+
+The smoke requires `KCC_LOCAL_ADMIN_EMAIL` and `KCC_LOCAL_ADMIN_PASSWORD`; optional `KCC_API_BASE_URL` and `KCC_SMOKE_RUN_ID` can override the default API endpoint and unique test identity suffix. Test credentials are generated for the ephemeral CI stack and must never be reused as production credentials.
+
 ## Structured logging
 
 Logs should include stable operational fields such as:
@@ -81,7 +105,12 @@ Every change should run:
 6. build;
 7. dependency/secret scanning.
 
-The Docker quality gate also verifies the local MongoDB replica set and end-to-end outbox-to-Timeline delivery through the worker for both workspace and private mutation paths.
+The Docker quality gates also verify:
+
+- local MongoDB replica-set readiness;
+- end-to-end outbox-to-Timeline delivery through the worker for workspace and private mutation paths;
+- persistent standalone owner/member authentication and authorization;
+- password-change token invalidation.
 
 Main must remain releasable. Failed verification blocks release.
 
