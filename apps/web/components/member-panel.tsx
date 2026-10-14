@@ -1,30 +1,72 @@
-import type { DictionaryCopy, Locale } from '../lib/i18n';
+import type { Locale } from '../lib/i18n';
 import type { LocalMember } from '../lib/local-identities';
 
 export function MemberPanel({
   locale,
-  copy,
   members,
 }: {
   locale: Locale;
-  copy: DictionaryCopy;
   members: LocalMember[] | null;
 }) {
+  const copy =
+    locale === 'es'
+      ? {
+          title: 'Miembros',
+          help: 'Administra usuarios locales, roles, estado y restablecimiento de contraseña.',
+          name: 'Nombre',
+          email: 'Correo electrónico',
+          role: 'Rol',
+          language: 'Idioma',
+          timezone: 'Zona horaria',
+          initialPassword: 'Contraseña inicial',
+          add: 'Añadir miembro',
+          owner: 'Propietario',
+          admin: 'Administrador',
+          member: 'Miembro',
+          status: 'Estado',
+          active: 'Activo',
+          suspended: 'Suspendido',
+          disabled: 'Deshabilitado',
+          save: 'Guardar',
+          resetPassword: 'Nueva contraseña',
+          reset: 'Restablecer',
+          ownerProtected: 'Propietario protegido',
+          empty: 'No hay miembros disponibles.',
+        }
+      : {
+          title: 'Members',
+          help: 'Manage local users, roles, status and password resets.',
+          name: 'Name',
+          email: 'Email',
+          role: 'Role',
+          language: 'Language',
+          timezone: 'Timezone',
+          initialPassword: 'Initial password',
+          add: 'Add member',
+          owner: 'Owner',
+          admin: 'Admin',
+          member: 'Member',
+          status: 'Status',
+          active: 'Active',
+          suspended: 'Suspended',
+          disabled: 'Disabled',
+          save: 'Save',
+          resetPassword: 'New password',
+          reset: 'Reset',
+          ownerProtected: 'Protected owner',
+          empty: 'No members available.',
+        };
   const roleLabel = (role: LocalMember['role']) =>
-    role === 'owner' ? copy.roleOwner : role === 'admin' ? copy.roleAdmin : copy.roleMember;
+    role === 'owner' ? copy.owner : role === 'admin' ? copy.admin : copy.member;
   const statusLabel = (status: LocalMember['status']) =>
-    status === 'active'
-      ? copy.memberStatusActive
-      : status === 'suspended'
-        ? copy.memberStatusSuspended
-        : copy.memberStatusDisabled;
+    status === 'active' ? copy.active : status === 'suspended' ? copy.suspended : copy.disabled;
 
   return (
     <article className="panel management-panel members-panel">
       <div className="panel-heading management-heading">
         <div>
-          <h2>{copy.members}</h2>
-          <p>{copy.membersHelp}</p>
+          <h2>{copy.title}</h2>
+          <p>{copy.help}</p>
         </div>
         <span>{members?.length ?? 0}</span>
       </div>
@@ -33,7 +75,7 @@ export function MemberPanel({
         <input type="hidden" name="locale" value={locale} />
         <input type="hidden" name="operation" value="member-create" />
         <label className="field">
-          <span>{copy.displayName}</span>
+          <span>{copy.name}</span>
           <input name="displayName" required maxLength={160} />
         </label>
         <label className="field">
@@ -43,8 +85,8 @@ export function MemberPanel({
         <label className="field compact-field">
           <span>{copy.role}</span>
           <select name="role" defaultValue="member">
-            <option value="member">{copy.roleMember}</option>
-            <option value="admin">{copy.roleAdmin}</option>
+            <option value="member">{copy.member}</option>
+            <option value="admin">{copy.admin}</option>
           </select>
         </label>
         <label className="field compact-field">
@@ -63,7 +105,7 @@ export function MemberPanel({
           <input name="password" type="password" minLength={12} maxLength={1024} required autoComplete="new-password" />
         </label>
         <button className="primary-button" type="submit">
-          {copy.addMember}
+          {copy.add}
         </button>
       </form>
 
@@ -88,16 +130,16 @@ export function MemberPanel({
                     <label>
                       <span>{copy.role}</span>
                       <select name="role" defaultValue={member.role}>
-                        <option value="member">{copy.roleMember}</option>
-                        <option value="admin">{copy.roleAdmin}</option>
+                        <option value="member">{copy.member}</option>
+                        <option value="admin">{copy.admin}</option>
                       </select>
                     </label>
                     <label>
-                      <span>{copy.statusLabel}</span>
+                      <span>{copy.status}</span>
                       <select name="status" defaultValue={member.status}>
-                        <option value="active">{copy.memberStatusActive}</option>
-                        <option value="suspended">{copy.memberStatusSuspended}</option>
-                        <option value="disabled">{copy.memberStatusDisabled}</option>
+                        <option value="active">{copy.active}</option>
+                        <option value="suspended">{copy.suspended}</option>
+                        <option value="disabled">{copy.disabled}</option>
                       </select>
                     </label>
                     <button className="secondary-button" type="submit">
@@ -121,7 +163,7 @@ export function MemberPanel({
             </div>
           ))
         ) : (
-          <p className="empty-state">{copy.noMembers}</p>
+          <p className="empty-state">{copy.empty}</p>
         )}
       </div>
     </article>
