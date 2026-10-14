@@ -1,17 +1,25 @@
 import { MongoClient } from 'mongodb';
+import { LocalAuthProvider } from '@kcc/auth';
 import { loadApiConfig } from '@kcc/config';
+import { MongoLocalAuthStore } from '@kcc/local-auth';
 import { MongoOperationalStore } from '@kcc/persistence';
 import { buildApp } from './application';
 
 const config = loadApiConfig();
 const mongo = new MongoClient(config.MONGODB_URI, { serverSelectionTimeoutMS: 3000 });
-const operationalStore = new MongoOperationalStore(mongo.db());
+const db = mongo.db();
+const operationalStore = new MongoOperationalStore(db);
+const localAuthStore = new MongoLocalAuthStore(db, {
+  sessionTtlHours: config.KCC_LOCAL_SESSION_TTL_HOURS,
+  ...(config.KCC_BOOTSTRAP_SECRET ? { bootstrapSecret: config.KCC_BOOTSTRAP_SECRET } : {}),
+});
+const authProvider = new LocalAuthProvider(localAuthStore);
 let mongoReady = false;
 
 try {
   await mongo.connect();
-  await mongo.db().command({ ping: 1 });
-  await operationalStore.ensureIndexes();
+  await db.command({ ping: 1 });
+  await Promise.all([operationalStore.ensureIndexes(), localAuthStore.ensureIndexes()]);
   mongoReady = true;
 } catch (error) {
   console.error('MongoDB is not ready; API will stay alive but readiness will fail.', error);
@@ -19,12 +27,14 @@ try {
 
 const app = buildApp({
   logger: true,
+  authProvider,
+  localAuthService: localAuthStore,
   operationalStore,
   milestoneStore: operationalStore,
   readinessCheck: async () => {
     if (!mongoReady) {
       try {
-        await mongo.db().command({ ping: 1 });
+        await db.command({ ping: 1 });
         mongoReady = true;
       } catch {
         mongoReady = false;
@@ -34,6 +44,7 @@ const app = buildApp({
     return {
       process: 'ok',
       mongodb: mongoReady ? 'ok' : 'error',
+      local_auth: config.KCC_AUTH_MODE === 'local' ? 'ok' : 'error',
     };
   },
 });
