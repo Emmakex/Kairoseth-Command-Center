@@ -59,7 +59,7 @@ Milestone state and the resulting project progress are updated in the same trans
 
 ## GitHub repository links
 
-The first Phase 4 integration contract is intentionally metadata-only and does not require GitHub credentials or a live GitHub API call.
+Phase 4 Slice 1 is metadata-only and does not require GitHub credentials or a live GitHub API call.
 
 Routes:
 
@@ -67,31 +67,60 @@ Routes:
 - `POST /v1/integrations/github/repositories`
 - `DELETE /v1/integrations/github/repositories/:resourceId`
 
+All routes derive the workspace from the authenticated session, require `integrations.manage` plus the `command-center` entitlement and operate only on normalized provider `github`, kind `repository` resources.
+
+Create accepts `projectId`, `owner`, `repository` and an optional `defaultBranch` hint. Raw workspace/user IDs and arbitrary repository URLs are not authorization or persistence inputs. Repository identity is canonicalized case-insensitively and the GitHub deep link is generated server-side.
+
+Link/unlink state and audit-outbox events are committed in the same MongoDB transaction. This slice does not prove that the remote repository exists.
+
+## GitHub connections and encrypted credentials
+
+Phase 4 Slice 2 adds a local credential lifecycle without live provider validation.
+
+Routes:
+
+- `GET /v1/integrations/github/connections`
+- `POST /v1/integrations/github/connections`
+- `PATCH /v1/integrations/github/connections/:id/credential`
+- `DELETE /v1/integrations/github/connections/:id`
+
 All routes:
 
 - require an authenticated active workspace;
 - derive the workspace exclusively from the server-side session;
 - require `integrations.manage` plus the `command-center` product entitlement;
-- operate only on provider `github`, kind `repository` normalized resources.
+- fail closed with `503 github_connection_store_unavailable` when the encrypted vault is not configured.
 
 Create accepts:
 
 ```json
 {
-  "projectId": "project-id",
-  "owner": "Emmakex",
-  "repository": "Kairoseth-Command-Center",
-  "defaultBranch": "main"
+  "displayName": "Primary GitHub",
+  "token": "<provider credential>"
 }
 ```
 
-`workspaceId`, user IDs and arbitrary repository URLs are not authorization or persistence inputs. The API validates owner/repository path components, creates a canonical lowercase `owner/repository` external ID, and constructs the GitHub URL server-side. `projectId` must resolve inside the authenticated workspace.
+The plaintext token is never part of a response. Public connection responses contain only:
 
-Repository identity is unique per workspace/provider/kind/external ID. A duplicate returns `409 github_repository_already_linked`. A project outside the authenticated workspace is indistinguishable from a missing project and returns `404 project_not_found`.
+```json
+{
+  "id": "connection-id",
+  "provider": "github",
+  "displayName": "Primary GitHub",
+  "status": "active",
+  "credentialConfigured": true,
+  "createdAt": "...",
+  "updatedAt": "..."
+}
+```
 
-Link/unlink state and audit-outbox events are committed in the same MongoDB transaction. Unlink queries include workspace scope and resource kind/provider, so a raw resource ID cannot cross tenant boundaries.
+`secretRef`, ciphertext, IV and authentication tag are internal-only fields. The domain `IntegrationConnection` stores a `secretRef`; encrypted secret material lives in the separate `integration_secrets` collection.
 
-This slice does not validate that a repository exists remotely. Live repository validation, credentials, sync and webhooks are separate connector slices.
+Credential encryption uses AES-256-GCM with a runtime-only `KCC_INTEGRATION_SECRET_KEY` (64 hexadecimal characters). Workspace ID and secret reference are authenticated as AAD. This prevents a ciphertext record copied under a different workspace/ref from being accepted during decryption.
+
+Credential rotation replaces the encrypted payload under the same secret reference and commits the audit-outbox record in the same MongoDB transaction. Connection deletion removes the connection and encrypted secret atomically. Deletion returns `409 github_connection_in_use` when an `ExternalResource.connectionId` still references that connection.
+
+Connection status `active` in this slice means configured/enabled locally; it does not yet assert that GitHub accepted the token. Live provider validation is a later slice.
 
 ## Transactional audit event delivery
 
@@ -148,7 +177,7 @@ Internal events should follow a normalized envelope:
 - `task.created|quick_captured|status_changed`
 - `alert.created|status_changed`
 - `decision.created|superseded|reversed`
-- `integration.connected|degraded|disconnected`
+- `integration.github.connected|credential_rotated|disconnected`
 - `integration.github.repository_linked|repository_unlinked`
 - `repository.sync.completed|failed`
 - `membership.created|updated|revoked`

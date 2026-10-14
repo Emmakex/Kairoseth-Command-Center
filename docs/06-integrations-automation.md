@@ -12,7 +12,7 @@ GitHub is implemented in small releaseable slices rather than one large connecto
 
 ### Slice 1 — repository registration/linking
 
-Current Phase 4 work establishes the normalized resource boundary without provider credentials or network calls:
+Merged and post-merge validated in PR #15:
 
 - workspace-only repository registration;
 - project ↔ repository linking;
@@ -25,12 +25,31 @@ Current Phase 4 work establishes the normalized resource boundary without provid
 
 The API never accepts a raw workspace/user ID as authorization scope and never persists an arbitrary repository URL supplied by a client.
 
+### Slice 2 — encrypted GitHub connections
+
+PR #16 introduces a credential boundary without making live GitHub calls yet:
+
+- workspace-scoped `IntegrationConnection` records;
+- token credentials encrypted with AES-256-GCM before persistence;
+- separate `integration_secrets` collection containing ciphertext, IV and authentication tag only;
+- `IntegrationConnection.secretRef` is the only credential reference stored in the domain record;
+- runtime-only `KCC_INTEGRATION_SECRET_KEY` master key (32 bytes / 64 hex characters);
+- workspace ID + secret reference used as authenticated additional data (AAD), preventing ciphertext rebinding across workspace/ref boundaries;
+- create/list/rotate/delete connection lifecycle;
+- transactional credential rotation/deletion and audit-outbox events;
+- deletion blocked while normalized external resources still reference the connection;
+- public API responses redact both plaintext credentials and `secretRef`.
+
+`KCC_INTEGRATION_SECRET_KEY` is optional for the core product. When absent, Projects/Tasks and metadata-only repository links continue to work, while credential-backed connection management fails closed with 503. Self-hosted operators therefore control their own provider-encryption key and do not depend on a Kairoseth credential service.
+
+A connection with status `active` in this slice means **configured/enabled locally**. It does not yet prove that GitHub accepts the credential or that any remote repository is reachable. Remote validation belongs to Slice 3.
+
 ### Later GitHub slices
 
-After the normalized repository boundary is merged and green:
+After the encrypted connection boundary is merged and green:
 
-1. Connection/authentication lifecycle (`IntegrationConnection`) with secret references only.
-2. Manual repository validation/sync.
+1. Live connection validation and manual repository sync.
+2. Bind normalized repository links to a validated connection.
 3. Default branch and latest commit normalization.
 4. Pull request counts/status.
 5. Issue counts/status.
@@ -77,14 +96,24 @@ externalId = lower(owner/repository)
 displayName = owner/repository
 url = server-generated https://github.com/<owner>/<repository>
 projectId = same-workspace project
+connectionId = optional until live validation/sync slice
 metadata.owner = validated owner
 metadata.repository = validated repository
 metadata.defaultBranch = optional hint until live sync exists
 ```
 
-The current link is configuration/metadata only. It does **not** prove that the remote repository exists or that the installation can access it; live validation belongs to the connection/sync slice.
+The current link is configuration/metadata only. It does **not** prove that the remote repository exists or that the installation can access it.
 
 Link and unlink mutations write the `external_resources` change and its audit-outbox event in the same MongoDB transaction.
+
+## Credential storage rules
+
+- Plaintext provider credentials exist only at the request boundary and transiently in application memory.
+- MongoDB stores encrypted payloads in `integration_secrets`, never plaintext credentials.
+- The encryption master key is runtime configuration, not a database/document field.
+- API serializers never expose `secretRef`, ciphertext, IV or auth tag.
+- Backup archives may contain encrypted secret records but must not contain the runtime master key.
+- Losing the master key makes stored integration credentials unreadable; rotation/recovery procedures must therefore preserve the key independently from data backups.
 
 ## Planned connectors
 
@@ -141,6 +170,7 @@ AI must not silently change permissions, delete external data, merge code, send 
 - Connection errors are visible in the UI.
 - A failing connector must not break core task/project functionality.
 - Repository-link administration remains usable even when live GitHub connectivity is unavailable.
+- Missing credential-vault configuration disables credential-backed connector actions rather than weakening encryption requirements.
 
 ## Customer portability
 

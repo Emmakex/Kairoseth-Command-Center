@@ -4,7 +4,7 @@
 **Technical/internal project:** Kairoseth Command Center  
 **Commercial names:** Gestor de Trabajo (ES) / Work Manager (EN)  
 **Category:** Kairoseth Software  
-**Status:** Phase 3 standalone release boundary is fully green on `main`. PR #15 starts the first GitHub integration slice with normalized repository ↔ project links.
+**Status:** Phase 3 is closed. Phase 4 Slice 1 (normalized GitHub repository links) is merged and post-merge green. PR #16 is the active Slice 2 front: encrypted GitHub connections and credential lifecycle.
 
 ## Naming rule / Regla de naming
 
@@ -40,13 +40,9 @@
 - [x] Scoped Timeline/audit UI.
 - [x] Validated Decision create/supersede/reverse lifecycle.
 - [x] Transactional audit outbox, idempotent Timeline delivery and worker processing.
-- [x] All current manual mutation families migrated to transactional audit delivery.
 - [x] Persistent standalone multi-user identities and password lifecycle.
-- [x] Route-level member denial, owner protection and stale-session invalidation.
 - [x] Production-oriented standalone Docker profile.
-- [x] Fail-closed runtime credentials/secrets.
 - [x] Backup + SHA-256 + guarded restore tooling.
-- [x] Standalone release smoke with backup/restore and post-restore authentication.
 - [x] PR #13 merged and post-merge validated.
 - [x] PR #14 merged as `c3d95397559ae0a6987601a5529bd502059fb270`.
 - [x] Post-merge `main` CI #96 green.
@@ -59,34 +55,58 @@
 
 ### Slice 1 — normalized repository links (PR #15)
 
-Implemented/in progress:
-
-- [x] Core normalized `IntegrationConnection` and `ExternalResource` contracts.
-- [x] GitHub repository links represented as workspace-scoped `ExternalResource` records.
+- [x] Normalized `IntegrationConnection` / `ExternalResource` domain contracts.
+- [x] Workspace-scoped GitHub repository links stored as `ExternalResource`.
 - [x] Canonical case-insensitive `owner/repository` external identity.
-- [x] Server-built GitHub deep link; arbitrary client `url` is not persisted.
-- [x] Same-workspace project validation before linking.
+- [x] Server-built GitHub deep link; arbitrary client URLs are not persisted.
+- [x] Same-workspace project validation.
 - [x] `integrations.manage` + `command-center` entitlement enforcement.
-- [x] Workspace derived only from authenticated session.
-- [x] Transactional repository link/unlink + audit-outbox event.
-- [x] Mongo indexes for workspace/project/resource identity.
-- [x] `GET /v1/integrations/github/repositories`.
-- [x] `POST /v1/integrations/github/repositories`.
-- [x] `DELETE /v1/integrations/github/repositories/:resourceId`.
-- [x] Negative tests for member denial, foreign project, workspace isolation, arbitrary URL, duplicates and path-like owner/repository input.
-- [x] Domain/integration/API documentation updated.
-- [ ] Final PR #15 CI/type/test/build/Docker quality gate.
+- [x] Workspace derived from authenticated session.
+- [x] Transactional link/unlink + audit outbox.
+- [x] Dedicated GitHub repository-links Docker smoke.
+- [x] PR #15 merged as `2c1219f4e0f6b7d568a1c0edb56026c1915ec121`.
+- [x] Post-merge CI #104 green.
+- [x] Post-merge Local identities smoke #30 green.
+- [x] Post-merge Standalone release gate #17 green.
+- [x] Post-merge GitHub repository links smoke #2 green.
+
+**Slice 1: CLOSED / CERRADA.**
+
+### Slice 2 — encrypted GitHub connections (PR #16)
+
+Implemented in the active branch:
+
+- [x] Optional runtime `KCC_INTEGRATION_SECRET_KEY` (32 bytes / 64 hex chars).
+- [x] AES-256-GCM encrypted secret vault in separate `integration_secrets` collection.
+- [x] Workspace ID + `secretRef` authenticated as AAD.
+- [x] Plaintext token never persisted in `IntegrationConnection`.
+- [x] `IntegrationConnection.secretRef` points to encrypted secret material only.
+- [x] Create/list/rotate/delete GitHub connection API.
+- [x] Public API redacts both token and `secretRef`; exposes `credentialConfigured` only.
+- [x] `integrations.manage` + product entitlement required.
+- [x] Missing vault key fails closed for connection management without breaking core Work Manager operation.
+- [x] Credential rotation updates ciphertext transactionally and audits the mutation.
+- [x] Connection delete removes encrypted secret transactionally.
+- [x] Delete refuses while an `ExternalResource.connectionId` still references the connection.
+- [x] Unit tests for capability denial, workspace derivation, response redaction and vault-unavailable behavior.
+- [x] AES-GCM tests prove workspace/ref ciphertext rebinding is rejected.
+- [x] Dedicated GitHub connection Docker smoke created.
+- [x] Standalone compose and `.env.standalone.example` support optional vault key.
+- [x] Integration/API documentation updated.
+- [ ] Final PR #16 CI/type/test/build/Docker gates.
 - [ ] Merge and post-merge validation.
 
-Deliberately deferred to later Phase 4 slices:
+Important semantic boundary: `status=active` currently means locally configured/enabled. It does **not** yet prove that GitHub accepted the credential.
 
-- [ ] GitHub App/OAuth/PAT connection lifecycle.
-- [ ] Secret reference configuration.
-- [ ] Live repository existence/access validation.
-- [ ] Manual sync and normalized default branch/latest commit.
+### Deferred Phase 4 slices
+
+- [ ] Slice 3: live GitHub credential validation + manual repository sync.
+- [ ] Bind repository resources to a validated connection.
+- [ ] Normalize default branch/latest commit.
 - [ ] PR/issue/workflow/release ingestion.
 - [ ] Verified GitHub webhooks.
 - [ ] GitHub-derived alerts and automation rules.
+- [ ] OAuth/GitHub App flow after the token-backed adapter boundary is proven.
 
 ## Security invariants
 
@@ -108,21 +128,26 @@ Deliberately deferred to later Phase 4 slices:
 16. GitHub repository links are workspace-only and validate project references in the same workspace.
 17. A raw external resource ID, repository name or client-supplied URL never grants cross-workspace access.
 18. GitHub link/unlink state and audit-outbox records commit atomically.
-19. Provider credentials are not introduced in the repository-link slice.
+19. Plaintext provider credentials are never persisted in domain documents or Mongo secret records.
+20. Integration ciphertext is AES-256-GCM authenticated against workspace + secret reference.
+21. The integration master key is runtime-only and must be stored separately from database backups.
+22. API responses never expose provider token, `secretRef`, ciphertext, IV or auth tag.
+23. Missing vault configuration disables credential-backed integration actions rather than weakening encryption.
+24. Credential rotation/deletion and corresponding audit records commit transactionally.
 
 ## Next / Siguiente
 
-1. Finish PR #15 validation and merge only when the complete quality gate is green.
-2. Verify `main` after merge.
-3. Implement the GitHub connection/authentication slice using secret references, not plaintext credentials.
-4. Add live repository validation/manual sync.
-5. Add normalized commit/PR/issue/workflow/release ingestion in separate slices.
+1. Finish PR #16 validation and merge only when all five gates are green.
+2. Verify the same gates on `main` after merge.
+3. Implement Slice 3: live GitHub credential validation and manual repository sync.
+4. Bind normalized repository resources to validated GitHub connections.
+5. Continue commit/PR/issue/workflow/release normalization in separate slices.
 6. When commercial publication is scheduled, create the Kairoseth Software catalog entry as **Gestor de Trabajo / Work Manager**.
 
 ## Current blockers / Bloqueos actuales
 
-No known product blocker. PR #15 is the active development front.
+No known product blocker. PR #16 is the active development front.
 
 ## Operating rule
 
-Update this file at meaningful milestones. Keep Phase 4 slices small; do not mix credentials, sync, webhooks and automation into the repository-link foundation.
+Update this file at meaningful milestones. Keep Phase 4 slices small; do not mix credential storage, live sync, webhook ingestion and automation rules in one PR.

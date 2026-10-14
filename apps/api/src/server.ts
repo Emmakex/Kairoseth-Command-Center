@@ -3,7 +3,9 @@ import { loadApiConfig } from '@kcc/config';
 import { MongoOperationalStore } from '@kcc/persistence';
 import { buildApp } from './application';
 import { MongoDecisionLifecycleStore } from './decision-lifecycle-store';
+import { MongoGitHubConnectionStore } from './github-connection-store';
 import { MongoGitHubRepositoryStore } from './github-repository-store';
+import { MongoEncryptedIntegrationSecretStore } from './integration-secret-store';
 import { MongoLocalIdentityStore } from './local-identity-store';
 import { MongoOperationalAuditStore } from './operational-audit-store';
 import { PersistentLocalAuthProvider } from './persistent-local-auth';
@@ -14,6 +16,12 @@ const operationalStore = new MongoOperationalStore(mongo.db());
 const operationalAuditStore = new MongoOperationalAuditStore(mongo, mongo.db());
 const decisionLifecycleStore = new MongoDecisionLifecycleStore(mongo, mongo.db());
 const githubRepositoryStore = new MongoGitHubRepositoryStore(mongo, mongo.db());
+const integrationSecretStore = config.KCC_INTEGRATION_SECRET_KEY
+  ? new MongoEncryptedIntegrationSecretStore(mongo.db(), config.KCC_INTEGRATION_SECRET_KEY)
+  : undefined;
+const githubConnectionStore = integrationSecretStore
+  ? new MongoGitHubConnectionStore(mongo, mongo.db(), integrationSecretStore)
+  : undefined;
 const localIdentityStore = new MongoLocalIdentityStore(mongo, mongo.db());
 let mongoReady = false;
 let localAuthProvider: PersistentLocalAuthProvider | undefined;
@@ -25,6 +33,7 @@ try {
     operationalStore.ensureIndexes(),
     decisionLifecycleStore.ensureIndexes(),
     githubRepositoryStore.ensureIndexes(),
+    ...(githubConnectionStore ? [githubConnectionStore.ensureIndexes()] : []),
   ]);
   mongoReady = true;
 
@@ -64,6 +73,7 @@ const app = buildApp({
   milestoneStore: operationalStore,
   decisionLifecycleStore,
   githubRepositoryStore,
+  ...(githubConnectionStore ? { githubConnectionStore } : {}),
   ...(localAuthProvider
     ? {
         authProvider: localAuthProvider,
@@ -90,6 +100,7 @@ const app = buildApp({
           : localAuthProvider || config.KCC_AUTH_MODE === 'external'
             ? 'ok'
             : 'error',
+      integrationSecrets: githubConnectionStore ? 'ok' : 'not_configured',
     };
   },
 });
