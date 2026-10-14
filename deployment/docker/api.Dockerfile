@@ -1,0 +1,19 @@
+FROM node:22-alpine
+
+RUN corepack enable
+WORKDIR /app
+
+COPY package.json pnpm-workspace.yaml tsconfig.base.json ./
+COPY apps/api/package.json apps/api/package.json
+COPY packages/config/package.json packages/config/package.json
+COPY packages/contracts/package.json packages/contracts/package.json
+RUN pnpm install --no-frozen-lockfile
+
+COPY apps/api apps/api
+COPY packages/config packages/config
+COPY packages/contracts packages/contracts
+
+RUN pnpm --filter @kcc/api... build
+
+EXPOSE 4000
+CMD ["pnpm", "--filter", "@kcc/api", "start"]
