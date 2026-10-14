@@ -28,8 +28,20 @@ This project follows semantic versioning once versioned releases begin.
 - Fastify `/health` and `/ready` endpoints with MongoDB readiness.
 - Background worker bootstrap and MongoDB heartbeat.
 - Docker Compose local stack and service Dockerfiles.
-- Base GitHub Actions CI with lint, typecheck, tests, build, dependency audit and secret scan.
+- Base GitHub Actions CI with lint, typecheck, tests, build, dependency audit, secret scan and Docker smoke validation.
+- `User`, `Workspace` and `Membership` domain entities.
+- Capability-based authorization with owner/admin/member presets and Kairoseth-only `platform_admin`.
+- Product entitlement checks.
+- Strict workspace/private scope authorization.
+- Portable Local and Kairoseth Identity auth provider contracts.
+- Protected `GET /v1/session` endpoint with server-side session resolution.
+- Cross-tenant, private-scope, membership-state and invalid-session negative tests.
 - Local development guide.
 
+### Security
+- Upgraded Vitest to a patched release after CI detected critical `tinypool` advisories.
+- Private user data remains inaccessible to workspace administrators unless the user is the owner of that private scope.
+- Role selection in the UI is explicitly non-authoritative; permissions are resolved server-side.
+
 ### Status
-Phase 1 implementation is in progress. The core shell has been scaffolded on `feat/phase-1-core-shell`; CI validation is required before the Phase 1 exit gate can be considered complete.
+Phase 1 is merged and validated. Phase 2 identity/workspace/authorization core is implemented on `feat/phase-2-identity-workspaces` and awaiting its PR quality gate.
