@@ -22,6 +22,14 @@ This project follows semantic versioning once versioned releases begin.
 - Commercial packaging.
 - Initial decision log.
 - Contribution and security documentation.
+- pnpm monorepo with `web`, `api` and `worker` applications.
+- Shared `domain`, `contracts`, `auth`, `integrations`, `config` and `ui` packages.
+- ES/EN web shell with `/es` and `/en` routes.
+- Fastify `/health` and `/ready` endpoints with MongoDB readiness.
+- Background worker bootstrap and MongoDB heartbeat.
+- Docker Compose local stack and service Dockerfiles.
+- Base GitHub Actions CI with lint, typecheck, tests, build, dependency audit and secret scan.
+- Local development guide.
 
 ### Status
-Implementation has not started yet. Phase 0 documentation foundation is in place.
+Phase 1 implementation is in progress. The core shell has been scaffolded on `feat/phase-1-core-shell`; CI validation is required before the Phase 1 exit gate can be considered complete.
