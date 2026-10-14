@@ -34,6 +34,8 @@ function eventAction(type: string, copy: DictionaryCopy): string {
     'milestone.created': copy.timelineMilestoneCreated,
     'milestone.status_changed': copy.timelineMilestoneChanged,
     'decision.created': copy.timelineDecisionCreated,
+    'decision.superseded': copy.timelineDecisionSuperseded,
+    'decision.reversed': copy.timelineDecisionReversed,
   };
   return actions[type] ?? copy.timelineUnknown;
 }
