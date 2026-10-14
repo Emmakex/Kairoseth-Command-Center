@@ -38,6 +38,8 @@ Suggested sections:
 - private reminders when enabled;
 - quick capture.
 
+The Phase 3 standalone surface composes Today from feature-level components rather than one monolithic page: Quick Capture, metrics, Projects/Tasks/Alerts, Milestones and the workspace Decision Log. The route page owns authentication, scope selection and data orchestration; feature components own their forms and presentation.
+
 ## Progressive disclosure
 
 Keep the first view operational and concise. Technical detail (raw integration metadata, event JSON, sync diagnostics) should live behind “details” or dedicated diagnostic screens.
@@ -54,6 +56,31 @@ A project summary should show:
 - next action;
 - last meaningful activity;
 - primary external source link.
+
+## Milestones / Hitos
+
+Milestones are scoped to the same workspace/private boundary as their project. The management surface should show:
+
+- parent project;
+- milestone title;
+- weight;
+- status (`planned`, `active`, `done`, `cancelled`);
+- due date when available.
+
+Creating or changing a weighted milestone can change project progress, so the UI must treat milestone status as an operational project-progress control rather than decorative metadata.
+
+## Decision Log / Registro de decisiones
+
+Decisions are **workspace-only**. They must never be stored in or presented as part of private scope.
+
+The initial manual-use surface supports creating and reading a decision with:
+
+- title;
+- optional context;
+- final decision text;
+- status and timestamp in the history list.
+
+Project association is intentionally not offered by the creation form until the API enforces same-workspace referential validation. Supersede/reverse actions are also deferred until the Decision lifecycle API is implemented so the UI cannot imply semantics the backend does not yet guarantee.
 
 ## Alert UX
 
@@ -75,6 +102,8 @@ A persistent `+ Capture` action should accept plain language and allow immediate
 
 Private items must have a clear private indicator. Shared/workspace items should show the active workspace/team. Users should never have to guess whether a reminder is visible to colleagues.
 
+The Decision Log is hidden/replaced by an explanatory workspace-only state in private view. Milestones remain available in private view only when their parent project is private.
+
 ## Role-aware interface
 
 Navigation is capability-driven. A member sees only authorized modules/actions. An owner/admin may see workspace administration. Kairoseth internal capabilities never appear solely because the user is an admin of a customer workspace.
@@ -89,6 +118,8 @@ Desktop-first for dense operations, fully responsive for tablet/mobile quick act
 - alerts;
 - project status;
 - reminders.
+
+Milestone and Decision forms collapse to one column on small screens, and mutation actions remain usable without horizontal scrolling.
 
 ## Accessibility
 
