@@ -1,0 +1,207 @@
+.management-grid {
+  display: grid;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.management-panel {
+  overflow: hidden;
+}
+
+.management-heading {
+  align-items: flex-start;
+}
+
+.management-heading > div {
+  min-width: 0;
+}
+
+.management-heading h2 {
+  margin-bottom: 6px;
+}
+
+.management-heading p {
+  max-width: 760px;
+  margin: 0;
+  color: #64748b;
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.management-form {
+  display: grid;
+  gap: 12px;
+  align-items: end;
+  margin: 18px 0 12px;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #f8fafc;
+}
+
+.milestone-create-form {
+  grid-template-columns: minmax(180px, 0.9fr) minmax(220px, 1.5fr) 130px auto;
+}
+
+.decision-create-form {
+  grid-template-columns: minmax(180px, 0.8fr) minmax(240px, 1.2fr) minmax(260px, 1.4fr) minmax(260px, 1.4fr);
+}
+
+.decision-submit {
+  grid-column: 4;
+  justify-self: end;
+  min-width: 150px;
+  padding: 0 18px;
+}
+
+.management-list {
+  margin-top: 8px;
+}
+
+.milestone-operation {
+  grid-template-columns: minmax(130px, 1fr) auto;
+  flex-basis: 300px;
+}
+
+.decision-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.decision-card {
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #ffffff;
+}
+
+.decision-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.decision-card-heading > div {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.decision-card-heading strong {
+  overflow-wrap: anywhere;
+}
+
+.decision-card-heading div > span {
+  color: #64748b;
+  font-size: 0.8rem;
+}
+
+.decision-status {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #eef2f7;
+  color: #475569;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.decision-status-active {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.decision-status-superseded,
+.decision-status-reversed {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.decision-context,
+.decision-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.decision-context {
+  margin: 14px 0 8px;
+  color: #64748b;
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.decision-body {
+  margin: 8px 0 0;
+  color: #1e293b;
+  font-size: 0.94rem;
+  font-weight: 650;
+  line-height: 1.55;
+}
+
+.workspace-only-panel .empty-state {
+  padding-top: 6px;
+  max-width: 720px;
+}
+
+@media (max-width: 1180px) {
+  .milestone-create-form {
+    grid-template-columns: 1fr 1fr 130px auto;
+  }
+
+  .decision-create-form {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .decision-context-field,
+  .decision-body-field {
+    grid-column: span 1;
+  }
+
+  .decision-submit {
+    grid-column: 2;
+  }
+}
+
+@media (max-width: 760px) {
+  .milestone-create-form,
+  .decision-create-form {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .management-title-field,
+  .decision-context-field,
+  .decision-body-field {
+    grid-column: 1 / -1;
+  }
+
+  .decision-submit {
+    grid-column: 2;
+  }
+}
+
+@media (max-width: 520px) {
+  .management-form,
+  .milestone-create-form,
+  .decision-create-form {
+    grid-template-columns: 1fr;
+  }
+
+  .management-title-field,
+  .decision-context-field,
+  .decision-body-field,
+  .decision-submit {
+    grid-column: auto;
+  }
+
+  .decision-submit,
+  .management-form button {
+    width: 100%;
+  }
+
+  .decision-card-heading {
+    flex-direction: column;
+  }
+}
