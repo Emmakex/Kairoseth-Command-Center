@@ -38,7 +38,25 @@ The validated manual lifecycle is workspace-only and derives the workspace from 
 
 Project references are resolved server-side inside the authenticated workspace. `supersedesId` must identify an active same-workspace decision. Lifecycle updates use conditional `active` transitions so repeated or racing terminal transitions fail rather than silently overwriting history.
 
-The older `/v1/decisions` create route remains a compatibility surface during Phase 3 cleanup. New managed clients must use the lifecycle route for project-linked, superseding or reversing operations. Transaction/outbox hardening remains required before Phase 3 closes so multi-write Decision + Timeline operations become atomic/recoverable.
+Decision lifecycle mutations are transactionally audited: Decision state changes and durable audit-outbox records are committed in the same MongoDB transaction. The worker later materializes those events in `timeline_events` idempotently. A successful API mutation therefore cannot commit without also persisting the audit work needed to reconstruct its Timeline activity.
+
+The older `/v1/decisions` create route remains a compatibility surface for simple unlinked decisions. It rejects `projectId` and `supersedesId`; managed clients must use the lifecycle route for project-linked, superseding or reversing operations.
+
+Project, Task, Alert, Quick Capture and Milestone mutation families still need migration to the same transactional audit pattern before Phase 3 audit hardening is complete.
+
+## Transactional audit event delivery
+
+`audit_outbox` is an internal persistence contract, not a browser API. Each record contains a fully normalized Timeline event with a stable event ID plus delivery state (`pending`, `processing`, `delivered`, `failed`).
+
+The worker:
+
+1. recovers stale processing leases;
+2. claims pending records atomically;
+3. upserts the Timeline event by event ID;
+4. marks the outbox record delivered only after successful Timeline persistence;
+5. retries failures with bounded backoff.
+
+This means duplicate worker execution is safe and worker interruption does not lose a committed audit event.
 
 ## Error envelope
 
