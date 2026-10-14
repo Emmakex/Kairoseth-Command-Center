@@ -1,14 +1,17 @@
 # Project status / Estado del proyecto
 
 **Current phase:** Phase 3 — Operational core  
-**Product:** Kairoseth Command Center  
+**Technical/internal project:** Kairoseth Command Center  
+**Reserved commercial names:** Gestor de Trabajo (ES) / Work Manager (EN)  
 **Category:** Kairoseth Software  
-**Status:** PR #11 merged; post-merge main CI #57 green. PR #12 is migrating the remaining manual mutation families to the transactional audit outbox pattern.
+**Status:** PR #12 merged; post-merge `main` CI #64 green. PR #13 is the final major Phase 3 functional slice: persistent standalone multi-user identities and password lifecycle.
 
 ## Completed / Completado
 
 ### Phase 0 — Foundation
 - [x] Product, architecture, portability, tenancy, security and commercial model documented.
+- [x] Commercial naming rule documented: product names do not use `Kairoseth` as a prefix; ES/EN names are defined independently.
+- [x] Reserved commercial names: **Gestor de Trabajo** (ES) / **Work Manager** (EN).
 
 ### Phase 1 — Core shell
 - [x] Portable monorepo, web/API/worker, ES/EN, Docker and CI baseline.
@@ -71,17 +74,34 @@
 - [x] CI verifies replica-set readiness and real Decision lifecycle outbox-to-Timeline delivery.
 - [x] PR #11 merged; post-merge main CI #57 green.
 
-### Phase 3 — operational transactional audit migration in progress
-- [x] Atomic store implemented for Project create/status and Quick Capture project.
-- [x] Atomic store implemented for Task create/status and Quick Capture task.
-- [x] Atomic store implemented for Alert create/status.
-- [x] Atomic store implemented for simple compatibility Decision creation.
-- [x] Atomic store implemented for Milestone create/status with project progress recalculation inside the transaction.
+### Phase 3 — operational transactional audit migration
+- [x] Atomic store for Project create/status and Quick Capture project.
+- [x] Atomic store for Task create/status and Quick Capture task.
+- [x] Atomic store for Alert create/status.
+- [x] Atomic store for simple compatibility Decision creation.
+- [x] Atomic store for Milestone create/status with project progress recalculation inside the transaction.
 - [x] Existing public URLs and response shapes retained through a fixed allowlisted pre-handler.
-- [x] Tests prove the legacy mutation handlers do not execute after an atomic interception.
-- [x] Tests cover private Quick Capture, Milestone hook ordering, Decision compatibility precedence and capability denial.
-- [x] CI Docker smoke now verifies workspace Decision plus private Quick Capture delivery through the worker/outbox path.
-- [ ] PR #12 final quality gate and merge.
+- [x] Tests prove legacy mutation handlers do not execute after an atomic interception.
+- [x] CI Docker smoke verifies workspace Decision plus private Quick Capture delivery through the worker/outbox path.
+- [x] PR #12 merged; post-merge main CI #64 green.
+
+### Phase 3 — persistent standalone multi-user identities (PR #13)
+- [x] Mongo-backed `users`, `workspaces`, `memberships` and separate `local_credentials`.
+- [x] Unique normalized identity/membership/credential indexes.
+- [x] `scrypt-v1` password derivation with random salt; no plaintext password persistence.
+- [x] HMAC local session token v2 includes password version and resolves persisted User + Workspace + Membership on every request.
+- [x] Bootstrap owner persists only when the credential store is empty; restart does not recreate the owner.
+- [x] `admin` / `member` managed roles; owner protected from management mutations.
+- [x] Member-management API protected by `members.manage`.
+- [x] Password change/reset increments password version and invalidates all older bearer sessions immediately.
+- [x] Membership/password lifecycle changes are audited through the transactional outbox.
+- [x] ES/EN account/password and member-management UI with fixed same-product proxy.
+- [x] Unit/integration tests cover restart persistence, role capabilities, reset/change invalidation, suspension, route-level member denial and owner protection.
+- [x] Reusable Docker smoke covers owner bootstrap/login → create member → member login → permission denial → owner protection → password change → old-session invalidation → renewed login.
+- [x] Dedicated `Local identities smoke` GitHub Actions gate runs the Docker lifecycle independently of the transactional-audit smoke.
+- [x] Auth/security/operations documentation synchronized.
+- [ ] Final PR #13 CI + dedicated multi-user Docker smoke green on the final head.
+- [ ] Merge PR #13 and verify post-merge `main` gates.
 
 ## Validation / Validación
 
@@ -91,13 +111,14 @@
 - [x] PR #9 — full gate green; main CI #42 green.
 - [x] PR #10 — full gate green; main CI #49 green.
 - [x] PR #11 — full gate green; main CI #57 green, including transactional Decision audit smoke.
-- [ ] PR #12 — final head under validation; lint/typecheck/tests/build/audit/secrets green on CI #60, Docker smoke pending.
+- [x] PR #12 — merged; post-merge main CI #64 green, including workspace/private transactional outbox smoke.
+- [ ] PR #13 — final full gate and dedicated multi-user Docker smoke must be green before merge.
 
 ## Phase 3 still pending / Pendiente de la fase 3
 
-- [ ] Merge and post-merge validate PR #12 so all current manual operational mutation families use atomic audit delivery.
-- [ ] Persistent multi-user local identities and password lifecycle beyond the single-owner bootstrap.
-- [ ] Final standalone end-to-end release gate and Kairoseth Software publication readiness.
+- [ ] Merge and post-merge validate PR #13.
+- [ ] Run the final standalone Phase 3 end-to-end release gate across the merged `main` state.
+- [ ] Prepare publication readiness under Kairoseth Software using the commercial names **Gestor de Trabajo / Work Manager**.
 
 ## Security invariants
 
@@ -117,17 +138,23 @@
 14. Outbox delivery to Timeline is idempotent and safe to retry after worker interruption.
 15. Atomic route interception preserves existing authorization/scope validation and prevents the legacy mutation handler from executing a second write.
 16. Timeline presentation follows the same workspace/private scope and hides raw technical metadata from the main dashboard.
+17. Standalone passwords are never persisted in plaintext; local credentials store `scrypt-v1` derived material with random salt.
+18. Persistent local sessions are revalidated against current user/workspace/membership/credential state on every request.
+19. Password change/reset increments password version and invalidates every older local bearer token immediately.
+20. Normal members cannot administer workspace identities; `members.manage` is required.
+21. The standalone owner cannot be demoted/disabled or password-reset through member-management routes.
 
 ## Next / Siguiente
 
-1. Finish PR #12 Docker smoke, merge it and verify post-merge `main` CI.
-2. Implement persistent multi-user local identities and password lifecycle.
-3. Run the final standalone Phase 3 end-to-end release gate.
-4. Publish Command Center under Kairoseth Software and begin Phase 4 GitHub integration.
+1. Finish the final PR #13 quality gates and dedicated multi-user Docker smoke.
+2. Merge PR #13 and verify both workflows on `main`.
+3. Execute the final standalone Phase 3 end-to-end release gate.
+4. Prepare **Gestor de Trabajo / Work Manager** for publication under Kairoseth Software.
+5. Begin Phase 4 GitHub integration after the standalone release boundary is clean.
 
 ## Current blockers / Bloqueos actuales
 
-None documented. PR #12 is under final CI validation.
+No functional blocker documented. PR #13 is waiting only on its final automated quality gates before merge.
 
 ## Operating rule
 
