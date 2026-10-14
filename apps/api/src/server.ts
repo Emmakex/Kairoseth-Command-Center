@@ -8,13 +8,13 @@ import { StandaloneLocalAuthProvider } from './local-auth';
 const config = loadApiConfig();
 const mongo = new MongoClient(config.MONGODB_URI, { serverSelectionTimeoutMS: 3000 });
 const operationalStore = new MongoOperationalStore(mongo.db());
-const decisionLifecycleStore = new MongoDecisionLifecycleStore(mongo.db());
+const decisionLifecycleStore = new MongoDecisionLifecycleStore(mongo, mongo.db());
 let mongoReady = false;
 
 try {
   await mongo.connect();
   await mongo.db().command({ ping: 1 });
-  await operationalStore.ensureIndexes();
+  await Promise.all([operationalStore.ensureIndexes(), decisionLifecycleStore.ensureIndexes()]);
   mongoReady = true;
 } catch (error) {
   console.error('MongoDB is not ready; API will stay alive but readiness will fail.', error);
