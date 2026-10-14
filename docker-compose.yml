@@ -1,0 +1,55 @@
+services:
+  mongo:
+    image: mongo:8.0
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - kcc-mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: deployment/docker/api.Dockerfile
+    environment:
+      NODE_ENV: development
+      KCC_API_HOST: 0.0.0.0
+      KCC_API_PORT: 4000
+      MONGODB_URI: mongodb://mongo:27017/kairoseth_command_center
+    ports:
+      - "4000:4000"
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      dockerfile: deployment/docker/worker.Dockerfile
+    environment:
+      NODE_ENV: development
+      KCC_WORKER_POLL_MS: 30000
+      MONGODB_URI: mongodb://mongo:27017/kairoseth_command_center
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: deployment/docker/web.Dockerfile
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:4000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+volumes:
+  kcc-mongo-data:
