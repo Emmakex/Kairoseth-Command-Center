@@ -32,12 +32,19 @@ Personal/private objects require owner-user authorization. A workspace owner/adm
 - Short-lived access/session strategy with revocation support.
 - Brute-force/rate-limit protections.
 - MFA/SSO compatibility.
+- Standalone passwords are stored only as `scrypt-v1` derived material with random per-password salt; plaintext passwords are never persisted.
+- Persistent local tokens carry a password version and every request re-resolves the current persisted identity/membership state.
+- Password change or administrative reset increments the credential password version, immediately invalidating all previously issued tokens for that user.
+- Suspended/disabled users and inactive memberships/workspaces cannot resolve a valid session.
 
 ### Authorization
 - Deny by default.
 - Capability checks on server actions.
 - Platform-admin privileges never inferred from customer-admin roles.
 - Product entitlement and role are separate checks.
+- Standalone member administration requires `members.manage`.
+- Managed users can be assigned only `admin` or `member`; the standalone `owner` cannot be demoted, disabled or have their password reset through member-management routes.
+- Route-level negative tests must prove a regular `member` cannot use member-management endpoints.
 
 ### Webhooks
 - Signature/token verification.
@@ -51,18 +58,21 @@ Only ingest provider data needed for the enabled feature. Prefer metadata and de
 
 ## Logging & privacy
 
-Operational logs should use IDs and structured metadata instead of sensitive content when possible. Private task/reminder bodies should not be written to general application logs.
+Operational logs should use IDs and structured metadata instead of sensitive content when possible. Private task/reminder bodies should not be written to general application logs. Authentication logs must never include passwords, bearer tokens, password hashes or password salts.
 
 ## Audit trail
 
 Audit at minimum:
 
-- membership/role changes;
+- membership/role/status changes;
+- local password change/reset lifecycle events without exposing password material;
 - entitlement changes;
 - integration connect/disconnect;
 - secret rotation events without exposing secret value;
 - exports/deletions;
 - security-sensitive configuration changes.
+
+Standalone membership/password lifecycle changes use the same transactional audit outbox as other hardened operational mutations so the identity state change and its audit record are committed atomically.
 
 ## Customer deployment
 
@@ -77,6 +87,8 @@ Before stable release:
 - SAST/lint/security checks in CI;
 - secret scanning;
 - authorization integration tests;
+- persistent local-identity lifecycle tests;
+- Docker smoke for owner bootstrap, member creation/login, permission denial and password-change session invalidation;
 - webhook verification tests;
 - dependency update policy;
 - vulnerability reporting process in `SECURITY.md`.
