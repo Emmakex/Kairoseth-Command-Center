@@ -94,16 +94,31 @@ export function parseOperationalMutation(form: FormData): OperationalMutation | 
     const title = requiredText(form.get('title'), 240);
     const decision = requiredText(form.get('decision'), 8000);
     const context = optionalText(form.get('context'), 8000);
-    if (!title || !decision || context === null) return null;
+    const projectId = optionalText(form.get('projectId'), 100);
+    const supersedesId = optionalText(form.get('supersedesId'), 100);
+    if (!title || !decision || context === null || projectId === null || supersedesId === null) return null;
 
     const body: Record<string, string | number> = { scope, title, decision };
     if (context) body.context = context;
-    return { path: '/v1/decisions', method: 'POST', body };
+    if (projectId) body.projectId = projectId;
+    if (supersedesId) body.supersedesId = supersedesId;
+    return { path: '/v1/decision-lifecycle', method: 'POST', body };
   }
 
   const id = requiredText(form.get('id'), 100);
   if (!id) return null;
   const encodedId = encodeURIComponent(id);
+
+  if (operation === 'decision-reverse') {
+    if (scope !== 'workspace') return null;
+    const reason = requiredText(form.get('reason'), 4000);
+    if (!reason) return null;
+    return {
+      path: `/v1/decision-lifecycle/${encodedId}/reverse`,
+      method: 'PATCH',
+      body: { scope, reason },
+    };
+  }
 
   if (operation === 'project-status') {
     const status = enumValue(form.get('status'), PROJECT_STATUSES);
