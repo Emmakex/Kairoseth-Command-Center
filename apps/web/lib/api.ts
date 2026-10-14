@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 
 export const SESSION_COOKIE = 'kcc_session';
 
-type SessionResponse = {
+export type SessionResponse = {
   user: {
     id: string;
     email: string;
@@ -17,7 +17,7 @@ type SessionResponse = {
   productEntitlements: string[];
 };
 
-type ProjectSummary = {
+export type ProjectSummary = {
   id: string;
   name: string;
   status: string;
@@ -25,7 +25,7 @@ type ProjectSummary = {
   dueAt?: string;
 };
 
-type TaskSummary = {
+export type TaskSummary = {
   id: string;
   title: string;
   status: string;
@@ -33,12 +33,33 @@ type TaskSummary = {
   dueAt?: string;
 };
 
-type AlertSummary = {
+export type AlertSummary = {
   id: string;
   title: string;
   status: string;
   severity: string;
   message?: string;
+};
+
+export type MilestoneSummary = {
+  id: string;
+  projectId: string;
+  title: string;
+  status: 'planned' | 'active' | 'done' | 'cancelled';
+  weight: number;
+  dueAt?: string;
+};
+
+export type DecisionSummary = {
+  id: string;
+  projectId?: string;
+  title: string;
+  context?: string;
+  decision: string;
+  status: 'active' | 'superseded' | 'reversed';
+  madeBy: string;
+  madeAt: string;
+  supersedesId?: string;
 };
 
 export type TodayResponse = {
@@ -56,6 +77,9 @@ export type TodayResponse = {
   tasks: TaskSummary[];
   alerts: AlertSummary[];
 };
+
+export type MilestonesResponse = { milestones: MilestoneSummary[] };
+export type DecisionsResponse = { decisions: DecisionSummary[] };
 
 export function apiBaseUrl(): string {
   return (
@@ -75,6 +99,7 @@ async function authenticatedGet<T>(path: string, token: string): Promise<T | nul
     const response = await fetch(`${apiBaseUrl()}${path}`, {
       headers: { authorization: `Bearer ${token}` },
       cache: 'no-store',
+      signal: AbortSignal.timeout(6000),
     });
     if (!response.ok) return null;
     return (await response.json()) as T;
@@ -92,4 +117,17 @@ export function getToday(
   scope: 'workspace' | 'private',
 ): Promise<TodayResponse | null> {
   return authenticatedGet<TodayResponse>(`/v1/today?scope=${scope}`, token);
+}
+
+export async function getMilestones(
+  token: string,
+  scope: 'workspace' | 'private',
+): Promise<MilestoneSummary[] | null> {
+  const response = await authenticatedGet<MilestonesResponse>(`/v1/milestones?scope=${scope}`, token);
+  return response?.milestones ?? null;
+}
+
+export async function getDecisions(token: string): Promise<DecisionSummary[] | null> {
+  const response = await authenticatedGet<DecisionsResponse>('/v1/decisions', token);
+  return response?.decisions ?? null;
 }
