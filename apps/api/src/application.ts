@@ -40,7 +40,6 @@ export function buildApp(options: ApplicationOptions = {}) {
 
   registerDecisionLifecycleRoutes(app, {
     ...(options.authProvider ? { authProvider: options.authProvider } : {}),
-    ...(options.operationalStore ? { operationalStore: options.operationalStore } : {}),
     ...(options.decisionLifecycleStore
       ? { decisionLifecycleStore: options.decisionLifecycleStore }
       : {}),
