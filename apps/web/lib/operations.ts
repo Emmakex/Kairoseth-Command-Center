@@ -102,7 +102,7 @@ export function parseOperationalMutation(form: FormData): OperationalMutation | 
     if (context) body.context = context;
     if (projectId) body.projectId = projectId;
     if (supersedesId) body.supersedesId = supersedesId;
-    return { path: '/v1/decisions', method: 'POST', body };
+    return { path: '/v1/decision-lifecycle', method: 'POST', body };
   }
 
   const id = requiredText(form.get('id'), 100);
@@ -114,7 +114,7 @@ export function parseOperationalMutation(form: FormData): OperationalMutation | 
     const reason = requiredText(form.get('reason'), 4000);
     if (!reason) return null;
     return {
-      path: `/v1/decisions/${encodedId}/reverse`,
+      path: `/v1/decision-lifecycle/${encodedId}/reverse`,
       method: 'PATCH',
       body: { scope, reason },
     };
