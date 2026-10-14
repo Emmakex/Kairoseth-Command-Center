@@ -6,7 +6,9 @@ import { registerDecisionCompatibilityGuard } from './decision-compatibility';
 import { registerDecisionLifecycleRoutes } from './decisions';
 import type { DecisionLifecycleStore } from './decision-lifecycle-store';
 import { registerStandaloneAuthRoutes } from './local-auth';
-import type { StandaloneLocalAuthProvider } from './local-auth';
+import type { LocalLoginProvider } from './local-auth';
+import { registerLocalIdentityRoutes } from './local-identity-routes';
+import type { PersistentLocalAuthProvider } from './persistent-local-auth';
 import { registerMilestoneRoutes } from './milestones';
 import { registerOperationalAuditRoutes } from './operational-audit-routes';
 import type { OperationalAuditStore } from './operational-audit-store';
@@ -15,7 +17,8 @@ type ApplicationOptions = {
   readinessCheck?: ReadinessCheck;
   logger?: boolean;
   authProvider?: AuthProvider;
-  standaloneAuthProvider?: StandaloneLocalAuthProvider;
+  standaloneAuthProvider?: LocalLoginProvider;
+  localIdentityProvider?: PersistentLocalAuthProvider;
   operationalStore?: OperationalStore;
   milestoneStore?: MilestoneStore;
   decisionLifecycleStore?: DecisionLifecycleStore;
@@ -38,6 +41,12 @@ export function buildApp(options: ApplicationOptions = {}) {
 
   if (options.standaloneAuthProvider) {
     registerStandaloneAuthRoutes(app, options.standaloneAuthProvider);
+  }
+  if (options.localIdentityProvider) {
+    registerLocalIdentityRoutes(app, {
+      ...(options.authProvider ? { authProvider: options.authProvider } : {}),
+      identityProvider: options.localIdentityProvider,
+    });
   }
 
   registerMilestoneRoutes(app, {
