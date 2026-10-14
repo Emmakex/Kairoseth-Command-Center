@@ -39,6 +39,7 @@ services:
       KCC_LOCAL_WORKSPACE_NAME: ${KCC_LOCAL_WORKSPACE_NAME:-Work Manager}
       KCC_LOCAL_SESSION_TTL_SECONDS: ${KCC_LOCAL_SESSION_TTL_SECONDS:-43200}
       KCC_INTEGRATION_SECRET_KEY: ${KCC_INTEGRATION_SECRET_KEY:-}
+      KCC_GITHUB_API_BASE_URL: ${KCC_GITHUB_API_BASE_URL:-https://api.github.com}
     depends_on:
       mongo:
         condition: service_healthy
