@@ -2,15 +2,20 @@ services:
   mongo:
     image: mongo:8.0
     restart: unless-stopped
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
     ports:
       - "27017:27017"
     volumes:
       - kcc-mongo-data:/data/db
     healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
-      interval: 10s
+      test:
+        [
+          "CMD-SHELL",
+          "mongosh --quiet --eval \"try { print(rs.status().ok) } catch (e) { print(rs.initiate({_id:'rs0',members:[{_id:0,host:'mongo:27017'}]}).ok) }\" | grep 1",
+        ]
+      interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 20
 
   api:
     build:
@@ -20,7 +25,7 @@ services:
       NODE_ENV: development
       KCC_API_HOST: 0.0.0.0
       KCC_API_PORT: 4000
-      MONGODB_URI: mongodb://mongo:27017/kairoseth_command_center
+      MONGODB_URI: mongodb://mongo:27017/kairoseth_command_center?replicaSet=rs0&directConnection=true
       KCC_AUTH_MODE: ${KCC_AUTH_MODE:-disabled}
       KCC_LOCAL_ADMIN_EMAIL: ${KCC_LOCAL_ADMIN_EMAIL:-admin@kcc.local}
       KCC_LOCAL_ADMIN_PASSWORD: ${KCC_LOCAL_ADMIN_PASSWORD:-}
@@ -44,8 +49,8 @@ services:
       dockerfile: deployment/docker/worker.Dockerfile
     environment:
       NODE_ENV: development
-      KCC_WORKER_POLL_MS: 30000
-      MONGODB_URI: mongodb://mongo:27017/kairoseth_command_center
+      KCC_WORKER_POLL_MS: 5000
+      MONGODB_URI: mongodb://mongo:27017/kairoseth_command_center?replicaSet=rs0&directConnection=true
     depends_on:
       mongo:
         condition: service_healthy
