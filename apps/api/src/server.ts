@@ -2,11 +2,13 @@ import { MongoClient } from 'mongodb';
 import { loadApiConfig } from '@kcc/config';
 import { MongoOperationalStore } from '@kcc/persistence';
 import { buildApp } from './application';
+import { MongoDecisionLifecycleStore } from './decision-lifecycle-store';
 import { StandaloneLocalAuthProvider } from './local-auth';
 
 const config = loadApiConfig();
 const mongo = new MongoClient(config.MONGODB_URI, { serverSelectionTimeoutMS: 3000 });
 const operationalStore = new MongoOperationalStore(mongo.db());
+const decisionLifecycleStore = new MongoDecisionLifecycleStore(mongo.db());
 let mongoReady = false;
 
 try {
@@ -44,6 +46,7 @@ const app = buildApp({
   logger: true,
   operationalStore,
   milestoneStore: operationalStore,
+  decisionLifecycleStore,
   ...(standaloneAuthProvider
     ? {
         authProvider: standaloneAuthProvider,
