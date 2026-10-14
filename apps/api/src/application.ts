@@ -2,6 +2,7 @@ import type { AuthProvider } from '@kcc/auth';
 import type { MilestoneStore, OperationalStore } from '@kcc/persistence';
 import { buildApp as buildBaseApp } from './app';
 import type { ReadinessCheck } from './app';
+import { registerDecisionCompatibilityGuard } from './decision-compatibility';
 import { registerDecisionLifecycleRoutes } from './decisions';
 import type { DecisionLifecycleStore } from './decision-lifecycle-store';
 import { registerStandaloneAuthRoutes } from './local-auth';
@@ -25,6 +26,8 @@ export function buildApp(options: ApplicationOptions = {}) {
     ...(options.authProvider ? { authProvider: options.authProvider } : {}),
     ...(options.operationalStore ? { operationalStore: options.operationalStore } : {}),
   });
+
+  registerDecisionCompatibilityGuard(app);
 
   if (options.standaloneAuthProvider) {
     registerStandaloneAuthRoutes(app, options.standaloneAuthProvider);
