@@ -71,13 +71,13 @@ describe('parseOperationalMutation', () => {
     });
   });
 
-  it('builds workspace decision creation and rejects decisions in private scope', () => {
+  it('builds workspace decision creation, strips project references and rejects private decisions', () => {
     expect(
       parseOperationalMutation(
         form({
           operation: 'decision-create',
           scope: 'workspace',
-          projectId: 'project-1',
+          projectId: 'unvalidated-project-reference',
           title: 'Launch path',
           context: 'We need one deployment model for v1.',
           decision: 'Ship standalone first.',
@@ -88,7 +88,6 @@ describe('parseOperationalMutation', () => {
       method: 'POST',
       body: {
         scope: 'workspace',
-        projectId: 'project-1',
         title: 'Launch path',
         context: 'We need one deployment model for v1.',
         decision: 'Ship standalone first.',
