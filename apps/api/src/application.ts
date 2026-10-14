@@ -7,6 +7,7 @@ import { registerDecisionLifecycleRoutes } from './decisions';
 import type { DecisionLifecycleStore } from './decision-lifecycle-store';
 import { registerGitHubConnectionRoutes } from './github-connections';
 import type { GitHubConnectionStore } from './github-connection-store';
+import type { GitHubProviderClient } from './github-provider-client';
 import { registerGitHubRepositoryRoutes } from './github-repositories';
 import type { GitHubRepositoryStore } from './github-repository-store';
 import { registerStandaloneAuthRoutes } from './local-auth';
@@ -29,6 +30,7 @@ type ApplicationOptions = {
   operationalAuditStore?: OperationalAuditStore;
   githubRepositoryStore?: GitHubRepositoryStore;
   githubConnectionStore?: GitHubConnectionStore;
+  githubProviderClient?: GitHubProviderClient;
 };
 
 export function buildApp(options: ApplicationOptions = {}) {
@@ -72,12 +74,21 @@ export function buildApp(options: ApplicationOptions = {}) {
     ...(options.githubRepositoryStore
       ? { githubRepositoryStore: options.githubRepositoryStore }
       : {}),
+    ...(options.githubConnectionStore
+      ? { githubConnectionStore: options.githubConnectionStore }
+      : {}),
+    ...(options.githubProviderClient
+      ? { githubProviderClient: options.githubProviderClient }
+      : {}),
   });
 
   registerGitHubConnectionRoutes(app, {
     ...(options.authProvider ? { authProvider: options.authProvider } : {}),
     ...(options.githubConnectionStore
       ? { githubConnectionStore: options.githubConnectionStore }
+      : {}),
+    ...(options.githubProviderClient
+      ? { githubProviderClient: options.githubProviderClient }
       : {}),
   });
 
