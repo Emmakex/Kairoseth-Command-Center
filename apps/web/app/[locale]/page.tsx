@@ -45,6 +45,12 @@ export default async function CommandCenterPage({
     resolved: copy.statusResolved,
     dismissed: copy.statusDismissed,
   };
+  const severityLabels: Record<string, string> = {
+    info: copy.severityInfo,
+    warning: copy.severityWarning,
+    urgent: copy.severityUrgent,
+    critical: copy.severityCritical,
+  };
   const resultMessages: Record<string, string> = {
     saved: copy.actionSaved,
     invalid: copy.actionInvalid,
@@ -270,7 +276,9 @@ export default async function CommandCenterPage({
                   <div className="item-copy alert-copy">
                     <div className="alert-title-row">
                       <strong>{alert.title}</strong>
-                      <span className={`severity severity-${alert.severity}`}>{alert.severity}</span>
+                      <span className={`severity severity-${alert.severity}`}>
+                        {severityLabels[alert.severity] ?? alert.severity}
+                      </span>
                     </div>
                     <span>{alert.message ?? statusLabels[alert.status] ?? alert.status}</span>
                   </div>
