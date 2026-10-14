@@ -2,6 +2,7 @@ import type { AuthProvider } from '@kcc/auth';
 import type { MilestoneStore, OperationalStore } from '@kcc/persistence';
 import { buildApp as buildBaseApp } from './app';
 import type { ReadinessCheck } from './app';
+import type { DecisionLifecycleStore } from './decision-lifecycle-store';
 import { registerStandaloneAuthRoutes } from './local-auth';
 import type { StandaloneLocalAuthProvider } from './local-auth';
 import { registerMilestoneRoutes } from './milestones';
@@ -13,6 +14,7 @@ type ApplicationOptions = {
   standaloneAuthProvider?: StandaloneLocalAuthProvider;
   operationalStore?: OperationalStore;
   milestoneStore?: MilestoneStore;
+  decisionLifecycleStore?: DecisionLifecycleStore;
 };
 
 export function buildApp(options: ApplicationOptions = {}) {
@@ -21,6 +23,9 @@ export function buildApp(options: ApplicationOptions = {}) {
     ...(options.logger !== undefined ? { logger: options.logger } : {}),
     ...(options.authProvider ? { authProvider: options.authProvider } : {}),
     ...(options.operationalStore ? { operationalStore: options.operationalStore } : {}),
+    ...(options.decisionLifecycleStore
+      ? { decisionLifecycleStore: options.decisionLifecycleStore }
+      : {}),
   });
 
   if (options.standaloneAuthProvider) {
