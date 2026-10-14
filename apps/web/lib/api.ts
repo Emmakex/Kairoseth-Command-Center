@@ -78,6 +78,7 @@ export type TodayResponse = {
   alerts: AlertSummary[];
 };
 
+export type ProjectsResponse = { projects: ProjectSummary[] };
 export type MilestonesResponse = { milestones: MilestoneSummary[] };
 export type DecisionsResponse = { decisions: DecisionSummary[] };
 
@@ -117,6 +118,14 @@ export function getToday(
   scope: 'workspace' | 'private',
 ): Promise<TodayResponse | null> {
   return authenticatedGet<TodayResponse>(`/v1/today?scope=${scope}`, token);
+}
+
+export async function getProjects(
+  token: string,
+  scope: 'workspace' | 'private',
+): Promise<ProjectSummary[] | null> {
+  const response = await authenticatedGet<ProjectsResponse>(`/v1/projects?scope=${scope}`, token);
+  return response?.projects ?? null;
 }
 
 export async function getMilestones(
