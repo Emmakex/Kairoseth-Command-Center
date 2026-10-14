@@ -19,6 +19,7 @@ Esta carpeta es la fuente de verdad para las decisiones de producto, arquitectur
 12. [`11-operations-observability.md`](11-operations-observability.md) — CI/CD, telemetry, backup and runtime operations.
 13. [`12-commercial-packaging.md`](12-commercial-packaging.md) — packaging and deployment editions.
 14. [`13-decisions.md`](13-decisions.md) — architectural/product decisions already agreed.
+15. [`14-development.md`](14-development.md) — local workspace, Docker stack and Phase 1 quality gate.
 
 ## Living documents / Documentos vivos
 
