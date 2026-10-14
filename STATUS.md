@@ -1,9 +1,9 @@
 # Project status / Estado del proyecto
 
-**Current phase:** Phase 2 — Identity, workspaces and permissions  
+**Current phase:** Phase 2 — Identity, workspaces and permissions complete  
 **Product:** Kairoseth Command Center  
 **Category:** Kairoseth Software  
-**Status:** Authorization core implemented on `feat/phase-2-identity-workspaces`; CI validation pending.
+**Status:** Phase 2 exit gate passed on PR #2; ready to merge and begin Phase 3.
 
 ## Completed / Completado
 
@@ -21,7 +21,7 @@
 - [x] CI, dependency audit, secret scan and Docker smoke validation.
 - [x] Phase 1 merged to `main` in PR #1.
 
-### Phase 2 — implemented on feature branch
+### Phase 2 — Identity, workspaces and permissions
 - [x] `User`, `Workspace` and `Membership` domain entities.
 - [x] Workspace types/status and membership lifecycle.
 - [x] Role presets: `platform_admin`, `owner`, `admin`, `member`.
@@ -40,34 +40,43 @@
 - [x] Suspended membership negative test.
 - [x] Invalid credential/session API tests.
 
-## Validation pending / Validación pendiente
+## Validation / Validación
 
-- [ ] Phase 2 PR opened.
-- [ ] lint/typecheck/tests/build green.
-- [ ] dependency audit green.
-- [ ] secret scan green.
-- [ ] Docker smoke green with the new auth package dependency graph.
+PR #2 CI run #10 passed the complete Phase 2 quality gate after one strict-TypeScript fix:
 
-## Security invariants under test
+- [x] install.
+- [x] lint.
+- [x] TypeScript validation.
+- [x] automated tests, including tenant/private negative tests.
+- [x] production build.
+- [x] dependency audit.
+- [x] secret scan.
+- [x] Docker Compose build/runtime smoke test.
+- [x] API/web baseline smoke tests.
+
+The first CI attempt exposed an `exactOptionalPropertyTypes` mismatch in the API auth request object. It was fixed by omitting absent credential fields rather than weakening the TypeScript configuration.
+
+## Security invariants verified
 
 1. UI role selection never grants authorization.
 2. A workspace administrator cannot cross tenant boundaries.
 3. Workspace ownership/admin does not reveal another user's private data.
-4. Product access requires entitlement in addition to authorization when applicable.
+4. Product access can require entitlement in addition to authorization.
 5. `platform_admin` is not a portable customer role and is valid only in Kairoseth-hosted context.
 6. Protected API responses never expose credentials or raw tokens.
 
 ## Next / Siguiente
 
-1. Open Phase 2 pull request.
-2. Run the full CI and Docker smoke gate.
-3. Fix failures without weakening tenant/private boundaries.
-4. Merge Phase 2 when the negative tests and all quality gates are green.
-5. Start Phase 3 — operational core: Projects, Milestones, Tasks, Alerts, Timeline, Decisions, Personal and Today.
+1. Merge PR #2 into `main`.
+2. Start Phase 3 — Operational core.
+3. Implement persistence/repository boundaries for Projects, Milestones, Tasks, Alerts, Timeline and Decisions.
+4. Add Personal/private reminders using the same strict private scope.
+5. Build the first useful `Today` vertical slice and quick capture.
+6. Close Phase 3 only when the product is useful manually with no external integration.
 
 ## Phase 2 exit gate
 
-Phase 2 closes only when:
+**PASSED.**
 
 - session context is resolved server-side;
 - workspace membership and role/capability authorization pass;
@@ -78,7 +87,7 @@ Phase 2 closes only when:
 
 ## Current blockers / Bloqueos actuales
 
-None documented. Runtime validation is pending.
+None.
 
 ## Operating rule
 
