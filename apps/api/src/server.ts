@@ -3,6 +3,7 @@ import { loadApiConfig } from '@kcc/config';
 import { MongoOperationalStore } from '@kcc/persistence';
 import { buildApp } from './application';
 import { MongoDecisionLifecycleStore } from './decision-lifecycle-store';
+import { MongoGitHubRepositoryStore } from './github-repository-store';
 import { MongoLocalIdentityStore } from './local-identity-store';
 import { MongoOperationalAuditStore } from './operational-audit-store';
 import { PersistentLocalAuthProvider } from './persistent-local-auth';
@@ -12,6 +13,7 @@ const mongo = new MongoClient(config.MONGODB_URI, { serverSelectionTimeoutMS: 30
 const operationalStore = new MongoOperationalStore(mongo.db());
 const operationalAuditStore = new MongoOperationalAuditStore(mongo, mongo.db());
 const decisionLifecycleStore = new MongoDecisionLifecycleStore(mongo, mongo.db());
+const githubRepositoryStore = new MongoGitHubRepositoryStore(mongo, mongo.db());
 const localIdentityStore = new MongoLocalIdentityStore(mongo, mongo.db());
 let mongoReady = false;
 let localAuthProvider: PersistentLocalAuthProvider | undefined;
@@ -19,7 +21,11 @@ let localAuthProvider: PersistentLocalAuthProvider | undefined;
 try {
   await mongo.connect();
   await mongo.db().command({ ping: 1 });
-  await Promise.all([operationalStore.ensureIndexes(), decisionLifecycleStore.ensureIndexes()]);
+  await Promise.all([
+    operationalStore.ensureIndexes(),
+    decisionLifecycleStore.ensureIndexes(),
+    githubRepositoryStore.ensureIndexes(),
+  ]);
   mongoReady = true;
 
   if (config.KCC_AUTH_MODE === 'local') {
@@ -57,6 +63,7 @@ const app = buildApp({
   operationalAuditStore,
   milestoneStore: operationalStore,
   decisionLifecycleStore,
+  githubRepositoryStore,
   ...(localAuthProvider
     ? {
         authProvider: localAuthProvider,
