@@ -3,7 +3,7 @@
 **Current phase:** Phase 3 — Operational core  
 **Product:** Kairoseth Command Center  
 **Category:** Kairoseth Software  
-**Status:** PR #6 open; standalone local auth + first connected ES/EN Today UI complete with the full CI/security/Docker quality gate green and pending merge.
+**Status:** PR #6 merged; standalone local auth + first connected ES/EN Today UI are on `main`, with post-merge CI #30 fully green.
 
 ## Completed / Completado
 
@@ -56,7 +56,7 @@
 - [x] PR #5 merged.
 - [x] Main CI #22 green after merge.
 
-### Phase 3 — standalone manual-use slice implemented
+### Phase 3 — standalone manual-use slice merged
 - [x] Added explicit local standalone auth configuration with no production default password/secret.
 - [x] Added signed, expiring HMAC session tokens.
 - [x] Added local owner bootstrap using the normal owner RBAC preset and `command-center` entitlement.
@@ -68,6 +68,8 @@
 - [x] Added workspace/private Today switch without sending tenant/user IDs as authorization scope.
 - [x] Added live project/task/alert metrics and operational lists.
 - [x] Added Docker/internal API runtime wiring and standalone-auth documentation.
+- [x] PR #6 merged to `main`.
+- [x] Main CI #30 green after merge.
 
 ## Validation / Validación
 
@@ -87,7 +89,8 @@
 - [x] dependency audit green.
 - [x] secret scan green.
 - [x] Docker Compose smoke green, including API readiness and ES/EN web routes.
-- [ ] Merged to `main`.
+- [x] Merged to `main`.
+- [x] Post-merge `main` CI #30 green.
 
 ## Phase 3 still pending / Pendiente de la fase 3
 
@@ -116,16 +119,15 @@
 
 ## Next / Siguiente
 
-1. Merge PR #6 when its final documentation-only CI rerun is green.
-2. Implement the ES/EN Quick Capture and operational management surfaces.
-3. Add Decision supersede/reverse lifecycle and transaction/outbox consistency.
-4. Add the persistent multi-user local identity/password lifecycle needed beyond bootstrap mode.
-5. Close Phase 3 only when the standalone product is useful manually end-to-end.
-6. Publish Command Center under Kairoseth Software when the Phase 3 exit gate is met, then begin Phase 4 GitHub integration.
+1. Implement the ES/EN Quick Capture and operational management surfaces.
+2. Add Decision supersede/reverse lifecycle and transaction/outbox consistency.
+3. Add the persistent multi-user local identity/password lifecycle needed beyond bootstrap mode.
+4. Close Phase 3 only when the standalone product is useful manually end-to-end.
+5. Publish Command Center under Kairoseth Software when the Phase 3 exit gate is met, then begin Phase 4 GitHub integration.
 
 ## Current blockers / Bloqueos actuales
 
-None documented. PR #6 is pending its final documentation-only CI rerun before merge.
+None documented.
 
 ## Operating rule
 
