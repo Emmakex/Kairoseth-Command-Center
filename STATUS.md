@@ -1,10 +1,10 @@
 # Project status / Estado del proyecto
 
-**Current phase:** Phase 3 — standalone release boundary  
+**Current phase:** Phase 4 — GitHub integration  
 **Technical/internal project:** Kairoseth Command Center  
 **Commercial names:** Gestor de Trabajo (ES) / Work Manager (EN)  
 **Category:** Kairoseth Software  
-**Status:** PR #13 merged and post-merge validated. PR #14 hardens the standalone production-oriented release boundary and is at final merge validation.
+**Status:** Phase 3 standalone release boundary is fully green on `main`. PR #15 starts the first GitHub integration slice with normalized repository ↔ project links.
 
 ## Naming rule / Regla de naming
 
@@ -41,61 +41,52 @@
 - [x] Validated Decision create/supersede/reverse lifecycle.
 - [x] Transactional audit outbox, idempotent Timeline delivery and worker processing.
 - [x] All current manual mutation families migrated to transactional audit delivery.
-- [x] PRs #3–#12 merged with their quality gates green.
+- [x] Persistent standalone multi-user identities and password lifecycle.
+- [x] Route-level member denial, owner protection and stale-session invalidation.
+- [x] Production-oriented standalone Docker profile.
+- [x] Fail-closed runtime credentials/secrets.
+- [x] Backup + SHA-256 + guarded restore tooling.
+- [x] Standalone release smoke with backup/restore and post-restore authentication.
+- [x] PR #13 merged and post-merge validated.
+- [x] PR #14 merged as `c3d95397559ae0a6987601a5529bd502059fb270`.
+- [x] Post-merge `main` CI #96 green.
+- [x] Post-merge Local identities smoke #22 green.
+- [x] Post-merge Standalone release gate #9 green.
 
-### Phase 3 — Persistent standalone multi-user identities
-- [x] Mongo-backed `users`, `workspaces`, `memberships` and separate `local_credentials`.
-- [x] Unique normalized identity/membership/credential indexes.
-- [x] `scrypt-v1` password derivation with random salt; no plaintext password persistence.
-- [x] Persistent local sessions re-resolve User + Workspace + Membership + credential version.
-- [x] Bootstrap owner persists only when the credential store is empty.
-- [x] `owner` / `admin` / `member` capability model; owner protected from management mutations.
-- [x] Member-management API protected by `members.manage`.
-- [x] Password change/reset invalidates all older bearer sessions immediately through password versioning.
-- [x] Identity/password lifecycle audited through the transactional outbox.
-- [x] ES/EN account/password and member-management UI.
-- [x] Route-level member denial, owner-protection and stale-session tests.
-- [x] Dedicated multi-user Docker smoke.
-- [x] PR #13 merged as `da3c72194e81f502a7b63d96bd9cb5dfebaa93b2`.
-- [x] PR #13 post-merge `main` CI and Local identities smoke green.
+**Phase 3 technical release boundary: CLOSED / CERRADA.**
 
-### Phase 3 — Standalone production-oriented release boundary (PR #14)
-- [x] Separate `docker-compose.standalone.yml`; development compose remains unchanged.
-- [x] API/worker/web run with `NODE_ENV=production` in the standalone profile.
-- [x] Required owner email/password/HMAC secret fail closed when missing.
-- [x] Required values are empty in `.env.standalone.example`; no production defaults.
-- [x] `.dockerignore` excludes `.env` and `.env.*` from Docker build contexts.
-- [x] MongoDB is not published to the host and remains on the internal backend network.
-- [x] API/web host bindings default to `127.0.0.1`; remote access is intended through a TLS reverse proxy.
-- [x] API also joins the frontend Docker network so its loopback host binding remains reachable while Mongo stays isolated.
-- [x] Backup helper creates a compressed MongoDB archive plus SHA-256 checksum.
-- [x] Restore helper verifies checksum when available and requires `KCC_RESTORE_CONFIRM=RESTORE`.
-- [x] Standalone release smoke validates production build/start, API readiness, ES/EN routes, multi-user lifecycle, Mongo non-publication, backup, restore and post-restore authentication.
-- [x] Dedicated `Standalone release gate` GitHub Actions workflow.
-- [x] Standalone install/release/backup/restore documentation and updated README.
+## Phase 4 — GitHub integration
 
-## Validation / Validación
+### Slice 1 — normalized repository links (PR #15)
 
-Historical merged gates:
+Implemented/in progress:
 
-- [x] PR #6 → main CI #30 green.
-- [x] PR #7 → main CI #36 green.
-- [x] PR #8 → main CI #39 green.
-- [x] PR #9 → main CI #42 green.
-- [x] PR #10 → main CI #49 green.
-- [x] PR #11 → main CI #57 green.
-- [x] PR #12 → main CI #64 green.
-- [x] PR #13 → final CI + Local identities smoke green; merged and post-merge validated.
+- [x] Core normalized `IntegrationConnection` and `ExternalResource` contracts.
+- [x] GitHub repository links represented as workspace-scoped `ExternalResource` records.
+- [x] Canonical case-insensitive `owner/repository` external identity.
+- [x] Server-built GitHub deep link; arbitrary client `url` is not persisted.
+- [x] Same-workspace project validation before linking.
+- [x] `integrations.manage` + `command-center` entitlement enforcement.
+- [x] Workspace derived only from authenticated session.
+- [x] Transactional repository link/unlink + audit-outbox event.
+- [x] Mongo indexes for workspace/project/resource identity.
+- [x] `GET /v1/integrations/github/repositories`.
+- [x] `POST /v1/integrations/github/repositories`.
+- [x] `DELETE /v1/integrations/github/repositories/:resourceId`.
+- [x] Negative tests for member denial, foreign project, workspace isolation, arbitrary URL, duplicates and path-like owner/repository input.
+- [x] Domain/integration/API documentation updated.
+- [ ] Final PR #15 CI/type/test/build/Docker quality gate.
+- [ ] Merge and post-merge validation.
 
-PR #14 implementation validation on `f0145cf48d4cf8bd6d0b4893d6d922fed93b8577`:
+Deliberately deferred to later Phase 4 slices:
 
-- [x] CI #94 — lint, typecheck, tests, build, dependency audit, secret scan and transactional Docker smoke green.
-- [x] Local identities smoke #20 — green.
-- [x] Standalone release gate #7 — green, including backup/restore and post-restore login.
-
-The first standalone gate attempt correctly exposed a Docker-network topology issue: API was healthy internally but its loopback host publication was unreachable while attached only to the internal network. The profile was corrected by attaching API to both backend and frontend networks while retaining loopback-only publication. The complete release smoke then passed.
-
-**Final merge rule:** after this status synchronization, the same three gates must be green again on the final PR #14 head before merge.
+- [ ] GitHub App/OAuth/PAT connection lifecycle.
+- [ ] Secret reference configuration.
+- [ ] Live repository existence/access validation.
+- [ ] Manual sync and normalized default branch/latest commit.
+- [ ] PR/issue/workflow/release ingestion.
+- [ ] Verified GitHub webhooks.
+- [ ] GitHub-derived alerts and automation rules.
 
 ## Security invariants
 
@@ -113,20 +104,25 @@ The first standalone gate attempt correctly exposed a Docker-network topology is
 12. Production-oriented standalone MongoDB is not published to the host.
 13. Standalone required credentials/secrets fail closed when absent.
 14. Runtime `.env` files are excluded from Docker build contexts.
+15. Integration administration requires `integrations.manage`.
+16. GitHub repository links are workspace-only and validate project references in the same workspace.
+17. A raw external resource ID, repository name or client-supplied URL never grants cross-workspace access.
+18. GitHub link/unlink state and audit-outbox records commit atomically.
+19. Provider credentials are not introduced in the repository-link slice.
 
 ## Next / Siguiente
 
-1. Run the three final PR #14 gates on this synchronized head.
-2. Merge PR #14 only if all three are green.
-3. Verify CI, Local identities smoke and Standalone release gate again on `main`.
-4. With those post-merge gates green, close the Phase 3 standalone technical release boundary.
-5. Continue with Phase 4 GitHub integration.
+1. Finish PR #15 validation and merge only when the complete quality gate is green.
+2. Verify `main` after merge.
+3. Implement the GitHub connection/authentication slice using secret references, not plaintext credentials.
+4. Add live repository validation/manual sync.
+5. Add normalized commit/PR/issue/workflow/release ingestion in separate slices.
 6. When commercial publication is scheduled, create the Kairoseth Software catalog entry as **Gestor de Trabajo / Work Manager**.
 
 ## Current blockers / Bloqueos actuales
 
-No functional blocker. PR #14 is in final automated validation.
+No known product blocker. PR #15 is the active development front.
 
 ## Operating rule
 
-Update this file at meaningful milestones. Do not use it as a substitute for detailed roadmap/issues documentation.
+Update this file at meaningful milestones. Keep Phase 4 slices small; do not mix credentials, sync, webhooks and automation into the repository-link foundation.
