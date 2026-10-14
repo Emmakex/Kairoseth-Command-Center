@@ -1,7 +1,7 @@
 import { MongoClient } from 'mongodb';
 import { loadApiConfig } from '@kcc/config';
 import { MongoOperationalStore } from '@kcc/persistence';
-import { buildApp } from './app';
+import { buildApp } from './application';
 
 const config = loadApiConfig();
 const mongo = new MongoClient(config.MONGODB_URI, { serverSelectionTimeoutMS: 3000 });
