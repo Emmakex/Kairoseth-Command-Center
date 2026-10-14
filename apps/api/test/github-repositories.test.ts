@@ -3,8 +3,10 @@ import type { AuthProvider, SessionContext } from '@kcc/auth';
 import type { ExternalResource, Scope } from '@kcc/domain';
 import { buildApp } from '../src/application';
 import type {
+  BindGitHubRepositoryConnectionResult,
   CreateGitHubRepositoryLinkInput,
   GitHubRepositoryStore,
+  GitHubRepositorySyncInput,
 } from '../src/github-repository-store';
 
 type WorkspaceScope = Extract<Scope, { kind: 'workspace' }>;
@@ -48,6 +50,8 @@ function sameScope(left: WorkspaceScope, right: WorkspaceScope): boolean {
 class MemoryGitHubRepositoryStore implements GitHubRepositoryStore {
   resources: ExternalResource[] = [];
   validProjects = new Set(['workspace-a:project-a', 'workspace-b:project-b']);
+  connections = new Map<string, { workspaceId: string; validated: boolean }>();
+  syncFailures: Array<{ resourceId: string; errorCode: string }> = [];
 
   async ensureIndexes() {}
 
@@ -102,6 +106,62 @@ class MemoryGitHubRepositoryStore implements GitHubRepositoryStore {
         resource.kind === 'repository' &&
         (!projectId || resource.projectId === projectId),
     );
+  }
+
+  async getRepositoryLink(
+    scope: WorkspaceScope,
+    resourceId: string,
+  ): Promise<ExternalResource | null> {
+    return this.resources.find(
+      (resource) => resource.id === resourceId && sameScope(resource.scope, scope),
+    ) ?? null;
+  }
+
+  async bindConnection(
+    scope: WorkspaceScope,
+    _actorUserId: string,
+    resourceId: string,
+    connectionId: string,
+  ): Promise<BindGitHubRepositoryConnectionResult> {
+    const resource = await this.getRepositoryLink(scope, resourceId);
+    if (!resource) return { status: 'repository_not_found' };
+    const connection = this.connections.get(connectionId);
+    if (!connection || connection.workspaceId !== scope.workspaceId) {
+      return { status: 'connection_not_found' };
+    }
+    if (!connection.validated) return { status: 'connection_not_validated' };
+    resource.connectionId = connectionId;
+    resource.updatedAt = '2026-10-14T19:00:00.000Z';
+    return { status: 'bound', resource };
+  }
+
+  async applySyncResult(input: GitHubRepositorySyncInput): Promise<ExternalResource | null> {
+    const resource = await this.getRepositoryLink(input.scope, input.resourceId);
+    if (!resource || resource.connectionId !== input.connectionId) return null;
+    resource.metadata = {
+      ...resource.metadata,
+      githubRepositoryId: input.githubRepositoryId,
+      remoteFullName: input.remoteFullName,
+      defaultBranch: input.defaultBranch,
+      latestCommitSha: input.latestCommitSha,
+      private: input.private,
+      archived: input.archived,
+      lastSyncedAt: input.syncedAt,
+      ...(input.latestCommitUrl ? { latestCommitUrl: input.latestCommitUrl } : {}),
+      ...(input.latestCommitAt ? { latestCommitAt: input.latestCommitAt } : {}),
+      ...(input.remoteUpdatedAt ? { remoteUpdatedAt: input.remoteUpdatedAt } : {}),
+    };
+    resource.updatedAt = input.syncedAt;
+    return resource;
+  }
+
+  async recordSyncFailure(
+    _scope: WorkspaceScope,
+    _actorUserId: string,
+    resourceId: string,
+    errorCode: string,
+  ): Promise<void> {
+    this.syncFailures.push({ resourceId, errorCode });
   }
 
   async deleteRepositoryLink(
@@ -185,7 +245,7 @@ describe('GitHub repository links API', () => {
     await app.close();
   });
 
-  it('requires integrations.manage for list, create and delete', async () => {
+  it('requires integrations.manage for list, create, bind and delete', async () => {
     const store = new MemoryGitHubRepositoryStore();
     const app = buildApp({
       authProvider: provider(memberSession),
@@ -207,12 +267,70 @@ describe('GitHub repository links API', () => {
     });
     expect(created.statusCode).toBe(403);
 
+    const bound = await app.inject({
+      method: 'PATCH',
+      url: '/v1/integrations/github/repositories/resource-1/connection',
+      headers: authHeaders,
+      payload: { connectionId: 'connection-1' },
+    });
+    expect(bound.statusCode).toBe(403);
+
     const deleted = await app.inject({
       method: 'DELETE',
       url: '/v1/integrations/github/repositories/resource-1',
       headers: authHeaders,
     });
     expect(deleted.statusCode).toBe(403);
+    await app.close();
+  });
+
+  it('requires a validated same-workspace connection before binding', async () => {
+    const store = new MemoryGitHubRepositoryStore();
+    const workspaceA: WorkspaceScope = { kind: 'workspace', workspaceId: 'workspace-a' };
+    const resource = await store.createRepositoryLink({
+      scope: workspaceA,
+      actorUserId: 'user-admin',
+      projectId: 'project-a',
+      owner: 'Emmakex',
+      repository: 'sync-me',
+      externalId: 'emmakex/sync-me',
+      url: 'https://github.com/Emmakex/sync-me',
+    });
+    expect(resource).not.toBeNull();
+    store.connections.set('connection-unverified', { workspaceId: 'workspace-a', validated: false });
+    store.connections.set('connection-active', { workspaceId: 'workspace-a', validated: true });
+    store.connections.set('connection-foreign', { workspaceId: 'workspace-b', validated: true });
+
+    const app = buildApp({
+      authProvider: provider(adminSession),
+      githubRepositoryStore: store,
+    });
+
+    const unverified = await app.inject({
+      method: 'PATCH',
+      url: `/v1/integrations/github/repositories/${resource?.id}/connection`,
+      headers: authHeaders,
+      payload: { connectionId: 'connection-unverified' },
+    });
+    expect(unverified.statusCode).toBe(409);
+    expect(unverified.json().error).toBe('github_connection_not_validated');
+
+    const foreign = await app.inject({
+      method: 'PATCH',
+      url: `/v1/integrations/github/repositories/${resource?.id}/connection`,
+      headers: authHeaders,
+      payload: { connectionId: 'connection-foreign' },
+    });
+    expect(foreign.statusCode).toBe(404);
+
+    const bound = await app.inject({
+      method: 'PATCH',
+      url: `/v1/integrations/github/repositories/${resource?.id}/connection`,
+      headers: authHeaders,
+      payload: { connectionId: 'connection-active' },
+    });
+    expect(bound.statusCode).toBe(200);
+    expect(bound.json().repository.connectionId).toBe('connection-active');
     await app.close();
   });
 
