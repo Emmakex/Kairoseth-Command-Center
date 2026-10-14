@@ -29,11 +29,13 @@ Mutations that require durable Timeline/audit consistency use a transactional ou
 5. failed deliveries return to `pending` with bounded backoff and become `failed` after the configured attempt ceiling;
 6. stale `processing` leases are recoverable after worker interruption.
 
-Decision create/supersede/reverse is the first Phase 3 mutation family hardened with this model. The same mechanism must be extended to the remaining manual mutation families before Phase 3 audit hardening is considered complete.
+The current Phase 3 manual mutation families use this model: Project, Task, Alert, Quick Capture, simple Decision creation, Milestone create/status and validated Decision create/supersede/reverse. Milestone progress recalculation is included inside the same transaction as the Milestone state change and audit record.
 
 MongoDB deployments that execute transactional mutations must run as a replica set. The portable Docker stack uses a single-node `rs0` replica set; managed/production deployments may use a multi-node replica set according to their availability requirements.
 
 The worker logs `audit_outbox.tick` with claimed, delivered and failed counts. These fields are operational telemetry and must not contain private task/decision bodies.
+
+The CI Docker gate exercises both workspace and private scopes: it performs a real Decision lifecycle mutation and a private Quick Capture mutation, then waits for their Timeline events to be delivered by the worker and verifies the corresponding outbox records reach `delivered`.
 
 ## Structured logging
 
@@ -79,7 +81,7 @@ Every change should run:
 6. build;
 7. dependency/secret scanning.
 
-The Docker quality gate also verifies the local MongoDB replica set and an end-to-end outbox-to-Timeline delivery through the worker.
+The Docker quality gate also verifies the local MongoDB replica set and end-to-end outbox-to-Timeline delivery through the worker for both workspace and private mutation paths.
 
 Main must remain releasable. Failed verification blocks release.
 
