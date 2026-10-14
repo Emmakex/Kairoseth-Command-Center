@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { Collection, Db, Filter } from 'mongodb';
+import type { Collection, Db } from 'mongodb';
 import type {
   Alert,
   Project,
@@ -36,20 +36,8 @@ export interface OperationalStore {
   getTodaySummary(scope: Scope, day: { start: string; end: string }): Promise<TodaySummary>;
 }
 
-function scopeFilter<T>(scope: Scope): Filter<T> {
-  if (scope.kind === 'private') {
-    return { 'scope.kind': 'private', 'scope.userId': scope.userId } as Filter<T>;
-  }
-
-  if (scope.kind === 'system') {
-    return {
-      'scope.kind': 'system',
-      'scope.workspaceId': scope.workspaceId,
-      'scope.source': scope.source,
-    } as Filter<T>;
-  }
-
-  return { 'scope.kind': 'workspace', 'scope.workspaceId': scope.workspaceId } as Filter<T>;
+function scopeFilter(scope: Scope): { scope: Scope } {
+  return { scope };
 }
 
 export class MongoOperationalStore implements OperationalStore {
@@ -91,7 +79,7 @@ export class MongoOperationalStore implements OperationalStore {
   }
 
   async listProjects(scope: Scope): Promise<Project[]> {
-    return this.projects.find(scopeFilter<Project>(scope)).sort({ updatedAt: -1 }).toArray();
+    return this.projects.find(scopeFilter(scope)).sort({ updatedAt: -1 }).toArray();
   }
 
   async createTask(input: CreateTaskInput): Promise<Task> {
@@ -115,17 +103,17 @@ export class MongoOperationalStore implements OperationalStore {
   }
 
   async listTasks(scope: Scope): Promise<Task[]> {
-    return this.tasks.find(scopeFilter<Task>(scope)).sort({ priority: -1, dueAt: 1, createdAt: -1 }).toArray();
+    return this.tasks.find(scopeFilter(scope)).sort({ priority: -1, dueAt: 1, createdAt: -1 }).toArray();
   }
 
   async listAlerts(scope: Scope): Promise<Alert[]> {
-    return this.alerts.find(scopeFilter<Alert>(scope)).sort({ createdAt: -1 }).toArray();
+    return this.alerts.find(scopeFilter(scope)).sort({ createdAt: -1 }).toArray();
   }
 
   async getTodaySummary(scope: Scope, day: { start: string; end: string }): Promise<TodaySummary> {
-    const taskScope = scopeFilter<Task>(scope);
-    const alertScope = scopeFilter<Alert>(scope);
-    const projectScope = scopeFilter<Project>(scope);
+    const taskScope = scopeFilter(scope);
+    const alertScope = scopeFilter(scope);
+    const projectScope = scopeFilter(scope);
 
     const [openTasks, dueToday, blockedTasks, openAlerts, urgentAlerts, activeProjects] = await Promise.all([
       this.tasks.countDocuments({ ...taskScope, status: { $nin: ['done', 'cancelled'] } }),
