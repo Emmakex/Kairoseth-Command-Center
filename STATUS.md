@@ -3,7 +3,7 @@
 **Current phase:** Phase 3 — Operational core  
 **Product:** Kairoseth Command Center  
 **Category:** Kairoseth Software  
-**Status:** PR #8 merged and post-merge main CI #39 green. Scoped ES/EN Timeline/Audit UI is implemented on `feat/phase-3-timeline-ui` and ready for PR validation.
+**Status:** PR #10 merged; post-merge main CI #49 green. Transactional audit outbox hardening is in progress on PR #11.
 
 ## Completed / Completado
 
@@ -15,121 +15,107 @@
 - [x] Phase 1 merged in PR #1.
 
 ### Phase 2 — Identity, workspaces and permissions
-- [x] Server-side session context, workspaces, membership, RBAC/capabilities, product entitlements.
-- [x] Strict workspace and private-user boundaries.
-- [x] Local/Kairoseth Identity adapter contracts.
-- [x] Cross-tenant/private negative tests.
-- [x] Phase 2 merged in PR #2 with full CI/Docker gate green.
+- [x] Server-side session context, workspaces, membership, RBAC/capabilities and product entitlements.
+- [x] Strict workspace/private boundaries and negative isolation tests.
+- [x] Phase 2 merged in PR #2 with full quality gate green.
 
-### Phase 3 — operational foundation/actions merged
+### Phase 3 — operational foundation/actions
 - [x] Projects, Tasks, Alerts, Decisions and Timeline API/domain foundations.
 - [x] Scoped Mongo persistence and server-derived workspace/private boundaries.
 - [x] Project/Task mutations, Alert lifecycle, Quick Capture and server-authored Timeline events.
-- [x] Product entitlement/capability enforcement and negative scope tests.
 - [x] PR #3 and PR #4 merged with complete quality gates green.
 
-### Phase 3 — weighted milestones merged
-- [x] Milestone scoped persistence/API and separate read/write capabilities.
-- [x] Same-scope project validation for milestone creation.
-- [x] Weighted milestone progress recalculation; cancelled milestones excluded.
-- [x] Server-authored Timeline events for milestone mutations.
-- [x] PR #5 merged with full gate green; main CI #22 green.
+### Phase 3 — weighted milestones
+- [x] Milestone persistence/API and separate read/write capabilities.
+- [x] Same-scope project validation and weighted project progress recalculation.
+- [x] PR #5 merged; main CI #22 green.
 
-### Phase 3 — standalone manual-use slice merged
+### Phase 3 — standalone manual use
 - [x] Explicit standalone auth configuration with no production default password/secret.
-- [x] Signed expiring HMAC sessions and local owner bootstrap through normal RBAC.
-- [x] HTTP-only SameSite browser session cookie.
-- [x] ES/EN login and authenticated Today dashboard.
-- [x] Workspace/private Today switch with server-derived scope.
-- [x] PR #6 merged; post-merge main CI #30 green.
+- [x] Signed expiring HMAC sessions, local owner bootstrap and HTTP-only SameSite browser cookie.
+- [x] ES/EN login + Today dashboard with workspace/private scope switch.
+- [x] PR #6 merged; main CI #30 green.
 
-### Phase 3 — operational Today UI merged
+### Phase 3 — operational UI
 - [x] ES/EN Quick Capture for workspace/private projects and tasks.
-- [x] Project status/progress controls.
-- [x] Task start/block/complete controls.
-- [x] Alert acknowledge/resolve/dismiss controls.
+- [x] Project status/progress, Task status and Alert lifecycle controls.
 - [x] Fixed server-side mutation proxy with allowlisted operations and validation.
-- [x] Responsive desktop/mobile controls.
-- [x] PR #7 merged; post-merge main CI #36 green.
+- [x] PR #7 merged; main CI #36 green.
 
-### Phase 3 — Milestone + Decision Log UI merged
-- [x] Refactored Today into feature components instead of a monolithic page.
-- [x] Added full scoped project catalog reader.
-- [x] Added Milestone list/create/status management in workspace/private scope.
-- [x] Added workspace-only Decision Log list/create UI with ES/EN copy and localized timestamps/statuses.
-- [x] Private view explicitly explains Decision Log workspace-only behavior.
-- [x] Decision creation browser proxy rejects private scope and does not forward project references until backend validation exists.
-- [x] Historical unvalidated Decision project IDs are hidden unless they resolve in the authenticated workspace catalog.
-- [x] PR #8 merged; post-merge main CI #39 green.
+### Phase 3 — Milestone + Decision Log UI
+- [x] Feature-based Today components.
+- [x] Full scoped project catalog and Milestone management UI.
+- [x] Workspace-only Decision Log UI.
+- [x] PR #8 merged; main CI #39 green.
 
-### Phase 3 — Timeline UI implemented
-- [x] Added scoped `/v1/timeline` reader to the web application.
-- [x] Added workspace/private Timeline panel driven only by server-authored events.
-- [x] Localized known event types and status metadata in ES/EN.
-- [x] Removed raw status suffixes from status-change summaries when safe to do so.
-- [x] Timeline dates respect the authenticated user locale/timezone with safe timezone fallback.
-- [x] Main dashboard does not expose actor IDs, tenant IDs, source internals or raw event JSON.
-- [x] Today limits presentation to the 30 most recent events while the scoped API can return up to 100.
-- [x] Added responsive Timeline styles and semantic `time` elements.
-- [x] Updated UX documentation with Timeline scope, privacy and progressive-disclosure rules.
+### Phase 3 — Timeline/Audit UI
+- [x] Scoped `/v1/timeline` web reader and workspace/private Timeline panel.
+- [x] ES/EN known event labels, localized timestamps/statuses and privacy-safe presentation.
+- [x] PR #9 merged; post-merge main CI #42 green.
+
+### Phase 3 — validated Decision lifecycle
+- [x] Same-workspace validation for Decision project references.
+- [x] Active Decision supersede lifecycle with project inheritance/mismatch protection.
+- [x] Active Decision reversal with required reason.
+- [x] Conditional terminal transitions prevent double/repeated state changes.
+- [x] Legacy `/v1/decisions` route cannot bypass validation with `projectId` or `supersedesId`.
+- [x] ES/EN project/supersede/reverse controls in the Decision Log.
+- [x] PR #10 merged; post-merge main CI #49 green.
+
+### Phase 3 — transactional audit outbox in progress
+- [x] Durable `audit_outbox` model with leases, retries, backoff and failed terminal state.
+- [x] Idempotent Timeline delivery keyed by event ID.
+- [x] Worker drains audit outbox instead of heartbeat-only polling.
+- [x] Decision create/supersede/reverse writes state + audit outbox records in one Mongo transaction.
+- [x] Portable Docker MongoDB runs as single-node `rs0` replica set for transaction support.
+- [x] CI Docker smoke includes replica-set check and end-to-end outbox-to-Timeline delivery.
+- [ ] Full PR #11 quality gate green on final head.
+- [ ] Extend transactional outbox coverage to the remaining manual mutation families.
 
 ## Validation / Validación
 
-### PR #6 — Standalone + Today
-- [x] Full quality gate green.
-- [x] Merged to `main`; post-merge CI #30 green.
-
-### PR #7 — Operational Today UI
-- [x] Full quality gate green.
-- [x] Merged to `main`; post-merge CI #36 green.
-
-### PR #8 — Milestone + Decision Log UI
-- [x] Full quality gate green, including final documentation rerun.
-- [x] Merged to `main`; post-merge CI #39 green.
-
-### Timeline UI slice
-- [ ] Pull request opened.
-- [ ] lint/typecheck/tests/build green.
-- [ ] dependency audit green.
-- [ ] secret scan green.
-- [ ] Docker Compose smoke green.
+- [x] PR #6 — full gate green; main CI #30 green.
+- [x] PR #7 — full gate green; main CI #36 green.
+- [x] PR #8 — full gate green; main CI #39 green.
+- [x] PR #9 — full gate green; main CI #42 green.
+- [x] PR #10 — full gate green; main CI #49 green.
+- [ ] PR #11 — final validation pending.
 
 ## Phase 3 still pending / Pendiente de la fase 3
 
-- [ ] Decision same-workspace project-reference validation plus supersede/reverse lifecycle.
+- [ ] Extend transaction/outbox consistency to Project, Task, Alert, Quick Capture and Milestone mutation families.
 - [ ] Persistent multi-user local identities and password lifecycle beyond the single-owner bootstrap.
-- [ ] Transaction/outbox hardening for mutation + Timeline audit consistency.
+- [ ] Final standalone end-to-end release gate and Kairoseth Software publication readiness.
 
 ## Security invariants
 
-1. Manual APIs never accept a raw tenant/user ID as authorization scope.
+1. Manual APIs never accept raw tenant/user IDs as authorization scope.
 2. `scope=workspace` resolves only to the active authenticated workspace.
 3. `scope=private` resolves only to the authenticated user.
 4. Product entitlement and capability checks are both enforced.
 5. Mongo queries always include the scope boundary.
 6. System/integration scope cannot be created through manual operational endpoints.
-7. Today only aggregates data categories for which the session has explicit read capability.
-8. Decisions are workspace-only and cannot be stored in private scope.
-9. Timeline events are authored by the server; clients do not write arbitrary audit events.
-10. Mutation endpoints return not found when the entity exists only outside the authenticated/requested scope.
-11. A milestone can only reference a project found inside the same derived scope.
-12. Standalone browser sessions are HTTP-only and the browser does not persist bearer tokens in local storage.
-13. Operational browser forms post only to a fixed same-product server proxy and cannot choose arbitrary upstream API paths.
-14. Decision creation through the browser proxy is workspace-only and does not forward project references until backend referential validation exists.
-15. Timeline presentation follows the same server-derived workspace/private scope and hides raw technical metadata from the main dashboard.
+7. Decisions are workspace-only.
+8. Decision project/supersede references resolve inside the authenticated workspace.
+9. Legacy Decision creation cannot bypass validated lifecycle references.
+10. Timeline events are server-authored; browser clients cannot write arbitrary audit records.
+11. Operational browser forms post only to fixed same-product proxies and cannot choose arbitrary upstream paths.
+12. Standalone browser sessions are HTTP-only and bearer tokens are not persisted in browser storage.
+13. Transactionally hardened mutations write domain state and audit outbox records in the same MongoDB transaction.
+14. Outbox delivery to Timeline is idempotent and safe to retry after worker interruption.
+15. Timeline presentation follows the same workspace/private scope and hides raw technical metadata from the main dashboard.
 
 ## Next / Siguiente
 
-1. Open and validate the Timeline UI PR; merge only when the full gate is green.
-2. Implement Decision same-workspace project validation and supersede/reverse lifecycle.
-3. Add transaction/outbox consistency hardening for mutation + Timeline audit writes.
-4. Add the persistent multi-user local identity/password lifecycle needed beyond bootstrap mode.
-5. Close Phase 3 only when the standalone product is useful manually end-to-end.
-6. Publish Command Center under Kairoseth Software when the Phase 3 exit gate is met, then begin Phase 4 GitHub integration.
+1. Finish and validate PR #11 transactional outbox foundation.
+2. Apply the same atomic audit pattern to Project, Task, Alert, Quick Capture and Milestone mutations.
+3. Implement persistent multi-user local identity/password lifecycle.
+4. Run the final standalone Phase 3 end-to-end release gate.
+5. Publish Command Center under Kairoseth Software and begin Phase 4 GitHub integration.
 
 ## Current blockers / Bloqueos actuales
 
-None documented. Timeline UI is ready for PR validation.
+None documented. PR #11 is under CI validation.
 
 ## Operating rule
 

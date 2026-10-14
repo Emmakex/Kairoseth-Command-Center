@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { AuthProvider, SessionContext } from '@kcc/auth';
-import type { Decision, Project, TimelineEvent } from '@kcc/domain';
-import type { AppendTimelineInput, CreateDecisionInput, OperationalStore } from '@kcc/persistence';
+import type { Decision, Project } from '@kcc/domain';
 import { buildApp } from '../src/application';
 import type {
-  DecisionLifecycleStatus,
+  CreateDecisionLifecycleInput,
+  DecisionLifecycleResult,
   DecisionLifecycleStore,
+  ReverseDecisionLifecycleInput,
   WorkspaceScope,
 } from '../src/decision-lifecycle-store';
 
@@ -34,82 +35,99 @@ const provider: AuthProvider = {
 const authHeaders = { authorization: 'Bearer valid-token' };
 const workspaceScope: WorkspaceScope = { kind: 'workspace', workspaceId: 'workspace-a' };
 
+type AuditRecord = {
+  type: string;
+  entityId: string;
+  metadata: Record<string, unknown>;
+};
+
 class DecisionState implements DecisionLifecycleStore {
   projects: Project[] = [];
   decisions: Decision[] = [];
-  timeline: TimelineEvent[] = [];
+  audit: AuditRecord[] = [];
 
-  operationalStore(): OperationalStore {
-    return {
-      createDecision: async (input: CreateDecisionInput) => {
-        const decision: Decision = {
-          id: `decision-${this.decisions.length + 1}`,
-          scope: input.scope,
-          title: input.title,
-          decision: input.decision,
-          status: 'active',
-          madeBy: input.madeBy,
-          madeAt: input.madeAt ?? '2026-10-14T10:00:00.000Z',
-          createdAt: '2026-10-14T10:00:00.000Z',
-          updatedAt: '2026-10-14T10:00:00.000Z',
-          ...(input.projectId ? { projectId: input.projectId } : {}),
-          ...(input.context ? { context: input.context } : {}),
-          ...(input.supersedesId ? { supersedesId: input.supersedesId } : {}),
-        };
-        this.decisions.push(decision);
-        return decision;
+  async ensureIndexes(): Promise<void> {}
+
+  async createWithAudit(input: CreateDecisionLifecycleInput): Promise<DecisionLifecycleResult> {
+    if (
+      input.projectId &&
+      !this.projects.some(
+        (project) =>
+          project.id === input.projectId &&
+          project.scope.kind === 'workspace' &&
+          project.scope.workspaceId === input.scope.workspaceId,
+      )
+    ) {
+      return { ok: false, error: 'project_not_found' };
+    }
+
+    let superseded: Decision | undefined;
+    let effectiveProjectId = input.projectId;
+    if (input.supersedesId) {
+      superseded = this.decisions.find(
+        (decision) =>
+          decision.id === input.supersedesId &&
+          decision.scope.workspaceId === input.scope.workspaceId,
+      );
+      if (!superseded) return { ok: false, error: 'decision_not_found' };
+      if (superseded.status !== 'active') return { ok: false, error: 'decision_not_active' };
+      if (input.projectId && superseded.projectId && input.projectId !== superseded.projectId) {
+        return { ok: false, error: 'decision_project_mismatch' };
+      }
+      effectiveProjectId = input.projectId ?? superseded.projectId;
+      superseded.status = 'superseded';
+    }
+
+    const now = '2026-10-14T10:00:00.000Z';
+    const decision: Decision = {
+      id: `decision-${this.decisions.length + 1}`,
+      scope: input.scope,
+      title: input.title,
+      decision: input.decision,
+      status: 'active',
+      madeBy: input.madeBy,
+      madeAt: input.madeAt ?? now,
+      createdAt: now,
+      updatedAt: now,
+      ...(effectiveProjectId ? { projectId: effectiveProjectId } : {}),
+      ...(input.context ? { context: input.context } : {}),
+      ...(input.supersedesId ? { supersedesId: input.supersedesId } : {}),
+    };
+    this.decisions.push(decision);
+    if (superseded) {
+      this.audit.push({
+        type: 'decision.superseded',
+        entityId: superseded.id,
+        metadata: { replacementDecisionId: decision.id },
+      });
+    }
+    this.audit.push({
+      type: 'decision.created',
+      entityId: decision.id,
+      metadata: {
+        ...(decision.projectId ? { projectId: decision.projectId } : {}),
+        ...(decision.supersedesId ? { supersedesId: decision.supersedesId } : {}),
       },
-      appendTimeline: async (input: AppendTimelineInput) => {
-        const event: TimelineEvent = {
-          id: `event-${this.timeline.length + 1}`,
-          scope: input.scope,
-          type: input.type,
-          entityType: input.entityType,
-          entityId: input.entityId,
-          summary: input.summary,
-          source: input.source,
-          occurredAt: input.occurredAt ?? '2026-10-14T10:00:00.000Z',
-          metadata: input.metadata ?? {},
-          ...(input.actorUserId ? { actorUserId: input.actorUserId } : {}),
-        };
-        this.timeline.push(event);
-        return event;
-      },
-    } as unknown as OperationalStore;
+    });
+    return { ok: true, decision };
   }
 
-  async projectExists(scope: WorkspaceScope, projectId: string): Promise<boolean> {
-    return this.projects.some(
-      (project) =>
-        project.id === projectId &&
-        project.scope.kind === 'workspace' &&
-        project.scope.workspaceId === scope.workspaceId,
-    );
-  }
-
-  async getDecision(scope: WorkspaceScope, decisionId: string): Promise<Decision | null> {
-    return (
-      this.decisions.find(
-        (decision) => decision.id === decisionId && decision.scope.workspaceId === scope.workspaceId,
-      ) ?? null
-    );
-  }
-
-  async transitionActiveDecision(
-    scope: WorkspaceScope,
-    decisionId: string,
-    status: DecisionLifecycleStatus,
-  ): Promise<Decision | null> {
+  async reverseWithAudit(input: ReverseDecisionLifecycleInput): Promise<DecisionLifecycleResult> {
     const decision = this.decisions.find(
       (candidate) =>
-        candidate.id === decisionId &&
-        candidate.scope.workspaceId === scope.workspaceId &&
-        candidate.status === 'active',
+        candidate.id === input.decisionId &&
+        candidate.scope.workspaceId === input.scope.workspaceId,
     );
-    if (!decision) return null;
-    decision.status = status;
+    if (!decision) return { ok: false, error: 'decision_not_found' };
+    if (decision.status !== 'active') return { ok: false, error: 'decision_not_active' };
+    decision.status = 'reversed';
     decision.updatedAt = '2026-10-14T11:00:00.000Z';
-    return decision;
+    this.audit.push({
+      type: 'decision.reversed',
+      entityId: decision.id,
+      metadata: { reason: input.reason },
+    });
+    return { ok: true, decision };
   }
 }
 
@@ -141,11 +159,7 @@ function decision(id: string, status: Decision['status'] = 'active', projectId?:
 }
 
 function appFor(state: DecisionState) {
-  return buildApp({
-    authProvider: provider,
-    operationalStore: state.operationalStore(),
-    decisionLifecycleStore: state,
-  });
+  return buildApp({ authProvider: provider, decisionLifecycleStore: state });
 }
 
 describe('Decision lifecycle API', () => {
@@ -210,7 +224,7 @@ describe('Decision lifecycle API', () => {
       status: 'active',
     });
     expect(state.decisions.find((item) => item.id === 'decision-old')?.status).toBe('superseded');
-    expect(state.timeline.map((event) => event.type)).toEqual([
+    expect(state.audit.map((event) => event.type)).toEqual([
       'decision.superseded',
       'decision.created',
     ]);
@@ -240,7 +254,7 @@ describe('Decision lifecycle API', () => {
     await app.close();
   });
 
-  it('reverses an active decision once and records the reason in Timeline', async () => {
+  it('reverses an active decision once and records the audit reason', async () => {
     const state = new DecisionState();
     state.decisions.push(decision('decision-a'));
     const app = appFor(state);
@@ -253,7 +267,7 @@ describe('Decision lifecycle API', () => {
     });
     expect(first.statusCode).toBe(200);
     expect(first.json().decision.status).toBe('reversed');
-    expect(state.timeline[0]).toMatchObject({
+    expect(state.audit[0]).toMatchObject({
       type: 'decision.reversed',
       metadata: { reason: 'The assumption changed' },
     });
