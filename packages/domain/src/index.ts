@@ -15,7 +15,7 @@ export type AlertSeverity = 'info' | 'warning' | 'urgent' | 'critical';
 export type AlertStatus = 'open' | 'acknowledged' | 'resolved' | 'dismissed';
 export type DecisionStatus = 'active' | 'superseded' | 'reversed';
 export type IntegrationProvider = 'github';
-export type IntegrationConnectionStatus = 'active' | 'disabled' | 'error';
+export type IntegrationConnectionStatus = 'unverified' | 'active' | 'disabled' | 'error';
 export type ExternalResourceKind =
   | 'repository'
   | 'pull_request'
@@ -146,6 +146,10 @@ export interface IntegrationConnection {
   displayName: string;
   status: IntegrationConnectionStatus;
   secretRef?: string;
+  lastValidatedAt?: string;
+  remoteAccountId?: string;
+  remoteAccountLabel?: string;
+  lastErrorCode?: string;
   createdAt: string;
   updatedAt: string;
 }
