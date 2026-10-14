@@ -1,0 +1,62 @@
+import type { DictionaryCopy, Locale } from '../lib/i18n';
+
+export function QuickCapturePanel({
+  locale,
+  scope,
+  copy,
+}: {
+  locale: Locale;
+  scope: 'workspace' | 'private';
+  copy: DictionaryCopy;
+}) {
+  return (
+    <section className="capture-panel" aria-labelledby="quick-capture-heading">
+      <div className="capture-heading">
+        <div>
+          <span className="eyebrow">{copy.quickCapture}</span>
+          <h2 id="quick-capture-heading">{copy.quickCapture}</h2>
+          <p>{copy.quickCaptureHelp}</p>
+        </div>
+        <span className="scope-badge">{scope === 'private' ? copy.private : copy.workspace}</span>
+      </div>
+      <form className="quick-capture-form" action="/api/operations" method="post">
+        <input type="hidden" name="locale" value={locale} />
+        <input type="hidden" name="scope" value={scope} />
+        <input type="hidden" name="operation" value="quick-capture" />
+        <label className="field compact-field">
+          <span>{copy.kind}</span>
+          <select name="kind" defaultValue="task">
+            <option value="task">{copy.task}</option>
+            <option value="project">{copy.project}</option>
+          </select>
+        </label>
+        <label className="field title-field">
+          <span>{copy.titleLabel}</span>
+          <input
+            name="title"
+            required
+            maxLength={160}
+            autoComplete="off"
+            placeholder={copy.titlePlaceholder}
+          />
+        </label>
+        <label className="field description-field">
+          <span>{copy.description}</span>
+          <textarea
+            name="description"
+            rows={2}
+            maxLength={4000}
+            placeholder={copy.descriptionPlaceholder}
+          />
+        </label>
+        <label className="field compact-field">
+          <span>{copy.priorityTask}</span>
+          <input name="priority" type="number" min="0" max="100" defaultValue="50" />
+        </label>
+        <button className="primary-button capture-button" type="submit">
+          {copy.create}
+        </button>
+      </form>
+    </section>
+  );
+}
