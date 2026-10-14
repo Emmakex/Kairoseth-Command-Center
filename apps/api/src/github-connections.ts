@@ -3,6 +3,8 @@ import { authorize } from '@kcc/auth';
 import type { AuthProvider, SessionContext } from '@kcc/auth';
 import type { IntegrationConnection, Scope } from '@kcc/domain';
 import type { GitHubConnectionStore } from './github-connection-store';
+import { GitHubProviderError } from './github-provider-client';
+import type { GitHubProviderClient } from './github-provider-client';
 
 type WorkspaceScope = Extract<Scope, { kind: 'workspace' }>;
 
@@ -54,14 +56,36 @@ function publicConnection(connection: IntegrationConnection) {
     displayName: connection.displayName,
     status: connection.status,
     credentialConfigured: Boolean(connection.secretRef),
+    ...(connection.lastValidatedAt ? { lastValidatedAt: connection.lastValidatedAt } : {}),
+    ...(connection.remoteAccountId ? { remoteAccountId: connection.remoteAccountId } : {}),
+    ...(connection.remoteAccountLabel ? { remoteAccountLabel: connection.remoteAccountLabel } : {}),
+    ...(connection.lastErrorCode ? { lastErrorCode: connection.lastErrorCode } : {}),
     createdAt: connection.createdAt,
     updatedAt: connection.updatedAt,
   };
 }
 
+function validationHttpError(error: GitHubProviderError): { status: number; error: string } {
+  switch (error.code) {
+    case 'unauthorized':
+    case 'forbidden':
+      return { status: 422, error: 'github_connection_invalid_credential' };
+    case 'rate_limited':
+      return { status: 429, error: 'github_rate_limited' };
+    case 'timeout':
+    case 'upstream_error':
+    case 'not_found':
+      return { status: 502, error: 'github_upstream_unavailable' };
+  }
+}
+
 export function registerGitHubConnectionRoutes(
   app: FastifyInstance,
-  options: { authProvider?: AuthProvider; githubConnectionStore?: GitHubConnectionStore },
+  options: {
+    authProvider?: AuthProvider;
+    githubConnectionStore?: GitHubConnectionStore;
+    githubProviderClient?: GitHubProviderClient;
+  },
 ): void {
   app.get('/v1/integrations/github/connections', async (request, reply) => {
     const session = await resolveSession(request, options.authProvider);
@@ -100,6 +124,50 @@ export function registerGitHubConnectionRoutes(
       token,
     });
     return reply.code(201).send({ connection: publicConnection(connection) });
+  });
+
+  app.post('/v1/integrations/github/connections/:id/validate', async (request, reply) => {
+    const session = await resolveSession(request, options.authProvider);
+    if (!session) return reply.code(401).send({ error: 'unauthorized' });
+    const scope = workspaceScope(session);
+    if (!scope) return reply.code(400).send({ error: 'workspace_required' });
+    if (!canManageIntegrations(session, scope)) return reply.code(403).send({ error: 'forbidden' });
+    if (!options.githubConnectionStore || !options.githubProviderClient) {
+      return reply.code(503).send({ error: 'github_validation_unavailable' });
+    }
+
+    const params = request.params as { id?: string };
+    const connectionId = nonEmptyString(params.id, 100);
+    if (!connectionId) return reply.code(400).send({ error: 'invalid_connection_id' });
+    const connection = await options.githubConnectionStore.getConnection(scope, connectionId);
+    if (!connection) return reply.code(404).send({ error: 'github_connection_not_found' });
+    if (connection.status === 'disabled') {
+      return reply.code(409).send({ error: 'github_connection_disabled' });
+    }
+    const token = await options.githubConnectionStore.resolveCredential(scope, connectionId);
+    if (!token) return reply.code(409).send({ error: 'github_connection_credential_unavailable' });
+
+    try {
+      const account = await options.githubProviderClient.validateCredential(token);
+      const updated = await options.githubConnectionStore.markValidationSuccess(
+        scope,
+        session.user.id,
+        connectionId,
+        { id: account.id, label: account.login },
+      );
+      if (!updated) return reply.code(404).send({ error: 'github_connection_not_found' });
+      return { connection: publicConnection(updated) };
+    } catch (error) {
+      if (!(error instanceof GitHubProviderError)) throw error;
+      await options.githubConnectionStore.markValidationFailure(
+        scope,
+        session.user.id,
+        connectionId,
+        error.code,
+      );
+      const mapped = validationHttpError(error);
+      return reply.code(mapped.status).send({ error: mapped.error });
+    }
   });
 
   app.patch('/v1/integrations/github/connections/:id/credential', async (request, reply) => {
