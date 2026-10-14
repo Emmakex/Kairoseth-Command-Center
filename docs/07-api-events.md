@@ -42,7 +42,20 @@ Decision lifecycle mutations are transactionally audited: Decision state changes
 
 The older `/v1/decisions` create route remains a compatibility surface for simple unlinked decisions. It rejects `projectId` and `supersedesId`; managed clients must use the lifecycle route for project-linked, superseding or reversing operations.
 
-Project, Task, Alert, Quick Capture and Milestone mutation families still need migration to the same transactional audit pattern before Phase 3 audit hardening is complete.
+## Operational mutations
+
+The current manual mutation families use the same atomic audit pattern without changing their public URLs or response shapes:
+
+- Project create/status and Quick Capture project;
+- Task create/status and Quick Capture task;
+- Alert create/status;
+- simple compatibility Decision creation;
+- Milestone create/status, including weighted project-progress recalculation;
+- validated Decision create/supersede/reverse lifecycle.
+
+Authentication, workspace/private scope derivation, capability checks and payload validation remain server-side. The atomic route interceptor is allowlisted to the known mutation paths and returns the final response itself, so the legacy mutation handler cannot execute a second domain write after a successful atomic mutation.
+
+Milestone state and the resulting project progress are updated in the same transaction as the audit outbox record. Private Quick Capture keeps private-user scope and the `task.quick_captured` / `project.quick_captured` event semantics.
 
 ## Transactional audit event delivery
 
@@ -82,7 +95,7 @@ Internal events should follow a normalized envelope:
 ```json
 {
   "id": "evt_...",
-  "type": "task.completed",
+  "type": "task.status_changed",
   "occurredAt": "2026-10-14T08:00:00Z",
   "workspaceId": "ws_...",
   "actor": {"type": "user", "id": "usr_..."},
@@ -94,10 +107,10 @@ Internal events should follow a normalized envelope:
 
 ## Initial event taxonomy
 
-- `project.created|updated|archived`
-- `milestone.completed`
-- `task.created|updated|blocked|completed`
-- `alert.opened|acknowledged|resolved`
+- `project.created|quick_captured|status_changed`
+- `milestone.created|status_changed`
+- `task.created|quick_captured|status_changed`
+- `alert.created|status_changed`
 - `decision.created|superseded|reversed`
 - `integration.connected|degraded|disconnected`
 - `repository.sync.completed|failed`

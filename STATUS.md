@@ -3,7 +3,7 @@
 **Current phase:** Phase 3 — Operational core  
 **Product:** Kairoseth Command Center  
 **Category:** Kairoseth Software  
-**Status:** PR #10 merged; post-merge main CI #49 green. Transactional audit outbox hardening is in progress on PR #11.
+**Status:** PR #11 merged; post-merge main CI #57 green. PR #12 is migrating the remaining manual mutation families to the transactional audit outbox pattern.
 
 ## Completed / Completado
 
@@ -62,15 +62,26 @@
 - [x] ES/EN project/supersede/reverse controls in the Decision Log.
 - [x] PR #10 merged; post-merge main CI #49 green.
 
-### Phase 3 — transactional audit outbox in progress
-- [x] Durable `audit_outbox` model with leases, retries, backoff and failed terminal state.
-- [x] Idempotent Timeline delivery keyed by event ID.
-- [x] Worker drains audit outbox instead of heartbeat-only polling.
-- [x] Decision create/supersede/reverse writes state + audit outbox records in one Mongo transaction.
+### Phase 3 — transactional audit outbox foundation
+- [x] Durable `audit_outbox` with leases, stale-lease recovery, retries/backoff and terminal failed state.
+- [x] Idempotent Timeline delivery keyed by stable event ID.
+- [x] Worker drains audit outbox and emits structured delivery telemetry.
+- [x] Decision create/supersede/reverse writes domain state + audit outbox records in one MongoDB transaction.
 - [x] Portable Docker MongoDB runs as single-node `rs0` replica set for transaction support.
-- [x] CI Docker smoke includes replica-set check and end-to-end outbox-to-Timeline delivery.
-- [ ] Full PR #11 quality gate green on final head.
-- [ ] Extend transactional outbox coverage to the remaining manual mutation families.
+- [x] CI verifies replica-set readiness and real Decision lifecycle outbox-to-Timeline delivery.
+- [x] PR #11 merged; post-merge main CI #57 green.
+
+### Phase 3 — operational transactional audit migration in progress
+- [x] Atomic store implemented for Project create/status and Quick Capture project.
+- [x] Atomic store implemented for Task create/status and Quick Capture task.
+- [x] Atomic store implemented for Alert create/status.
+- [x] Atomic store implemented for simple compatibility Decision creation.
+- [x] Atomic store implemented for Milestone create/status with project progress recalculation inside the transaction.
+- [x] Existing public URLs and response shapes retained through a fixed allowlisted pre-handler.
+- [x] Tests prove the legacy mutation handlers do not execute after an atomic interception.
+- [x] Tests cover private Quick Capture, Milestone hook ordering, Decision compatibility precedence and capability denial.
+- [x] CI Docker smoke now verifies workspace Decision plus private Quick Capture delivery through the worker/outbox path.
+- [ ] PR #12 final quality gate and merge.
 
 ## Validation / Validación
 
@@ -79,11 +90,12 @@
 - [x] PR #8 — full gate green; main CI #39 green.
 - [x] PR #9 — full gate green; main CI #42 green.
 - [x] PR #10 — full gate green; main CI #49 green.
-- [ ] PR #11 — final validation pending.
+- [x] PR #11 — full gate green; main CI #57 green, including transactional Decision audit smoke.
+- [ ] PR #12 — final head under validation; lint/typecheck/tests/build/audit/secrets green on CI #60, Docker smoke pending.
 
 ## Phase 3 still pending / Pendiente de la fase 3
 
-- [ ] Extend transaction/outbox consistency to Project, Task, Alert, Quick Capture and Milestone mutation families.
+- [ ] Merge and post-merge validate PR #12 so all current manual operational mutation families use atomic audit delivery.
 - [ ] Persistent multi-user local identities and password lifecycle beyond the single-owner bootstrap.
 - [ ] Final standalone end-to-end release gate and Kairoseth Software publication readiness.
 
@@ -103,19 +115,19 @@
 12. Standalone browser sessions are HTTP-only and bearer tokens are not persisted in browser storage.
 13. Transactionally hardened mutations write domain state and audit outbox records in the same MongoDB transaction.
 14. Outbox delivery to Timeline is idempotent and safe to retry after worker interruption.
-15. Timeline presentation follows the same workspace/private scope and hides raw technical metadata from the main dashboard.
+15. Atomic route interception preserves existing authorization/scope validation and prevents the legacy mutation handler from executing a second write.
+16. Timeline presentation follows the same workspace/private scope and hides raw technical metadata from the main dashboard.
 
 ## Next / Siguiente
 
-1. Finish and validate PR #11 transactional outbox foundation.
-2. Apply the same atomic audit pattern to Project, Task, Alert, Quick Capture and Milestone mutations.
-3. Implement persistent multi-user local identity/password lifecycle.
-4. Run the final standalone Phase 3 end-to-end release gate.
-5. Publish Command Center under Kairoseth Software and begin Phase 4 GitHub integration.
+1. Finish PR #12 Docker smoke, merge it and verify post-merge `main` CI.
+2. Implement persistent multi-user local identities and password lifecycle.
+3. Run the final standalone Phase 3 end-to-end release gate.
+4. Publish Command Center under Kairoseth Software and begin Phase 4 GitHub integration.
 
 ## Current blockers / Bloqueos actuales
 
-None documented. PR #11 is under CI validation.
+None documented. PR #12 is under final CI validation.
 
 ## Operating rule
 

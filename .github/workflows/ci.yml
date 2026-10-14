@@ -83,7 +83,7 @@ jobs:
           curl --fail --silent http://localhost:3000/es >/dev/null
           curl --fail --silent http://localhost:3000/en >/dev/null
 
-      - name: Smoke test transactional Decision audit outbox
+      - name: Smoke test transactional audit outbox mutations
         run: |
           test "$(docker compose exec -T mongo mongosh --quiet --eval 'print(rs.status().ok)')" = "1"
 
@@ -101,13 +101,26 @@ jobs:
           decision_id="$(printf '%s' "$decision_response" | python3 -c 'import json,sys; print(json.load(sys.stdin)["decision"]["id"])')"
           test -n "$decision_id"
 
+          task_response="$(curl --fail --silent \
+            -X POST http://localhost:4000/v1/quick-capture \
+            -H 'content-type: application/json' \
+            -H "authorization: Bearer $access_token" \
+            --data '{"scope":"private","kind":"task","title":"CI private quick capture","priority":90}')"
+          task_id="$(printf '%s' "$task_response" | python3 -c 'import json,sys; print(json.load(sys.stdin)["task"]["id"])')"
+          test -n "$task_id"
+
           for attempt in {1..20}; do
-            count="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
-              "print(db.timeline_events.countDocuments({id:{\$exists:true},type:'decision.created',entityId:'$decision_id'}))")"
-            if [ "$count" = "1" ]; then
-              outbox_status="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
+            decision_count="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
+              "print(db.timeline_events.countDocuments({type:'decision.created',entityId:'$decision_id'}))")"
+            task_count="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
+              "print(db.timeline_events.countDocuments({type:'task.quick_captured',entityId:'$task_id','scope.kind':'private'}))")"
+            if [ "$decision_count" = "1" ] && [ "$task_count" = "1" ]; then
+              decision_outbox="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
                 "print(db.audit_outbox.findOne({'event.entityId':'$decision_id'}).status)")"
-              test "$outbox_status" = "delivered"
+              task_outbox="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
+                "print(db.audit_outbox.findOne({'event.entityId':'$task_id'}).status)")"
+              test "$decision_outbox" = "delivered"
+              test "$task_outbox" = "delivered"
               exit 0
             fi
             sleep 2

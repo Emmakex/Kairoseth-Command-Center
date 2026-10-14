@@ -8,6 +8,8 @@ import type { DecisionLifecycleStore } from './decision-lifecycle-store';
 import { registerStandaloneAuthRoutes } from './local-auth';
 import type { StandaloneLocalAuthProvider } from './local-auth';
 import { registerMilestoneRoutes } from './milestones';
+import { registerOperationalAuditRoutes } from './operational-audit-routes';
+import type { OperationalAuditStore } from './operational-audit-store';
 
 type ApplicationOptions = {
   readinessCheck?: ReadinessCheck;
@@ -17,6 +19,7 @@ type ApplicationOptions = {
   operationalStore?: OperationalStore;
   milestoneStore?: MilestoneStore;
   decisionLifecycleStore?: DecisionLifecycleStore;
+  operationalAuditStore?: OperationalAuditStore;
 };
 
 export function buildApp(options: ApplicationOptions = {}) {
@@ -28,6 +31,10 @@ export function buildApp(options: ApplicationOptions = {}) {
   });
 
   registerDecisionCompatibilityGuard(app);
+  registerOperationalAuditRoutes(app, {
+    ...(options.authProvider ? { authProvider: options.authProvider } : {}),
+    ...(options.operationalAuditStore ? { auditStore: options.operationalAuditStore } : {}),
+  });
 
   if (options.standaloneAuthProvider) {
     registerStandaloneAuthRoutes(app, options.standaloneAuthProvider);

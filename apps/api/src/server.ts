@@ -4,10 +4,12 @@ import { MongoOperationalStore } from '@kcc/persistence';
 import { buildApp } from './application';
 import { MongoDecisionLifecycleStore } from './decision-lifecycle-store';
 import { StandaloneLocalAuthProvider } from './local-auth';
+import { MongoOperationalAuditStore } from './operational-audit-store';
 
 const config = loadApiConfig();
 const mongo = new MongoClient(config.MONGODB_URI, { serverSelectionTimeoutMS: 3000 });
 const operationalStore = new MongoOperationalStore(mongo.db());
+const operationalAuditStore = new MongoOperationalAuditStore(mongo, mongo.db());
 const decisionLifecycleStore = new MongoDecisionLifecycleStore(mongo, mongo.db());
 let mongoReady = false;
 
@@ -45,6 +47,7 @@ if (config.KCC_AUTH_MODE === 'local') {
 const app = buildApp({
   logger: true,
   operationalStore,
+  operationalAuditStore,
   milestoneStore: operationalStore,
   decisionLifecycleStore,
   ...(standaloneAuthProvider
