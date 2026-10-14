@@ -54,6 +54,7 @@ services:
       - "127.0.0.1:${KCC_API_HOST_PORT:-4000}:4000"
     networks:
       - backend
+      - frontend
 
   worker:
     build:
