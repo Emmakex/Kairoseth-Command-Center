@@ -31,6 +31,10 @@ export type LocalLoginResult = {
   session: SessionContext;
 };
 
+export interface LocalLoginProvider extends AuthProvider {
+  authenticate(email: string, password: string): Promise<LocalLoginResult | null>;
+}
+
 function digest(value: string): Buffer {
   return createHash('sha256').update(value).digest();
 }
@@ -73,7 +77,7 @@ function decodePayload(encoded: string): TokenPayload | null {
   return candidate as TokenPayload;
 }
 
-export class StandaloneLocalAuthProvider implements AuthProvider {
+export class StandaloneLocalAuthProvider implements LocalLoginProvider {
   readonly name = 'standalone-local';
   private readonly session: SessionContext;
 
@@ -182,7 +186,7 @@ export class StandaloneLocalAuthProvider implements AuthProvider {
 
 export function registerStandaloneAuthRoutes(
   app: FastifyInstance,
-  provider: StandaloneLocalAuthProvider,
+  provider: LocalLoginProvider,
 ): void {
   app.post('/v1/auth/local/login', async (request, reply) => {
     reply.header('cache-control', 'no-store');
