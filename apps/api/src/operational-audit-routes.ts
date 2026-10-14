@@ -85,7 +85,8 @@ export function registerOperationalAuditRoutes(
   app: FastifyInstance,
   options: { authProvider?: AuthProvider; auditStore?: OperationalAuditStore },
 ): void {
-  if (!options.auditStore) return;
+  const auditStore = options.auditStore;
+  if (!auditStore) return;
 
   app.addHook('preHandler', async (request, reply) => {
     const routeKey = `${request.method} ${request.routeOptions.url}`;
@@ -105,7 +106,7 @@ export function registerOperationalAuditRoutes(
       const dueAt = body.dueAt === undefined ? undefined : validIsoDate(body.dueAt);
       if (body.dueAt !== undefined && !dueAt) return reply.code(400).send({ error: 'invalid_due_at' });
       const description = optionalString(body.description, 4000);
-      const project = await options.auditStore.createProject({
+      const project = await auditStore.createProject({
         scope,
         actorUserId: session.user.id,
         eventType: 'project.created',
@@ -127,7 +128,7 @@ export function registerOperationalAuditRoutes(
         return reply.code(400).send({ error: 'invalid_progress' });
       }
       if (!canUse(session, scope, 'projects.write')) return reply.code(403).send({ error: 'forbidden' });
-      const project = await options.auditStore.updateProjectStatus({
+      const project = await auditStore.updateProjectStatus({
         scope,
         actorUserId: session.user.id,
         projectId,
@@ -149,7 +150,7 @@ export function registerOperationalAuditRoutes(
       const priority = typeof body.priority === 'number' ? body.priority : undefined;
       const projectId = optionalString(body.projectId, 100);
       const description = optionalString(body.description, 8000);
-      const task = await options.auditStore.createTask({
+      const task = await auditStore.createTask({
         scope,
         actorUserId: session.user.id,
         eventType: 'task.created',
@@ -170,7 +171,7 @@ export function registerOperationalAuditRoutes(
       if (!scope) return reply.code(400).send({ error: 'workspace_required' });
       if (!status) return reply.code(400).send({ error: 'invalid_status' });
       if (!canUse(session, scope, 'tasks.write')) return reply.code(403).send({ error: 'forbidden' });
-      const task = await options.auditStore.updateTaskStatus({
+      const task = await auditStore.updateTaskStatus({
         scope,
         actorUserId: session.user.id,
         taskId,
@@ -191,7 +192,7 @@ export function registerOperationalAuditRoutes(
       const message = optionalString(body.message, 8000);
       const projectId = optionalString(body.projectId, 100);
       const fingerprint = optionalString(body.fingerprint, 200);
-      const alert = await options.auditStore.createAlert({
+      const alert = await auditStore.createAlert({
         scope,
         actorUserId: session.user.id,
         title,
@@ -211,7 +212,7 @@ export function registerOperationalAuditRoutes(
       if (!scope) return reply.code(400).send({ error: 'workspace_required' });
       if (!status) return reply.code(400).send({ error: 'invalid_status' });
       if (!canUse(session, scope, 'alerts.manage')) return reply.code(403).send({ error: 'forbidden' });
-      const alert = await options.auditStore.updateAlertStatus({
+      const alert = await auditStore.updateAlertStatus({
         scope,
         actorUserId: session.user.id,
         alertId,
@@ -234,7 +235,7 @@ export function registerOperationalAuditRoutes(
 
       if (kind === 'project') {
         if (!canUse(session, scope, 'projects.write')) return reply.code(403).send({ error: 'forbidden' });
-        const project = await options.auditStore.createProject({
+        const project = await auditStore.createProject({
           scope,
           actorUserId: session.user.id,
           eventType: 'project.quick_captured',
@@ -247,7 +248,7 @@ export function registerOperationalAuditRoutes(
 
       if (!canUse(session, scope, 'tasks.write')) return reply.code(403).send({ error: 'forbidden' });
       const priority = typeof body.priority === 'number' ? body.priority : undefined;
-      const task = await options.auditStore.createTask({
+      const task = await auditStore.createTask({
         scope,
         actorUserId: session.user.id,
         eventType: 'task.quick_captured',
@@ -273,7 +274,7 @@ export function registerOperationalAuditRoutes(
       const context = optionalString(body.context, 8000);
       const madeAt = body.madeAt === undefined ? undefined : validIsoDate(body.madeAt);
       if (body.madeAt !== undefined && !madeAt) return reply.code(400).send({ error: 'invalid_made_at' });
-      const created = await options.auditStore.createSimpleDecision({
+      const created = await auditStore.createSimpleDecision({
         scope,
         actorUserId: session.user.id,
         title,
@@ -297,7 +298,7 @@ export function registerOperationalAuditRoutes(
       }
       const dueAt = body.dueAt === undefined ? undefined : validIsoDate(body.dueAt);
       if (body.dueAt !== undefined && !dueAt) return reply.code(400).send({ error: 'invalid_due_at' });
-      const result = await options.auditStore.createMilestone({
+      const result = await auditStore.createMilestone({
         scope,
         actorUserId: session.user.id,
         projectId,
@@ -317,7 +318,7 @@ export function registerOperationalAuditRoutes(
       if (!scope) return reply.code(400).send({ error: 'workspace_required' });
       if (!status) return reply.code(400).send({ error: 'invalid_status' });
       if (!canUse(session, scope, 'milestones.write')) return reply.code(403).send({ error: 'forbidden' });
-      const result = await options.auditStore.updateMilestoneStatus({
+      const result = await auditStore.updateMilestoneStatus({
         scope,
         actorUserId: session.user.id,
         milestoneId,
