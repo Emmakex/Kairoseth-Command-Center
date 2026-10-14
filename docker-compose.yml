@@ -21,6 +21,17 @@ services:
       KCC_API_HOST: 0.0.0.0
       KCC_API_PORT: 4000
       MONGODB_URI: mongodb://mongo:27017/kairoseth_command_center
+      KCC_AUTH_MODE: ${KCC_AUTH_MODE:-disabled}
+      KCC_LOCAL_ADMIN_EMAIL: ${KCC_LOCAL_ADMIN_EMAIL:-admin@kcc.local}
+      KCC_LOCAL_ADMIN_PASSWORD: ${KCC_LOCAL_ADMIN_PASSWORD:-}
+      KCC_LOCAL_AUTH_SECRET: ${KCC_LOCAL_AUTH_SECRET:-}
+      KCC_LOCAL_ADMIN_DISPLAY_NAME: ${KCC_LOCAL_ADMIN_DISPLAY_NAME:-Local Owner}
+      KCC_LOCAL_LOCALE: ${KCC_LOCAL_LOCALE:-es}
+      KCC_LOCAL_TIMEZONE: ${KCC_LOCAL_TIMEZONE:-Europe/Madrid}
+      KCC_LOCAL_USER_ID: ${KCC_LOCAL_USER_ID:-local-owner}
+      KCC_LOCAL_WORKSPACE_ID: ${KCC_LOCAL_WORKSPACE_ID:-local-workspace}
+      KCC_LOCAL_WORKSPACE_NAME: ${KCC_LOCAL_WORKSPACE_NAME:-Local Workspace}
+      KCC_LOCAL_SESSION_TTL_SECONDS: ${KCC_LOCAL_SESSION_TTL_SECONDS:-43200}
     ports:
       - "4000:4000"
     depends_on:
@@ -46,6 +57,7 @@ services:
     environment:
       NODE_ENV: development
       NEXT_PUBLIC_API_BASE_URL: http://localhost:4000
+      KCC_API_INTERNAL_URL: http://api:4000
     ports:
       - "3000:3000"
     depends_on:
