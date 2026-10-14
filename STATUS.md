@@ -3,7 +3,7 @@
 **Current phase:** Phase 3 — Operational core  
 **Product:** Kairoseth Command Center  
 **Category:** Kairoseth Software  
-**Status:** PR #7 merged and post-merge CI #36 green. Milestone management + workspace Decision Log UI are implemented on `feat/phase-3-milestones-decisions-ui` and pending PR validation.
+**Status:** PR #8 open; Milestone management + workspace Decision Log UI are complete with the full CI/security/Docker gate green. Final documentation-only CI rerun is pending before merge.
 
 ## Completed / Completado
 
@@ -79,6 +79,7 @@
 - [x] Private view replaces Decision Log with an explicit workspace-only explanation.
 - [x] Decision creation proxy rejects private scope.
 - [x] Decision project association is intentionally read-only/not offered for new decisions until API same-workspace reference validation is implemented.
+- [x] Historical unvalidated Decision project IDs are not rendered unless they resolve in the authenticated workspace catalog.
 - [x] Added parser tests for milestone mutations and Decision workspace/private boundaries.
 - [x] Updated UX documentation with the new feature/component boundaries.
 
@@ -104,12 +105,14 @@
 - [x] Merged to `main`.
 - [x] Post-merge `main` CI #36 green.
 
-### Milestone + Decision Log UI slice
-- [ ] Pull request opened.
-- [ ] lint/typecheck/tests/build green.
-- [ ] dependency audit green.
-- [ ] secret scan green.
-- [ ] Docker Compose smoke green.
+### PR #8 — Milestone + Decision Log UI
+- [x] Pull request opened.
+- [x] lint/typecheck/tests/build green.
+- [x] dependency audit green.
+- [x] secret scan green.
+- [x] Docker Compose smoke green, including API readiness and ES/EN web routes.
+- [ ] Final documentation-only CI rerun green.
+- [ ] Merged to `main`.
 
 ## Phase 3 still pending / Pendiente de la fase 3
 
@@ -141,7 +144,7 @@
 
 ## Next / Siguiente
 
-1. Open and validate the Milestone + Decision Log UI PR; merge only when the complete gate is green.
+1. Merge PR #8 when its final documentation-only CI rerun is green.
 2. Implement Decision same-workspace project validation and supersede/reverse lifecycle.
 3. Add a manual Timeline/audit surface and transaction/outbox consistency hardening.
 4. Add the persistent multi-user local identity/password lifecycle needed beyond bootstrap mode.
@@ -150,7 +153,7 @@
 
 ## Current blockers / Bloqueos actuales
 
-None documented. The Milestone + Decision Log UI slice is ready for PR validation.
+None documented. PR #8 is pending its final documentation-only CI rerun before merge.
 
 ## Operating rule
 
