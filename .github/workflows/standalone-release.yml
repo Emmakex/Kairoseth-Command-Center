@@ -1,0 +1,65 @@
+name: Standalone release gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  standalone-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare ephemeral standalone configuration
+        run: |
+          admin_email="release-${GITHUB_RUN_ID}@kcc.local"
+          admin_password="release-${GITHUB_RUN_ID}-owner-password"
+          auth_secret="$(openssl rand -hex 32)"
+          cat > .env.standalone <<EOF
+          KCC_LOCAL_ADMIN_EMAIL=$admin_email
+          KCC_LOCAL_ADMIN_PASSWORD=$admin_password
+          KCC_LOCAL_AUTH_SECRET=$auth_secret
+          KCC_LOCAL_ADMIN_DISPLAY_NAME=Release Owner
+          KCC_LOCAL_LOCALE=es
+          KCC_LOCAL_TIMEZONE=Europe/Madrid
+          KCC_LOCAL_WORKSPACE_NAME=Work Manager
+          KCC_WEB_BIND_ADDRESS=127.0.0.1
+          KCC_WEB_PORT=3000
+          KCC_API_HOST_PORT=4000
+          KCC_WORKER_POLL_MS=1000
+          EOF
+          {
+            echo "KCC_LOCAL_ADMIN_EMAIL=$admin_email"
+            echo "KCC_LOCAL_ADMIN_PASSWORD=$admin_password"
+            echo "KCC_LOCAL_AUTH_SECRET=$auth_secret"
+          } >> "$GITHUB_ENV"
+
+      - name: Validate fail-closed configuration
+        run: |
+          if env -u KCC_LOCAL_ADMIN_EMAIL -u KCC_LOCAL_ADMIN_PASSWORD -u KCC_LOCAL_AUTH_SECRET \
+            docker compose -f docker-compose.standalone.yml config >/dev/null 2>&1; then
+            echo "Standalone compose accepted missing required credentials." >&2
+            exit 1
+          fi
+
+      - name: Run standalone release smoke
+        run: |
+          KCC_SMOKE_RUN_ID="$GITHUB_RUN_ID" \
+            bash deployment/docker/smoke-standalone-release.sh
+
+      - name: Show service state on failure
+        if: failure()
+        run: |
+          docker compose --env-file .env.standalone -f docker-compose.standalone.yml ps || true
+          docker compose --env-file .env.standalone -f docker-compose.standalone.yml logs --no-color || true
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker compose --env-file .env.standalone -f docker-compose.standalone.yml down -v --remove-orphans || true
+          rm -f .env.standalone
