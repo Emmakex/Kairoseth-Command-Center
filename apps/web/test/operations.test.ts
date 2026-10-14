@@ -33,6 +33,80 @@ describe('parseOperationalMutation', () => {
     });
   });
 
+  it('builds milestone create and status mutations inside the selected scope', () => {
+    expect(
+      parseOperationalMutation(
+        form({
+          operation: 'milestone-create',
+          scope: 'private',
+          projectId: 'project-1',
+          title: 'First usable release',
+          weight: '35',
+        }),
+      ),
+    ).toEqual({
+      path: '/v1/milestones',
+      method: 'POST',
+      body: {
+        scope: 'private',
+        projectId: 'project-1',
+        title: 'First usable release',
+        weight: 35,
+      },
+    });
+
+    expect(
+      parseOperationalMutation(
+        form({
+          operation: 'milestone-status',
+          scope: 'workspace',
+          id: 'milestone/1',
+          status: 'done',
+        }),
+      ),
+    ).toEqual({
+      path: '/v1/milestones/milestone%2F1/status',
+      method: 'PATCH',
+      body: { scope: 'workspace', status: 'done' },
+    });
+  });
+
+  it('builds workspace decision creation and rejects decisions in private scope', () => {
+    expect(
+      parseOperationalMutation(
+        form({
+          operation: 'decision-create',
+          scope: 'workspace',
+          projectId: 'project-1',
+          title: 'Launch path',
+          context: 'We need one deployment model for v1.',
+          decision: 'Ship standalone first.',
+        }),
+      ),
+    ).toEqual({
+      path: '/v1/decisions',
+      method: 'POST',
+      body: {
+        scope: 'workspace',
+        projectId: 'project-1',
+        title: 'Launch path',
+        context: 'We need one deployment model for v1.',
+        decision: 'Ship standalone first.',
+      },
+    });
+
+    expect(
+      parseOperationalMutation(
+        form({
+          operation: 'decision-create',
+          scope: 'private',
+          title: 'Private decision',
+          decision: 'This must not be accepted.',
+        }),
+      ),
+    ).toBeNull();
+  });
+
   it('encodes entity identifiers before placing them in an API path', () => {
     expect(
       parseOperationalMutation(
@@ -50,7 +124,7 @@ describe('parseOperationalMutation', () => {
     });
   });
 
-  it('rejects invalid scope, status and out-of-range progress values', () => {
+  it('rejects invalid scope, status, weights and out-of-range progress values', () => {
     expect(
       parseOperationalMutation(
         form({
@@ -71,6 +145,18 @@ describe('parseOperationalMutation', () => {
           id: 'project-1',
           status: 'active',
           progress: '101',
+        }),
+      ),
+    ).toBeNull();
+
+    expect(
+      parseOperationalMutation(
+        form({
+          operation: 'milestone-create',
+          scope: 'workspace',
+          projectId: 'project-1',
+          title: 'Too heavy',
+          weight: '101',
         }),
       ),
     ).toBeNull();
