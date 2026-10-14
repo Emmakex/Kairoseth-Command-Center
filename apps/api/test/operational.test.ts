@@ -20,6 +20,7 @@ const session: SessionContext = {
     'projects.write',
     'tasks.read',
     'tasks.write',
+    'alerts.read',
   ],
   productEntitlements: ['command-center'],
 };
