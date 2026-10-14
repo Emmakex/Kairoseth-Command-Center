@@ -20,6 +20,9 @@ const apiSchema = z.object({
   KCC_LOCAL_WORKSPACE_ID: z.string().min(1).max(160).default('local-workspace'),
   KCC_LOCAL_WORKSPACE_NAME: z.string().min(1).max(160).default('Local Workspace'),
   KCC_LOCAL_SESSION_TTL_SECONDS: z.coerce.number().int().min(900).max(604800).default(43200),
+  KCC_INTEGRATION_SECRET_KEY: optionalSecret(
+    z.string().regex(/^[0-9a-fA-F]{64}$/, 'KCC_INTEGRATION_SECRET_KEY must be 64 hexadecimal characters'),
+  ),
 });
 
 const workerSchema = z.object({
