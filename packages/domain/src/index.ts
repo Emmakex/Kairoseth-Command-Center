@@ -14,6 +14,14 @@ export type TaskStatus = 'todo' | 'in_progress' | 'blocked' | 'done' | 'cancelle
 export type AlertSeverity = 'info' | 'warning' | 'urgent' | 'critical';
 export type AlertStatus = 'open' | 'acknowledged' | 'resolved' | 'dismissed';
 export type DecisionStatus = 'active' | 'superseded' | 'reversed';
+export type IntegrationProvider = 'github';
+export type IntegrationConnectionStatus = 'active' | 'disabled' | 'error';
+export type ExternalResourceKind =
+  | 'repository'
+  | 'pull_request'
+  | 'issue'
+  | 'workflow'
+  | 'release';
 
 export interface User {
   id: string;
@@ -129,6 +137,32 @@ export interface TimelineEvent {
   source: string;
   occurredAt: string;
   metadata: Record<string, unknown>;
+}
+
+export interface IntegrationConnection {
+  id: string;
+  scope: Extract<Scope, { kind: 'workspace' }>;
+  provider: IntegrationProvider;
+  displayName: string;
+  status: IntegrationConnectionStatus;
+  secretRef?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExternalResource {
+  id: string;
+  scope: Extract<Scope, { kind: 'workspace' }>;
+  provider: IntegrationProvider;
+  kind: ExternalResourceKind;
+  externalId: string;
+  displayName: string;
+  url: string;
+  projectId?: string;
+  connectionId?: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface TodaySummary {
