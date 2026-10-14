@@ -1,12 +1,14 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { authorize } from '@kcc/auth';
 import type { AuthProvider, SessionContext } from '@kcc/auth';
-import type { OperationalStore } from '@kcc/persistence';
-import type { DecisionLifecycleStore, WorkspaceScope } from './decision-lifecycle-store';
+import type {
+  DecisionLifecycleError,
+  DecisionLifecycleStore,
+  WorkspaceScope,
+} from './decision-lifecycle-store';
 
 export type DecisionRouteOptions = {
   authProvider?: AuthProvider;
-  operationalStore?: OperationalStore;
   decisionLifecycleStore?: DecisionLifecycleStore;
 };
 
@@ -44,27 +46,12 @@ function isoDate(value: unknown): string | undefined | null {
   return Number.isNaN(parsed) ? null : new Date(parsed).toISOString();
 }
 
-async function timeline(
-  store: OperationalStore,
-  input: {
-    scope: WorkspaceScope;
-    type: string;
-    actorUserId: string;
-    entityId: string;
-    summary: string;
-    metadata?: Record<string, unknown>;
-  },
+function sendLifecycleError(
+  reply: Parameters<Parameters<FastifyInstance['post']>[1]>[1],
+  error: DecisionLifecycleError,
 ) {
-  return store.appendTimeline({
-    scope: input.scope,
-    type: input.type,
-    actorUserId: input.actorUserId,
-    entityType: 'decision',
-    entityId: input.entityId,
-    summary: input.summary,
-    source: 'manual-api',
-    ...(input.metadata ? { metadata: input.metadata } : {}),
-  });
+  const status = error === 'project_not_found' || error === 'decision_not_found' ? 404 : 409;
+  return reply.code(status).send({ error });
 }
 
 export function registerDecisionLifecycleRoutes(
@@ -74,7 +61,7 @@ export function registerDecisionLifecycleRoutes(
   app.post('/v1/decision-lifecycle', async (request, reply) => {
     const session = await resolveSession(request, options.authProvider);
     if (!session) return reply.code(401).send({ error: 'unauthorized' });
-    if (!options.operationalStore || !options.decisionLifecycleStore) {
+    if (!options.decisionLifecycleStore) {
       return reply.code(503).send({ error: 'decision_lifecycle_unavailable' });
     }
 
@@ -105,74 +92,24 @@ export function registerDecisionLifecycleRoutes(
     if (supersedesId === null) return reply.code(400).send({ error: 'invalid_supersedes_id' });
     if (madeAt === null) return reply.code(400).send({ error: 'invalid_made_at' });
 
-    if (projectId && !(await options.decisionLifecycleStore.projectExists(scope, projectId))) {
-      return reply.code(404).send({ error: 'project_not_found' });
-    }
-
-    let superseded = null;
-    let effectiveProjectId = projectId;
-    if (supersedesId) {
-      superseded = await options.decisionLifecycleStore.getDecision(scope, supersedesId);
-      if (!superseded) return reply.code(404).send({ error: 'decision_not_found' });
-      if (superseded.status !== 'active') {
-        return reply.code(409).send({ error: 'decision_not_active' });
-      }
-      if (projectId && superseded.projectId && projectId !== superseded.projectId) {
-        return reply.code(409).send({ error: 'decision_project_mismatch' });
-      }
-      effectiveProjectId = projectId ?? superseded.projectId;
-    }
-
-    const decision = await options.operationalStore.createDecision({
+    const result = await options.decisionLifecycleStore.createWithAudit({
       scope,
       title,
       decision: decisionText,
       madeBy: session.user.id,
       ...(context ? { context } : {}),
-      ...(effectiveProjectId ? { projectId: effectiveProjectId } : {}),
+      ...(projectId ? { projectId } : {}),
       ...(supersedesId ? { supersedesId } : {}),
       ...(madeAt ? { madeAt } : {}),
     });
-
-    if (supersedesId && superseded) {
-      const transitioned = await options.decisionLifecycleStore.transitionActiveDecision(
-        scope,
-        supersedesId,
-        'superseded',
-      );
-      if (!transitioned) {
-        await options.decisionLifecycleStore.transitionActiveDecision(scope, decision.id, 'reversed');
-        return reply.code(409).send({ error: 'decision_transition_conflict' });
-      }
-      await timeline(options.operationalStore, {
-        scope,
-        type: 'decision.superseded',
-        actorUserId: session.user.id,
-        entityId: transitioned.id,
-        summary: transitioned.title,
-        metadata: { replacementDecisionId: decision.id },
-      });
-    }
-
-    await timeline(options.operationalStore, {
-      scope,
-      type: 'decision.created',
-      actorUserId: session.user.id,
-      entityId: decision.id,
-      summary: decision.title,
-      metadata: {
-        ...(decision.projectId ? { projectId: decision.projectId } : {}),
-        ...(decision.supersedesId ? { supersedesId: decision.supersedesId } : {}),
-      },
-    });
-
-    return reply.code(201).send({ decision });
+    if (!result.ok) return sendLifecycleError(reply, result.error);
+    return reply.code(201).send({ decision: result.decision });
   });
 
   app.patch('/v1/decision-lifecycle/:id/reverse', async (request, reply) => {
     const session = await resolveSession(request, options.authProvider);
     if (!session) return reply.code(401).send({ error: 'unauthorized' });
-    if (!options.operationalStore || !options.decisionLifecycleStore) {
+    if (!options.decisionLifecycleStore) {
       return reply.code(503).send({ error: 'decision_lifecycle_unavailable' });
     }
 
@@ -196,28 +133,13 @@ export function registerDecisionLifecycleRoutes(
     if (!decisionId) return reply.code(400).send({ error: 'invalid_decision_id' });
     if (!reason) return reply.code(400).send({ error: 'invalid_reversal_reason' });
 
-    const existing = await options.decisionLifecycleStore.getDecision(scope, decisionId);
-    if (!existing) return reply.code(404).send({ error: 'decision_not_found' });
-    if (existing.status !== 'active') {
-      return reply.code(409).send({ error: 'decision_not_active' });
-    }
-
-    const decision = await options.decisionLifecycleStore.transitionActiveDecision(
+    const result = await options.decisionLifecycleStore.reverseWithAudit({
       scope,
       decisionId,
-      'reversed',
-    );
-    if (!decision) return reply.code(409).send({ error: 'decision_transition_conflict' });
-
-    await timeline(options.operationalStore, {
-      scope,
-      type: 'decision.reversed',
       actorUserId: session.user.id,
-      entityId: decision.id,
-      summary: decision.title,
-      metadata: { reason },
+      reason,
     });
-
-    return { decision };
+    if (!result.ok) return sendLifecycleError(reply, result.error);
+    return { decision: result.decision };
   });
 }
