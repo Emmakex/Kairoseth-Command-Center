@@ -7,6 +7,7 @@ export type OperationalMutation = {
 };
 
 const PROJECT_STATUSES = ['planned', 'active', 'blocked', 'done', 'archived'] as const;
+const MILESTONE_STATUSES = ['planned', 'active', 'done', 'cancelled'] as const;
 const TASK_STATUSES = ['todo', 'in_progress', 'blocked', 'done', 'cancelled'] as const;
 const ALERT_STATUSES = ['open', 'acknowledged', 'resolved', 'dismissed'] as const;
 
@@ -75,6 +76,33 @@ export function parseOperationalMutation(form: FormData): OperationalMutation | 
     return { path: '/v1/quick-capture', method: 'POST', body };
   }
 
+  if (operation === 'milestone-create') {
+    const projectId = requiredText(form.get('projectId'), 100);
+    const title = requiredText(form.get('title'), 240);
+    const weight = numericValue(form.get('weight'), 1, 100);
+    if (!projectId || !title || weight === undefined || weight === null) return null;
+
+    return {
+      path: '/v1/milestones',
+      method: 'POST',
+      body: { scope, projectId, title, weight },
+    };
+  }
+
+  if (operation === 'decision-create') {
+    if (scope !== 'workspace') return null;
+    const title = requiredText(form.get('title'), 240);
+    const decision = requiredText(form.get('decision'), 8000);
+    const context = optionalText(form.get('context'), 8000);
+    const projectId = optionalText(form.get('projectId'), 100);
+    if (!title || !decision || context === null || projectId === null) return null;
+
+    const body: Record<string, string | number> = { scope, title, decision };
+    if (context) body.context = context;
+    if (projectId) body.projectId = projectId;
+    return { path: '/v1/decisions', method: 'POST', body };
+  }
+
   const id = requiredText(form.get('id'), 100);
   if (!id) return null;
   const encodedId = encodeURIComponent(id);
@@ -87,6 +115,16 @@ export function parseOperationalMutation(form: FormData): OperationalMutation | 
     const body: Record<string, string | number> = { scope, status };
     if (progress !== undefined) body.progress = progress;
     return { path: `/v1/projects/${encodedId}/status`, method: 'PATCH', body };
+  }
+
+  if (operation === 'milestone-status') {
+    const status = enumValue(form.get('status'), MILESTONE_STATUSES);
+    if (!status) return null;
+    return {
+      path: `/v1/milestones/${encodedId}/status`,
+      method: 'PATCH',
+      body: { scope, status },
+    };
   }
 
   if (operation === 'task-status') {
