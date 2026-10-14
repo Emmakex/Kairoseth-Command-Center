@@ -8,10 +8,10 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "pnpm --parallel --filter './apps/*' dev",
+    "dev": "pnpm --filter './packages/*' build && pnpm --parallel --filter './apps/*' dev",
     "build": "pnpm -r --if-present build",
     "lint": "eslint .",
-    "typecheck": "pnpm -r --if-present typecheck",
+    "typecheck": "pnpm --filter './packages/*' build && pnpm -r --filter './apps/*' --if-present typecheck",
     "test": "vitest run --passWithNoTests",
     "format:check": "prettier --check .",
     "format": "prettier --write .",
