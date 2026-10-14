@@ -18,9 +18,10 @@ Esta carpeta es la fuente de verdad para las decisiones de producto, arquitectur
 11. [`10-roadmap.md`](10-roadmap.md) — implementation phases and release gates.
 12. [`11-operations-observability.md`](11-operations-observability.md) — CI/CD, telemetry, backup and runtime operations.
 13. [`12-commercial-packaging.md`](12-commercial-packaging.md) — packaging and deployment editions.
-14. [`13-decisions.md`](13-decisions.md) — architectural/product decisions already agreed.
-15. [`14-development.md`](14-development.md) — local workspace, Docker stack and Phase 1 quality gate.
-16. [`15-standalone-auth.md`](15-standalone-auth.md) — standalone local login, signed sessions and connected Today flow.
+14. [`12-standalone-release.md`](12-standalone-release.md) — hardened standalone profile, release gate, backup and restore.
+15. [`13-decisions.md`](13-decisions.md) — architectural/product decisions already agreed.
+16. [`14-development.md`](14-development.md) — local workspace, Docker stack and engineering quality gate.
+17. [`15-standalone-auth.md`](15-standalone-auth.md) — persistent standalone local login, sessions and connected Today flow.
 
 ## Living documents / Documentos vivos
 

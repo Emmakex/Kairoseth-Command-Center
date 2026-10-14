@@ -1,161 +1,132 @@
 # Project status / Estado del proyecto
 
-**Current phase:** Phase 3 — Operational core  
+**Current phase:** Phase 3 — standalone release boundary  
 **Technical/internal project:** Kairoseth Command Center  
-**Reserved commercial names:** Gestor de Trabajo (ES) / Work Manager (EN)  
+**Commercial names:** Gestor de Trabajo (ES) / Work Manager (EN)  
 **Category:** Kairoseth Software  
-**Status:** PR #12 merged; post-merge `main` CI #64 green. PR #13 is the final major Phase 3 functional slice: persistent standalone multi-user identities and password lifecycle.
+**Status:** PR #13 merged and post-merge validated. PR #14 hardens the standalone production-oriented release boundary and is at final merge validation.
+
+## Naming rule / Regla de naming
+
+- **ES:** Gestor de Trabajo
+- **EN:** Work Manager
+- `Kairoseth Command Center` remains the technical/internal repository name.
+- Public product names do **not** use `Kairoseth` as a prefix; Kairoseth is the vendor/catalog brand.
+- ES and EN commercial names/descriptors are defined independently.
 
 ## Completed / Completado
 
 ### Phase 0 — Foundation
 - [x] Product, architecture, portability, tenancy, security and commercial model documented.
-- [x] Commercial naming rule documented: product names do not use `Kairoseth` as a prefix; ES/EN names are defined independently.
-- [x] Reserved commercial names: **Gestor de Trabajo** (ES) / **Work Manager** (EN).
+- [x] ES/EN commercial naming rule documented.
 
 ### Phase 1 — Core shell
 - [x] Portable monorepo, web/API/worker, ES/EN, Docker and CI baseline.
-- [x] Phase 1 merged in PR #1.
+- [x] PR #1 merged.
 
 ### Phase 2 — Identity, workspaces and permissions
-- [x] Server-side session context, workspaces, membership, RBAC/capabilities and product entitlements.
+- [x] Server-side session context, workspaces, memberships, RBAC/capabilities and product entitlements.
 - [x] Strict workspace/private boundaries and negative isolation tests.
-- [x] Phase 2 merged in PR #2 with full quality gate green.
+- [x] PR #2 merged.
 
-### Phase 3 — operational foundation/actions
-- [x] Projects, Tasks, Alerts, Decisions and Timeline API/domain foundations.
-- [x] Scoped Mongo persistence and server-derived workspace/private boundaries.
-- [x] Project/Task mutations, Alert lifecycle, Quick Capture and server-authored Timeline events.
-- [x] PR #3 and PR #4 merged with complete quality gates green.
+### Phase 3 — Operational product
+- [x] Projects, Tasks, Alerts, Decisions and Timeline foundations.
+- [x] Scoped MongoDB persistence and server-derived workspace/private boundaries.
+- [x] Quick Capture and operational mutations.
+- [x] Weighted Milestones with project progress recalculation.
+- [x] Standalone login/bootstrap and authenticated Today dashboard.
+- [x] ES/EN operational UI.
+- [x] Milestone management and Decision Log UI.
+- [x] Scoped Timeline/audit UI.
+- [x] Validated Decision create/supersede/reverse lifecycle.
+- [x] Transactional audit outbox, idempotent Timeline delivery and worker processing.
+- [x] All current manual mutation families migrated to transactional audit delivery.
+- [x] PRs #3–#12 merged with their quality gates green.
 
-### Phase 3 — weighted milestones
-- [x] Milestone persistence/API and separate read/write capabilities.
-- [x] Same-scope project validation and weighted project progress recalculation.
-- [x] PR #5 merged; main CI #22 green.
-
-### Phase 3 — standalone manual use
-- [x] Explicit standalone auth configuration with no production default password/secret.
-- [x] Signed expiring HMAC sessions, local owner bootstrap and HTTP-only SameSite browser cookie.
-- [x] ES/EN login + Today dashboard with workspace/private scope switch.
-- [x] PR #6 merged; main CI #30 green.
-
-### Phase 3 — operational UI
-- [x] ES/EN Quick Capture for workspace/private projects and tasks.
-- [x] Project status/progress, Task status and Alert lifecycle controls.
-- [x] Fixed server-side mutation proxy with allowlisted operations and validation.
-- [x] PR #7 merged; main CI #36 green.
-
-### Phase 3 — Milestone + Decision Log UI
-- [x] Feature-based Today components.
-- [x] Full scoped project catalog and Milestone management UI.
-- [x] Workspace-only Decision Log UI.
-- [x] PR #8 merged; main CI #39 green.
-
-### Phase 3 — Timeline/Audit UI
-- [x] Scoped `/v1/timeline` web reader and workspace/private Timeline panel.
-- [x] ES/EN known event labels, localized timestamps/statuses and privacy-safe presentation.
-- [x] PR #9 merged; post-merge main CI #42 green.
-
-### Phase 3 — validated Decision lifecycle
-- [x] Same-workspace validation for Decision project references.
-- [x] Active Decision supersede lifecycle with project inheritance/mismatch protection.
-- [x] Active Decision reversal with required reason.
-- [x] Conditional terminal transitions prevent double/repeated state changes.
-- [x] Legacy `/v1/decisions` route cannot bypass validation with `projectId` or `supersedesId`.
-- [x] ES/EN project/supersede/reverse controls in the Decision Log.
-- [x] PR #10 merged; post-merge main CI #49 green.
-
-### Phase 3 — transactional audit outbox foundation
-- [x] Durable `audit_outbox` with leases, stale-lease recovery, retries/backoff and terminal failed state.
-- [x] Idempotent Timeline delivery keyed by stable event ID.
-- [x] Worker drains audit outbox and emits structured delivery telemetry.
-- [x] Decision create/supersede/reverse writes domain state + audit outbox records in one MongoDB transaction.
-- [x] Portable Docker MongoDB runs as single-node `rs0` replica set for transaction support.
-- [x] CI verifies replica-set readiness and real Decision lifecycle outbox-to-Timeline delivery.
-- [x] PR #11 merged; post-merge main CI #57 green.
-
-### Phase 3 — operational transactional audit migration
-- [x] Atomic store for Project create/status and Quick Capture project.
-- [x] Atomic store for Task create/status and Quick Capture task.
-- [x] Atomic store for Alert create/status.
-- [x] Atomic store for simple compatibility Decision creation.
-- [x] Atomic store for Milestone create/status with project progress recalculation inside the transaction.
-- [x] Existing public URLs and response shapes retained through a fixed allowlisted pre-handler.
-- [x] Tests prove legacy mutation handlers do not execute after an atomic interception.
-- [x] CI Docker smoke verifies workspace Decision plus private Quick Capture delivery through the worker/outbox path.
-- [x] PR #12 merged; post-merge main CI #64 green.
-
-### Phase 3 — persistent standalone multi-user identities (PR #13)
+### Phase 3 — Persistent standalone multi-user identities
 - [x] Mongo-backed `users`, `workspaces`, `memberships` and separate `local_credentials`.
 - [x] Unique normalized identity/membership/credential indexes.
 - [x] `scrypt-v1` password derivation with random salt; no plaintext password persistence.
-- [x] HMAC local session token v2 includes password version and resolves persisted User + Workspace + Membership on every request.
-- [x] Bootstrap owner persists only when the credential store is empty; restart does not recreate the owner.
-- [x] `admin` / `member` managed roles; owner protected from management mutations.
+- [x] Persistent local sessions re-resolve User + Workspace + Membership + credential version.
+- [x] Bootstrap owner persists only when the credential store is empty.
+- [x] `owner` / `admin` / `member` capability model; owner protected from management mutations.
 - [x] Member-management API protected by `members.manage`.
-- [x] Password change/reset increments password version and invalidates all older bearer sessions immediately.
-- [x] Membership/password lifecycle changes are audited through the transactional outbox.
-- [x] ES/EN account/password and member-management UI with fixed same-product proxy.
-- [x] Unit/integration tests cover restart persistence, role capabilities, reset/change invalidation, suspension, route-level member denial and owner protection.
-- [x] Reusable Docker smoke covers owner bootstrap/login → create member → member login → permission denial → owner protection → password change → old-session invalidation → renewed login.
-- [x] Dedicated `Local identities smoke` GitHub Actions gate runs the Docker lifecycle independently of the transactional-audit smoke.
-- [x] Auth/security/operations documentation synchronized.
-- [ ] Final PR #13 CI + dedicated multi-user Docker smoke green on the final head.
-- [ ] Merge PR #13 and verify post-merge `main` gates.
+- [x] Password change/reset invalidates all older bearer sessions immediately through password versioning.
+- [x] Identity/password lifecycle audited through the transactional outbox.
+- [x] ES/EN account/password and member-management UI.
+- [x] Route-level member denial, owner-protection and stale-session tests.
+- [x] Dedicated multi-user Docker smoke.
+- [x] PR #13 merged as `da3c72194e81f502a7b63d96bd9cb5dfebaa93b2`.
+- [x] PR #13 post-merge `main` CI and Local identities smoke green.
+
+### Phase 3 — Standalone production-oriented release boundary (PR #14)
+- [x] Separate `docker-compose.standalone.yml`; development compose remains unchanged.
+- [x] API/worker/web run with `NODE_ENV=production` in the standalone profile.
+- [x] Required owner email/password/HMAC secret fail closed when missing.
+- [x] Required values are empty in `.env.standalone.example`; no production defaults.
+- [x] `.dockerignore` excludes `.env` and `.env.*` from Docker build contexts.
+- [x] MongoDB is not published to the host and remains on the internal backend network.
+- [x] API/web host bindings default to `127.0.0.1`; remote access is intended through a TLS reverse proxy.
+- [x] API also joins the frontend Docker network so its loopback host binding remains reachable while Mongo stays isolated.
+- [x] Backup helper creates a compressed MongoDB archive plus SHA-256 checksum.
+- [x] Restore helper verifies checksum when available and requires `KCC_RESTORE_CONFIRM=RESTORE`.
+- [x] Standalone release smoke validates production build/start, API readiness, ES/EN routes, multi-user lifecycle, Mongo non-publication, backup, restore and post-restore authentication.
+- [x] Dedicated `Standalone release gate` GitHub Actions workflow.
+- [x] Standalone install/release/backup/restore documentation and updated README.
 
 ## Validation / Validación
 
-- [x] PR #6 — full gate green; main CI #30 green.
-- [x] PR #7 — full gate green; main CI #36 green.
-- [x] PR #8 — full gate green; main CI #39 green.
-- [x] PR #9 — full gate green; main CI #42 green.
-- [x] PR #10 — full gate green; main CI #49 green.
-- [x] PR #11 — full gate green; main CI #57 green, including transactional Decision audit smoke.
-- [x] PR #12 — merged; post-merge main CI #64 green, including workspace/private transactional outbox smoke.
-- [ ] PR #13 — final full gate and dedicated multi-user Docker smoke must be green before merge.
+Historical merged gates:
 
-## Phase 3 still pending / Pendiente de la fase 3
+- [x] PR #6 → main CI #30 green.
+- [x] PR #7 → main CI #36 green.
+- [x] PR #8 → main CI #39 green.
+- [x] PR #9 → main CI #42 green.
+- [x] PR #10 → main CI #49 green.
+- [x] PR #11 → main CI #57 green.
+- [x] PR #12 → main CI #64 green.
+- [x] PR #13 → final CI + Local identities smoke green; merged and post-merge validated.
 
-- [ ] Merge and post-merge validate PR #13.
-- [ ] Run the final standalone Phase 3 end-to-end release gate across the merged `main` state.
-- [ ] Prepare publication readiness under Kairoseth Software using the commercial names **Gestor de Trabajo / Work Manager**.
+PR #14 implementation validation on `f0145cf48d4cf8bd6d0b4893d6d922fed93b8577`:
+
+- [x] CI #94 — lint, typecheck, tests, build, dependency audit, secret scan and transactional Docker smoke green.
+- [x] Local identities smoke #20 — green.
+- [x] Standalone release gate #7 — green, including backup/restore and post-restore login.
+
+The first standalone gate attempt correctly exposed a Docker-network topology issue: API was healthy internally but its loopback host publication was unreachable while attached only to the internal network. The profile was corrected by attaching API to both backend and frontend networks while retaining loopback-only publication. The complete release smoke then passed.
+
+**Final merge rule:** after this status synchronization, the same three gates must be green again on the final PR #14 head before merge.
 
 ## Security invariants
 
-1. Manual APIs never accept raw tenant/user IDs as authorization scope.
-2. `scope=workspace` resolves only to the active authenticated workspace.
-3. `scope=private` resolves only to the authenticated user.
-4. Product entitlement and capability checks are both enforced.
-5. Mongo queries always include the scope boundary.
-6. System/integration scope cannot be created through manual operational endpoints.
-7. Decisions are workspace-only.
-8. Decision project/supersede references resolve inside the authenticated workspace.
-9. Legacy Decision creation cannot bypass validated lifecycle references.
-10. Timeline events are server-authored; browser clients cannot write arbitrary audit records.
-11. Operational browser forms post only to fixed same-product proxies and cannot choose arbitrary upstream paths.
-12. Standalone browser sessions are HTTP-only and bearer tokens are not persisted in browser storage.
-13. Transactionally hardened mutations write domain state and audit outbox records in the same MongoDB transaction.
-14. Outbox delivery to Timeline is idempotent and safe to retry after worker interruption.
-15. Atomic route interception preserves existing authorization/scope validation and prevents the legacy mutation handler from executing a second write.
-16. Timeline presentation follows the same workspace/private scope and hides raw technical metadata from the main dashboard.
-17. Standalone passwords are never persisted in plaintext; local credentials store `scrypt-v1` derived material with random salt.
-18. Persistent local sessions are revalidated against current user/workspace/membership/credential state on every request.
-19. Password change/reset increments password version and invalidates every older local bearer token immediately.
-20. Normal members cannot administer workspace identities; `members.manage` is required.
-21. The standalone owner cannot be demoted/disabled or password-reset through member-management routes.
+1. Workspace/private scope is derived from the authenticated session, never authorized by raw client tenant/user IDs.
+2. Product entitlement and capability checks are server-enforced.
+3. MongoDB queries include the applicable scope boundary.
+4. Decisions are workspace-only and project/supersede references resolve inside the authenticated workspace.
+5. Timeline events are server-authored and delivered idempotently through the transactional outbox.
+6. Browser operational forms use fixed same-product proxies and cannot choose arbitrary upstream paths.
+7. Standalone browser sessions are HTTP-only; bearer tokens are not persisted in browser storage.
+8. Standalone passwords are never persisted in plaintext.
+9. Password change/reset immediately invalidates older local sessions.
+10. Normal members cannot administer identities; `members.manage` is required.
+11. Standalone owner protection is enforced at the HTTP boundary.
+12. Production-oriented standalone MongoDB is not published to the host.
+13. Standalone required credentials/secrets fail closed when absent.
+14. Runtime `.env` files are excluded from Docker build contexts.
 
 ## Next / Siguiente
 
-1. Finish the final PR #13 quality gates and dedicated multi-user Docker smoke.
-2. Merge PR #13 and verify both workflows on `main`.
-3. Execute the final standalone Phase 3 end-to-end release gate.
-4. Prepare **Gestor de Trabajo / Work Manager** for publication under Kairoseth Software.
-5. Begin Phase 4 GitHub integration after the standalone release boundary is clean.
+1. Run the three final PR #14 gates on this synchronized head.
+2. Merge PR #14 only if all three are green.
+3. Verify CI, Local identities smoke and Standalone release gate again on `main`.
+4. With those post-merge gates green, close the Phase 3 standalone technical release boundary.
+5. Continue with Phase 4 GitHub integration.
+6. When commercial publication is scheduled, create the Kairoseth Software catalog entry as **Gestor de Trabajo / Work Manager**.
 
 ## Current blockers / Bloqueos actuales
 
-No functional blocker documented. PR #13 is waiting only on its final automated quality gates before merge.
+No functional blocker. PR #14 is in final automated validation.
 
 ## Operating rule
 
-Update this file at meaningful milestones. Do not use it as a substitute for detailed issues/roadmap; it is the concise project snapshot.
+Update this file at meaningful milestones. Do not use it as a substitute for detailed roadmap/issues documentation.
