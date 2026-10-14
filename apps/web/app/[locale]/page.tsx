@@ -1,7 +1,9 @@
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { Card } from '@kcc/ui';
+import { AccountPanel } from '../../components/account-panel';
 import { DecisionPanel } from '../../components/decision-panel';
+import { MemberPanel } from '../../components/member-panel';
 import { MilestonePanel } from '../../components/milestone-panel';
 import { OperationalPanels } from '../../components/operational-panels';
 import { QuickCapturePanel } from '../../components/quick-capture-panel';
@@ -16,6 +18,7 @@ import {
   readSessionToken,
 } from '../../lib/api';
 import { dictionary, isLocale, locales } from '../../lib/i18n';
+import { getLocalMembers } from '../../lib/local-identities';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,17 +39,20 @@ export default async function CommandCenterPage({
   const token = await readSessionToken();
   if (!token) redirect(`/${locale}/login`);
 
+  const session = await getSession(token);
+  if (!session) redirect(`/${locale}/login`);
+
   const { scope: requestedScope, result } = await searchParams;
   const scope = requestedScope === 'private' ? 'private' : 'workspace';
-  const [session, today, projects, milestones, decisions, timeline] = await Promise.all([
-    getSession(token),
+  const canManageMembers = session.capabilities.includes('members.manage');
+  const [today, projects, milestones, decisions, timeline, members] = await Promise.all([
     getToday(token, scope),
     getProjects(token, scope),
     getMilestones(token, scope),
     scope === 'workspace' ? getDecisions(token) : Promise.resolve(null),
     getTimeline(token, scope),
+    scope === 'workspace' && canManageMembers ? getLocalMembers(token) : Promise.resolve(null),
   ]);
-  if (!session) redirect(`/${locale}/login`);
 
   const copy = dictionary[locale];
   const otherLocale = locale === 'es' ? 'en' : 'es';
@@ -152,6 +158,10 @@ export default async function CommandCenterPage({
           timeZone={session.user.timezone}
           events={timeline}
         />
+        <AccountPanel locale={locale} />
+        {scope === 'workspace' && canManageMembers ? (
+          <MemberPanel locale={locale} members={members} />
+        ) : null}
       </section>
     </main>
   );
