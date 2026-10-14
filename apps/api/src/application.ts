@@ -5,6 +5,8 @@ import type { ReadinessCheck } from './app';
 import { registerDecisionCompatibilityGuard } from './decision-compatibility';
 import { registerDecisionLifecycleRoutes } from './decisions';
 import type { DecisionLifecycleStore } from './decision-lifecycle-store';
+import { registerGitHubRepositoryRoutes } from './github-repositories';
+import type { GitHubRepositoryStore } from './github-repository-store';
 import { registerStandaloneAuthRoutes } from './local-auth';
 import type { LocalLoginProvider } from './local-auth';
 import { registerLocalIdentityRoutes } from './local-identity-routes';
@@ -23,6 +25,7 @@ type ApplicationOptions = {
   milestoneStore?: MilestoneStore;
   decisionLifecycleStore?: DecisionLifecycleStore;
   operationalAuditStore?: OperationalAuditStore;
+  githubRepositoryStore?: GitHubRepositoryStore;
 };
 
 export function buildApp(options: ApplicationOptions = {}) {
@@ -58,6 +61,13 @@ export function buildApp(options: ApplicationOptions = {}) {
     ...(options.authProvider ? { authProvider: options.authProvider } : {}),
     ...(options.decisionLifecycleStore
       ? { decisionLifecycleStore: options.decisionLifecycleStore }
+      : {}),
+  });
+
+  registerGitHubRepositoryRoutes(app, {
+    ...(options.authProvider ? { authProvider: options.authProvider } : {}),
+    ...(options.githubRepositoryStore
+      ? { githubRepositoryStore: options.githubRepositoryStore }
       : {}),
   });
 
