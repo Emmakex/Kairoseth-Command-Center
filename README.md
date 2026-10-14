@@ -33,7 +33,7 @@ Requirements: Docker Engine with Docker Compose v2.
 cp .env.standalone.example .env.standalone
 ```
 
-2. Replace every `CHANGE_ME` value. Generate a long random signing secret, for example:
+2. Set the required empty values `KCC_LOCAL_ADMIN_EMAIL`, `KCC_LOCAL_ADMIN_PASSWORD` and `KCC_LOCAL_AUTH_SECRET`. Generate a long random signing secret, for example:
 
 ```bash
 openssl rand -hex 32
