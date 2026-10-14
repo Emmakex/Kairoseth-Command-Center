@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { authorize } from '@kcc/auth';
 import type { AuthProvider, SessionContext } from '@kcc/auth';
 import type {
@@ -46,10 +46,7 @@ function isoDate(value: unknown): string | undefined | null {
   return Number.isNaN(parsed) ? null : new Date(parsed).toISOString();
 }
 
-function sendLifecycleError(
-  reply: Parameters<Parameters<FastifyInstance['post']>[1]>[1],
-  error: DecisionLifecycleError,
-) {
+function sendLifecycleError(reply: FastifyReply, error: DecisionLifecycleError) {
   const status = error === 'project_not_found' || error === 'decision_not_found' ? 404 : 409;
   return reply.code(status).send({ error });
 }
