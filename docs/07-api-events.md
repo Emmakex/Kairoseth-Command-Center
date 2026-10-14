@@ -57,6 +57,42 @@ Authentication, workspace/private scope derivation, capability checks and payloa
 
 Milestone state and the resulting project progress are updated in the same transaction as the audit outbox record. Private Quick Capture keeps private-user scope and the `task.quick_captured` / `project.quick_captured` event semantics.
 
+## GitHub repository links
+
+The first Phase 4 integration contract is intentionally metadata-only and does not require GitHub credentials or a live GitHub API call.
+
+Routes:
+
+- `GET /v1/integrations/github/repositories`
+- `POST /v1/integrations/github/repositories`
+- `DELETE /v1/integrations/github/repositories/:resourceId`
+
+All routes:
+
+- require an authenticated active workspace;
+- derive the workspace exclusively from the server-side session;
+- require `integrations.manage` plus the `command-center` product entitlement;
+- operate only on provider `github`, kind `repository` normalized resources.
+
+Create accepts:
+
+```json
+{
+  "projectId": "project-id",
+  "owner": "Emmakex",
+  "repository": "Kairoseth-Command-Center",
+  "defaultBranch": "main"
+}
+```
+
+`workspaceId`, user IDs and arbitrary repository URLs are not authorization or persistence inputs. The API validates owner/repository path components, creates a canonical lowercase `owner/repository` external ID, and constructs the GitHub URL server-side. `projectId` must resolve inside the authenticated workspace.
+
+Repository identity is unique per workspace/provider/kind/external ID. A duplicate returns `409 github_repository_already_linked`. A project outside the authenticated workspace is indistinguishable from a missing project and returns `404 project_not_found`.
+
+Link/unlink state and audit-outbox events are committed in the same MongoDB transaction. Unlink queries include workspace scope and resource kind/provider, so a raw resource ID cannot cross tenant boundaries.
+
+This slice does not validate that a repository exists remotely. Live repository validation, credentials, sync and webhooks are separate connector slices.
+
 ## Transactional audit event delivery
 
 `audit_outbox` is an internal persistence contract, not a browser API. Each record contains a fully normalized Timeline event with a stable event ID plus delivery state (`pending`, `processing`, `delivered`, `failed`).
@@ -113,6 +149,7 @@ Internal events should follow a normalized envelope:
 - `alert.created|status_changed`
 - `decision.created|superseded|reversed`
 - `integration.connected|degraded|disconnected`
+- `integration.github.repository_linked|repository_unlinked`
 - `repository.sync.completed|failed`
 - `membership.created|updated|revoked`
 
