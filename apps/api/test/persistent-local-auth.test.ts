@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Membership, User, Workspace } from '@kcc/domain';
+import { buildApp } from '../src/application';
 import type {
   LocalCredential,
   LocalIdentityRecord,
@@ -301,5 +302,137 @@ describe('persistent local authentication', () => {
     expect(
       await auth.resolveSession({ authorization: `Bearer ${newLogin?.accessToken ?? ''}` }),
     ).toBeNull();
+  });
+
+  it('enforces member-management capability and protects the owner at the HTTP boundary', async () => {
+    const store = new MemoryIdentityStore();
+    const auth = provider(store);
+    await auth.initialize(bootstrap);
+    const member = await auth.createMember({
+      actorUserId: bootstrap.userId,
+      workspaceId: bootstrap.workspaceId,
+      email: 'member@example.com',
+      displayName: 'Member One',
+      locale: 'en',
+      timezone: 'Europe/Madrid',
+      role: 'member',
+      password: 'member-password-1234',
+    });
+    expect(member).not.toBeNull();
+
+    const ownerLogin = await auth.authenticate(bootstrap.email, bootstrap.password);
+    const memberLogin = await auth.authenticate('member@example.com', 'member-password-1234');
+    expect(ownerLogin).not.toBeNull();
+    expect(memberLogin).not.toBeNull();
+
+    const app = buildApp({
+      authProvider: auth,
+      standaloneAuthProvider: auth,
+      localIdentityProvider: auth,
+    });
+
+    const denied = await app.inject({
+      method: 'GET',
+      url: '/v1/auth/local/members',
+      headers: { authorization: `Bearer ${memberLogin?.accessToken ?? ''}` },
+    });
+    expect(denied.statusCode).toBe(403);
+    expect(denied.json()).toEqual({ error: 'forbidden' });
+
+    const allowed = await app.inject({
+      method: 'GET',
+      url: '/v1/auth/local/members',
+      headers: { authorization: `Bearer ${ownerLogin?.accessToken ?? ''}` },
+    });
+    expect(allowed.statusCode).toBe(200);
+    expect((allowed.json() as { members: unknown[] }).members).toHaveLength(2);
+
+    const demoteOwner = await app.inject({
+      method: 'PATCH',
+      url: `/v1/auth/local/members/${bootstrap.userId}`,
+      headers: { authorization: `Bearer ${ownerLogin?.accessToken ?? ''}` },
+      payload: { role: 'member' },
+    });
+    expect(demoteOwner.statusCode).toBe(409);
+    expect(demoteOwner.json()).toEqual({ error: 'owner_protected' });
+
+    const resetOwner = await app.inject({
+      method: 'POST',
+      url: `/v1/auth/local/members/${bootstrap.userId}/reset-password`,
+      headers: { authorization: `Bearer ${ownerLogin?.accessToken ?? ''}` },
+      payload: { newPassword: 'owner-reset-not-allowed-1234' },
+    });
+    expect(resetOwner.statusCode).toBe(409);
+    expect(resetOwner.json()).toEqual({ error: 'owner_protected' });
+
+    const promoteMember = await app.inject({
+      method: 'PATCH',
+      url: `/v1/auth/local/members/${member?.user.id ?? ''}`,
+      headers: { authorization: `Bearer ${ownerLogin?.accessToken ?? ''}` },
+      payload: { role: 'admin' },
+    });
+    expect(promoteMember.statusCode).toBe(200);
+    expect(promoteMember.json()).toMatchObject({ member: { role: 'admin' } });
+
+    await app.close();
+  });
+
+  it('changes a member password through the API and invalidates the previous session', async () => {
+    const store = new MemoryIdentityStore();
+    const auth = provider(store);
+    await auth.initialize(bootstrap);
+    await auth.createMember({
+      actorUserId: bootstrap.userId,
+      workspaceId: bootstrap.workspaceId,
+      email: 'member@example.com',
+      displayName: 'Member One',
+      locale: 'es',
+      timezone: 'Europe/Madrid',
+      role: 'member',
+      password: 'member-password-1234',
+    });
+    const memberLogin = await auth.authenticate('member@example.com', 'member-password-1234');
+    expect(memberLogin).not.toBeNull();
+
+    const app = buildApp({
+      authProvider: auth,
+      standaloneAuthProvider: auth,
+      localIdentityProvider: auth,
+    });
+
+    const changed = await app.inject({
+      method: 'POST',
+      url: '/v1/auth/local/change-password',
+      headers: { authorization: `Bearer ${memberLogin?.accessToken ?? ''}` },
+      payload: {
+        currentPassword: 'member-password-1234',
+        newPassword: 'member-password-5678',
+      },
+    });
+    expect(changed.statusCode).toBe(204);
+
+    const staleSession = await app.inject({
+      method: 'GET',
+      url: '/v1/session',
+      headers: { authorization: `Bearer ${memberLogin?.accessToken ?? ''}` },
+    });
+    expect(staleSession.statusCode).toBe(401);
+
+    const oldPassword = await app.inject({
+      method: 'POST',
+      url: '/v1/auth/local/login',
+      payload: { email: 'member@example.com', password: 'member-password-1234' },
+    });
+    expect(oldPassword.statusCode).toBe(401);
+
+    const newPassword = await app.inject({
+      method: 'POST',
+      url: '/v1/auth/local/login',
+      payload: { email: 'member@example.com', password: 'member-password-5678' },
+    });
+    expect(newPassword.statusCode).toBe(200);
+    expect(newPassword.json()).toMatchObject({ role: 'member' });
+
+    await app.close();
   });
 });
