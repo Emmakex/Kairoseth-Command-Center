@@ -3,45 +3,52 @@ import { loadApiConfig } from '@kcc/config';
 import { MongoOperationalStore } from '@kcc/persistence';
 import { buildApp } from './application';
 import { MongoDecisionLifecycleStore } from './decision-lifecycle-store';
-import { StandaloneLocalAuthProvider } from './local-auth';
+import { MongoLocalIdentityStore } from './local-identity-store';
 import { MongoOperationalAuditStore } from './operational-audit-store';
+import { PersistentLocalAuthProvider } from './persistent-local-auth';
 
 const config = loadApiConfig();
 const mongo = new MongoClient(config.MONGODB_URI, { serverSelectionTimeoutMS: 3000 });
 const operationalStore = new MongoOperationalStore(mongo.db());
 const operationalAuditStore = new MongoOperationalAuditStore(mongo, mongo.db());
 const decisionLifecycleStore = new MongoDecisionLifecycleStore(mongo, mongo.db());
+const localIdentityStore = new MongoLocalIdentityStore(mongo, mongo.db());
 let mongoReady = false;
+let localAuthProvider: PersistentLocalAuthProvider | undefined;
 
 try {
   await mongo.connect();
   await mongo.db().command({ ping: 1 });
   await Promise.all([operationalStore.ensureIndexes(), decisionLifecycleStore.ensureIndexes()]);
   mongoReady = true;
-} catch (error) {
-  console.error('MongoDB is not ready; API will stay alive but readiness will fail.', error);
-}
 
-let standaloneAuthProvider: StandaloneLocalAuthProvider | undefined;
-if (config.KCC_AUTH_MODE === 'local') {
-  if (config.KCC_LOCAL_ADMIN_PASSWORD && config.KCC_LOCAL_AUTH_SECRET) {
-    standaloneAuthProvider = new StandaloneLocalAuthProvider({
-      email: config.KCC_LOCAL_ADMIN_EMAIL,
-      password: config.KCC_LOCAL_ADMIN_PASSWORD,
-      secret: config.KCC_LOCAL_AUTH_SECRET,
-      displayName: config.KCC_LOCAL_ADMIN_DISPLAY_NAME,
-      locale: config.KCC_LOCAL_LOCALE,
-      timezone: config.KCC_LOCAL_TIMEZONE,
-      userId: config.KCC_LOCAL_USER_ID,
-      workspaceId: config.KCC_LOCAL_WORKSPACE_ID,
-      workspaceName: config.KCC_LOCAL_WORKSPACE_NAME,
-      sessionTtlSeconds: config.KCC_LOCAL_SESSION_TTL_SECONDS,
-    });
-  } else {
-    console.warn(
-      'Standalone local auth is selected but KCC_LOCAL_ADMIN_PASSWORD or KCC_LOCAL_AUTH_SECRET is missing.',
-    );
+  if (config.KCC_AUTH_MODE === 'local') {
+    if (!config.KCC_LOCAL_AUTH_SECRET) {
+      console.warn('Standalone local auth is selected but KCC_LOCAL_AUTH_SECRET is missing.');
+    } else {
+      const provider = new PersistentLocalAuthProvider(localIdentityStore, {
+        secret: config.KCC_LOCAL_AUTH_SECRET,
+        sessionTtlSeconds: config.KCC_LOCAL_SESSION_TTL_SECONDS,
+      });
+      await provider.initialize(
+        config.KCC_LOCAL_ADMIN_PASSWORD
+          ? {
+              email: config.KCC_LOCAL_ADMIN_EMAIL,
+              password: config.KCC_LOCAL_ADMIN_PASSWORD,
+              displayName: config.KCC_LOCAL_ADMIN_DISPLAY_NAME,
+              locale: config.KCC_LOCAL_LOCALE,
+              timezone: config.KCC_LOCAL_TIMEZONE,
+              userId: config.KCC_LOCAL_USER_ID,
+              workspaceId: config.KCC_LOCAL_WORKSPACE_ID,
+              workspaceName: config.KCC_LOCAL_WORKSPACE_NAME,
+            }
+          : undefined,
+      );
+      localAuthProvider = provider;
+    }
   }
+} catch (error) {
+  console.error('MongoDB or local identity bootstrap is not ready; API will stay alive but readiness will fail.', error);
 }
 
 const app = buildApp({
@@ -50,10 +57,11 @@ const app = buildApp({
   operationalAuditStore,
   milestoneStore: operationalStore,
   decisionLifecycleStore,
-  ...(standaloneAuthProvider
+  ...(localAuthProvider
     ? {
-        authProvider: standaloneAuthProvider,
-        standaloneAuthProvider,
+        authProvider: localAuthProvider,
+        standaloneAuthProvider: localAuthProvider,
+        localIdentityProvider: localAuthProvider,
       }
     : {}),
   readinessCheck: async () => {
@@ -72,7 +80,7 @@ const app = buildApp({
       authentication:
         config.KCC_AUTH_MODE === 'disabled'
           ? 'not_configured'
-          : standaloneAuthProvider || config.KCC_AUTH_MODE === 'external'
+          : localAuthProvider || config.KCC_AUTH_MODE === 'external'
             ? 'ok'
             : 'error',
     };
