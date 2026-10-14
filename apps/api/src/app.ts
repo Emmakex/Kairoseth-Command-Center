@@ -37,9 +37,11 @@ export function buildApp(
       return reply.code(401).send({ error: 'unauthorized' });
     }
 
+    const authorization = request.headers.authorization;
+    const cookie = request.headers.cookie;
     const session = await options.authProvider.resolveSession({
-      authorization: request.headers.authorization,
-      cookie: request.headers.cookie,
+      ...(authorization ? { authorization } : {}),
+      ...(cookie ? { cookie } : {}),
     });
 
     if (!session) {
