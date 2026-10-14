@@ -1,14 +1,17 @@
 import { MongoClient } from 'mongodb';
 import { loadApiConfig } from '@kcc/config';
+import { MongoOperationalStore } from '@kcc/persistence';
 import { buildApp } from './app';
 
 const config = loadApiConfig();
 const mongo = new MongoClient(config.MONGODB_URI, { serverSelectionTimeoutMS: 3000 });
+const operationalStore = new MongoOperationalStore(mongo.db());
 let mongoReady = false;
 
 try {
   await mongo.connect();
   await mongo.db().command({ ping: 1 });
+  await operationalStore.ensureIndexes();
   mongoReady = true;
 } catch (error) {
   console.error('MongoDB is not ready; API will stay alive but readiness will fail.', error);
@@ -16,6 +19,7 @@ try {
 
 const app = buildApp({
   logger: true,
+  operationalStore,
   readinessCheck: async () => {
     if (!mongoReady) {
       try {
