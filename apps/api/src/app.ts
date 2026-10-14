@@ -3,7 +3,13 @@ import type { FastifyRequest } from 'fastify';
 import { authorize } from '@kcc/auth';
 import type { AuthProvider, Capability, SessionContext } from '@kcc/auth';
 import type { HealthResponse, ReadyResponse } from '@kcc/contracts';
-import type { Scope } from '@kcc/domain';
+import type {
+  AlertSeverity,
+  AlertStatus,
+  ProjectStatus,
+  Scope,
+  TaskStatus,
+} from '@kcc/domain';
 import type { OperationalStore } from '@kcc/persistence';
 
 export type ReadinessCheck = () => Promise<Record<string, 'ok' | 'error' | 'not_configured'>>;
@@ -16,6 +22,12 @@ type AppOptions = {
 };
 
 type ManualScopeKind = 'workspace' | 'private';
+type QuickCaptureKind = 'project' | 'task';
+
+const PROJECT_STATUSES: readonly ProjectStatus[] = ['planned', 'active', 'blocked', 'done', 'archived'];
+const TASK_STATUSES: readonly TaskStatus[] = ['todo', 'in_progress', 'blocked', 'done', 'cancelled'];
+const ALERT_SEVERITIES: readonly AlertSeverity[] = ['info', 'warning', 'urgent', 'critical'];
+const ALERT_STATUSES: readonly AlertStatus[] = ['open', 'acknowledged', 'resolved', 'dismissed'];
 
 async function resolveSession(
   request: FastifyRequest,
@@ -73,6 +85,34 @@ function validIsoDate(value: unknown): string | undefined {
   if (typeof value !== 'string' || value.length > 40) return undefined;
   const parsed = Date.parse(value);
   return Number.isNaN(parsed) ? undefined : new Date(parsed).toISOString();
+}
+
+function enumValue<T extends string>(value: unknown, allowed: readonly T[]): T | null {
+  return typeof value === 'string' && allowed.includes(value as T) ? (value as T) : null;
+}
+
+async function recordTimeline(
+  store: OperationalStore,
+  input: {
+    scope: Scope;
+    type: string;
+    actorUserId: string;
+    entityType: string;
+    entityId: string;
+    summary: string;
+    metadata?: Record<string, unknown>;
+  },
+) {
+  return store.appendTimeline({
+    scope: input.scope,
+    type: input.type,
+    actorUserId: input.actorUserId,
+    entityType: input.entityType,
+    entityId: input.entityId,
+    summary: input.summary,
+    source: 'manual-api',
+    ...(input.metadata ? { metadata: input.metadata } : {}),
+  });
 }
 
 function partsInZone(date: Date, timeZone: string) {
@@ -241,8 +281,57 @@ export function buildApp(options: AppOptions = {}) {
       ...(description ? { description } : {}),
       ...(dueAt ? { dueAt } : {}),
     });
+    await recordTimeline(options.operationalStore, {
+      scope,
+      type: 'project.created',
+      actorUserId: session.user.id,
+      entityType: 'project',
+      entityId: project.id,
+      summary: project.name,
+    });
 
     return reply.code(201).send({ project });
+  });
+
+  app.patch('/v1/projects/:id/status', async (request, reply) => {
+    const session = await resolveSession(request, options.authProvider);
+    if (!session) return reply.code(401).send({ error: 'unauthorized' });
+    if (!options.operationalStore) return reply.code(503).send({ error: 'operational_store_unavailable' });
+
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const params = request.params as { id?: string };
+    const projectId = nonEmptyString(params.id, 100);
+    const scope = resolveManualScope(session, body.scope);
+    const status = enumValue(body.status, PROJECT_STATUSES);
+    if (!projectId) return reply.code(400).send({ error: 'invalid_project_id' });
+    if (!scope) return reply.code(400).send({ error: 'workspace_required' });
+    if (!status) return reply.code(400).send({ error: 'invalid_status' });
+    if (body.progress !== undefined && typeof body.progress !== 'number') {
+      return reply.code(400).send({ error: 'invalid_progress' });
+    }
+    if (!canUseCommandCenter(session, scope, 'projects.write')) {
+      return reply.code(403).send({ error: 'forbidden' });
+    }
+
+    const project = await options.operationalStore.updateProjectStatus(
+      scope,
+      projectId,
+      status,
+      typeof body.progress === 'number' ? body.progress : undefined,
+    );
+    if (!project) return reply.code(404).send({ error: 'project_not_found' });
+
+    await recordTimeline(options.operationalStore, {
+      scope,
+      type: 'project.status_changed',
+      actorUserId: session.user.id,
+      entityType: 'project',
+      entityId: project.id,
+      summary: `${project.name}: ${project.status}`,
+      metadata: { status: project.status, progress: project.progress },
+    });
+
+    return { project };
   });
 
   app.get('/v1/tasks', async (request, reply) => {
@@ -291,8 +380,274 @@ export function buildApp(options: AppOptions = {}) {
       ...(priority !== undefined ? { priority } : {}),
       ...(dueAt ? { dueAt } : {}),
     });
+    await recordTimeline(options.operationalStore, {
+      scope,
+      type: 'task.created',
+      actorUserId: session.user.id,
+      entityType: 'task',
+      entityId: task.id,
+      summary: task.title,
+    });
 
     return reply.code(201).send({ task });
+  });
+
+  app.patch('/v1/tasks/:id/status', async (request, reply) => {
+    const session = await resolveSession(request, options.authProvider);
+    if (!session) return reply.code(401).send({ error: 'unauthorized' });
+    if (!options.operationalStore) return reply.code(503).send({ error: 'operational_store_unavailable' });
+
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const params = request.params as { id?: string };
+    const taskId = nonEmptyString(params.id, 100);
+    const scope = resolveManualScope(session, body.scope);
+    const status = enumValue(body.status, TASK_STATUSES);
+    if (!taskId) return reply.code(400).send({ error: 'invalid_task_id' });
+    if (!scope) return reply.code(400).send({ error: 'workspace_required' });
+    if (!status) return reply.code(400).send({ error: 'invalid_status' });
+    if (!canUseCommandCenter(session, scope, 'tasks.write')) {
+      return reply.code(403).send({ error: 'forbidden' });
+    }
+
+    const task = await options.operationalStore.updateTaskStatus(scope, taskId, status);
+    if (!task) return reply.code(404).send({ error: 'task_not_found' });
+
+    await recordTimeline(options.operationalStore, {
+      scope,
+      type: 'task.status_changed',
+      actorUserId: session.user.id,
+      entityType: 'task',
+      entityId: task.id,
+      summary: `${task.title}: ${task.status}`,
+      metadata: { status: task.status },
+    });
+
+    return { task };
+  });
+
+  app.get('/v1/alerts', async (request, reply) => {
+    const session = await resolveSession(request, options.authProvider);
+    if (!session) return reply.code(401).send({ error: 'unauthorized' });
+    if (!options.operationalStore) return reply.code(503).send({ error: 'operational_store_unavailable' });
+
+    const query = request.query as { scope?: string };
+    const scope = resolveManualScope(session, query.scope);
+    if (!scope) return reply.code(400).send({ error: 'workspace_required' });
+    if (!canUseCommandCenter(session, scope, 'alerts.read')) {
+      return reply.code(403).send({ error: 'forbidden' });
+    }
+
+    return { alerts: await options.operationalStore.listAlerts(scope) };
+  });
+
+  app.post('/v1/alerts', async (request, reply) => {
+    const session = await resolveSession(request, options.authProvider);
+    if (!session) return reply.code(401).send({ error: 'unauthorized' });
+    if (!options.operationalStore) return reply.code(503).send({ error: 'operational_store_unavailable' });
+
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const scope = resolveManualScope(session, body.scope);
+    const title = nonEmptyString(body.title, 240);
+    const severity = enumValue(body.severity, ALERT_SEVERITIES);
+    if (!scope) return reply.code(400).send({ error: 'workspace_required' });
+    if (!title) return reply.code(400).send({ error: 'invalid_title' });
+    if (!severity) return reply.code(400).send({ error: 'invalid_severity' });
+    if (!canUseCommandCenter(session, scope, 'alerts.manage')) {
+      return reply.code(403).send({ error: 'forbidden' });
+    }
+
+    const message = optionalString(body.message, 8000);
+    const projectId = optionalString(body.projectId, 100);
+    const fingerprint = optionalString(body.fingerprint, 200);
+    const alert = await options.operationalStore.createAlert({
+      scope,
+      title,
+      severity,
+      ...(message ? { message } : {}),
+      ...(projectId ? { projectId } : {}),
+      ...(fingerprint ? { fingerprint } : {}),
+    });
+    await recordTimeline(options.operationalStore, {
+      scope,
+      type: 'alert.created',
+      actorUserId: session.user.id,
+      entityType: 'alert',
+      entityId: alert.id,
+      summary: alert.title,
+      metadata: { severity: alert.severity },
+    });
+
+    return reply.code(201).send({ alert });
+  });
+
+  app.patch('/v1/alerts/:id/status', async (request, reply) => {
+    const session = await resolveSession(request, options.authProvider);
+    if (!session) return reply.code(401).send({ error: 'unauthorized' });
+    if (!options.operationalStore) return reply.code(503).send({ error: 'operational_store_unavailable' });
+
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const params = request.params as { id?: string };
+    const alertId = nonEmptyString(params.id, 100);
+    const scope = resolveManualScope(session, body.scope);
+    const status = enumValue(body.status, ALERT_STATUSES);
+    if (!alertId) return reply.code(400).send({ error: 'invalid_alert_id' });
+    if (!scope) return reply.code(400).send({ error: 'workspace_required' });
+    if (!status) return reply.code(400).send({ error: 'invalid_status' });
+    if (!canUseCommandCenter(session, scope, 'alerts.manage')) {
+      return reply.code(403).send({ error: 'forbidden' });
+    }
+
+    const alert = await options.operationalStore.updateAlertStatus(scope, alertId, status);
+    if (!alert) return reply.code(404).send({ error: 'alert_not_found' });
+
+    await recordTimeline(options.operationalStore, {
+      scope,
+      type: 'alert.status_changed',
+      actorUserId: session.user.id,
+      entityType: 'alert',
+      entityId: alert.id,
+      summary: `${alert.title}: ${alert.status}`,
+      metadata: { status: alert.status, severity: alert.severity },
+    });
+
+    return { alert };
+  });
+
+  app.get('/v1/decisions', async (request, reply) => {
+    const session = await resolveSession(request, options.authProvider);
+    if (!session) return reply.code(401).send({ error: 'unauthorized' });
+    if (!options.operationalStore) return reply.code(503).send({ error: 'operational_store_unavailable' });
+
+    const scope = resolveManualScope(session, 'workspace');
+    if (!scope || scope.kind !== 'workspace') return reply.code(400).send({ error: 'workspace_required' });
+    if (!canUseCommandCenter(session, scope, 'decisions.read')) {
+      return reply.code(403).send({ error: 'forbidden' });
+    }
+
+    return { decisions: await options.operationalStore.listDecisions(scope) };
+  });
+
+  app.post('/v1/decisions', async (request, reply) => {
+    const session = await resolveSession(request, options.authProvider);
+    if (!session) return reply.code(401).send({ error: 'unauthorized' });
+    if (!options.operationalStore) return reply.code(503).send({ error: 'operational_store_unavailable' });
+
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    if (body.scope === 'private') return reply.code(400).send({ error: 'workspace_only' });
+    const scope = resolveManualScope(session, 'workspace');
+    if (!scope || scope.kind !== 'workspace') return reply.code(400).send({ error: 'workspace_required' });
+    if (!canUseCommandCenter(session, scope, 'decisions.write')) {
+      return reply.code(403).send({ error: 'forbidden' });
+    }
+
+    const title = nonEmptyString(body.title, 240);
+    const decisionText = nonEmptyString(body.decision, 8000);
+    if (!title) return reply.code(400).send({ error: 'invalid_title' });
+    if (!decisionText) return reply.code(400).send({ error: 'invalid_decision' });
+
+    const projectId = optionalString(body.projectId, 100);
+    const context = optionalString(body.context, 8000);
+    const supersedesId = optionalString(body.supersedesId, 100);
+    const madeAt = body.madeAt === undefined ? undefined : validIsoDate(body.madeAt);
+    if (body.madeAt !== undefined && !madeAt) return reply.code(400).send({ error: 'invalid_made_at' });
+
+    const decision = await options.operationalStore.createDecision({
+      scope,
+      title,
+      decision: decisionText,
+      madeBy: session.user.id,
+      ...(projectId ? { projectId } : {}),
+      ...(context ? { context } : {}),
+      ...(supersedesId ? { supersedesId } : {}),
+      ...(madeAt ? { madeAt } : {}),
+    });
+    await recordTimeline(options.operationalStore, {
+      scope,
+      type: 'decision.created',
+      actorUserId: session.user.id,
+      entityType: 'decision',
+      entityId: decision.id,
+      summary: decision.title,
+    });
+
+    return reply.code(201).send({ decision });
+  });
+
+  app.get('/v1/timeline', async (request, reply) => {
+    const session = await resolveSession(request, options.authProvider);
+    if (!session) return reply.code(401).send({ error: 'unauthorized' });
+    if (!options.operationalStore) return reply.code(503).send({ error: 'operational_store_unavailable' });
+
+    const query = request.query as { scope?: string };
+    const scope = resolveManualScope(session, query.scope);
+    if (!scope) return reply.code(400).send({ error: 'workspace_required' });
+    if (!canUseCommandCenter(session, scope, 'timeline.read')) {
+      return reply.code(403).send({ error: 'forbidden' });
+    }
+
+    return { events: await options.operationalStore.listTimeline(scope) };
+  });
+
+  app.post('/v1/quick-capture', async (request, reply) => {
+    const session = await resolveSession(request, options.authProvider);
+    if (!session) return reply.code(401).send({ error: 'unauthorized' });
+    if (!options.operationalStore) return reply.code(503).send({ error: 'operational_store_unavailable' });
+
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const scope = resolveManualScope(session, body.scope);
+    const kind: QuickCaptureKind | null = body.kind === 'project' || body.kind === 'task' ? body.kind : null;
+    const title = nonEmptyString(body.title, kind === 'project' ? 160 : 240);
+    if (!scope) return reply.code(400).send({ error: 'workspace_required' });
+    if (!kind) return reply.code(400).send({ error: 'invalid_kind' });
+    if (!title) return reply.code(400).send({ error: 'invalid_title' });
+
+    const dueAt = body.dueAt === undefined ? undefined : validIsoDate(body.dueAt);
+    if (body.dueAt !== undefined && !dueAt) return reply.code(400).send({ error: 'invalid_due_at' });
+    const description = optionalString(body.description, kind === 'project' ? 4000 : 8000);
+
+    if (kind === 'project') {
+      if (!canUseCommandCenter(session, scope, 'projects.write')) {
+        return reply.code(403).send({ error: 'forbidden' });
+      }
+      const project = await options.operationalStore.createProject({
+        scope,
+        name: title,
+        ownerUserId: session.user.id,
+        ...(description ? { description } : {}),
+        ...(dueAt ? { dueAt } : {}),
+      });
+      await recordTimeline(options.operationalStore, {
+        scope,
+        type: 'project.quick_captured',
+        actorUserId: session.user.id,
+        entityType: 'project',
+        entityId: project.id,
+        summary: project.name,
+      });
+      return reply.code(201).send({ kind, project });
+    }
+
+    if (!canUseCommandCenter(session, scope, 'tasks.write')) {
+      return reply.code(403).send({ error: 'forbidden' });
+    }
+    const priority = typeof body.priority === 'number' ? body.priority : undefined;
+    const task = await options.operationalStore.createTask({
+      scope,
+      title,
+      assigneeIds: scope.kind === 'private' ? [session.user.id] : [],
+      ...(description ? { description } : {}),
+      ...(priority !== undefined ? { priority } : {}),
+      ...(dueAt ? { dueAt } : {}),
+    });
+    await recordTimeline(options.operationalStore, {
+      scope,
+      type: 'task.quick_captured',
+      actorUserId: session.user.id,
+      entityType: 'task',
+      entityId: task.id,
+      summary: task.title,
+    });
+    return reply.code(201).send({ kind, task });
   });
 
   app.get('/v1/today', async (request, reply) => {
