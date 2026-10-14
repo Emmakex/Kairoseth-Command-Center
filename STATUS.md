@@ -3,7 +3,7 @@
 **Current phase:** Phase 3 — Operational core  
 **Product:** Kairoseth Command Center  
 **Category:** Kairoseth Software  
-**Status:** PR #6 merged; standalone local auth + first connected ES/EN Today UI are on `main`, with post-merge CI #30 fully green.
+**Status:** PR #7 open; ES/EN Quick Capture plus project/task/alert operational controls are implemented. Initial full quality gate is green; final localization/documentation CI rerun is pending.
 
 ## Completed / Completado
 
@@ -71,6 +71,17 @@
 - [x] PR #6 merged to `main`.
 - [x] Main CI #30 green after merge.
 
+### Phase 3 — operational UI slice implemented
+- [x] Added ES/EN Quick Capture for workspace/private projects and tasks.
+- [x] Added project status/progress controls.
+- [x] Added task start/block/complete controls.
+- [x] Added alert acknowledge/resolve/dismiss controls.
+- [x] Added localized statuses, severities and mutation feedback.
+- [x] Added responsive desktop/mobile operational controls.
+- [x] Added a fixed server-side mutation proxy so the HTTP-only bearer credential never reaches client code.
+- [x] Added an allowlisted operation parser with scope, enum, numeric range and encoded-ID validation.
+- [x] Added tests for Quick Capture shape, path-injection resistance and invalid scope/status/progress rejection.
+
 ## Validation / Validación
 
 ### PR #3
@@ -84,18 +95,23 @@
 - [x] Post-merge `main` CI green.
 
 ### PR #6 — Standalone + Today
-- [x] Pull request opened.
-- [x] lint/typecheck/tests/build green.
-- [x] dependency audit green.
-- [x] secret scan green.
-- [x] Docker Compose smoke green, including API readiness and ES/EN web routes.
+- [x] Full quality gate green.
 - [x] Merged to `main`.
 - [x] Post-merge `main` CI #30 green.
 
+### PR #7 — Operational Today UI
+- [x] Pull request opened.
+- [x] Initial lint/typecheck/tests/build green.
+- [x] Initial dependency audit green.
+- [x] Initial secret scan green.
+- [x] Initial Docker Compose smoke green, including API readiness and ES/EN web routes.
+- [ ] Final localization/documentation CI rerun green.
+- [ ] Merged to `main`.
+
 ## Phase 3 still pending / Pendiente de la fase 3
 
-- [ ] Decision supersede/reverse lifecycle.
-- [ ] ES/EN operational UI for Quick Capture and full projects/milestones/tasks/alerts/decisions management.
+- [ ] Milestone management UI.
+- [ ] Decision management UI plus supersede/reverse lifecycle.
 - [ ] Persistent multi-user local identities and password lifecycle beyond the single-owner bootstrap.
 - [ ] Transaction/outbox hardening for mutation + Timeline audit consistency.
 
@@ -116,18 +132,21 @@
 13. Standalone browser sessions are HTTP-only and the browser does not persist bearer tokens in local storage.
 14. Standalone signed tokens bind to the server-configured local user/workspace and cannot select an arbitrary tenant.
 15. Missing standalone credentials do not create an insecure default account.
+16. Browser operational forms post only to a fixed same-product server proxy; they cannot choose an arbitrary upstream API path.
+17. Operational proxy scope is limited to `workspace` or `private`, and entity IDs are URL-encoded before upstream routing.
 
 ## Next / Siguiente
 
-1. Implement the ES/EN Quick Capture and operational management surfaces.
-2. Add Decision supersede/reverse lifecycle and transaction/outbox consistency.
-3. Add the persistent multi-user local identity/password lifecycle needed beyond bootstrap mode.
-4. Close Phase 3 only when the standalone product is useful manually end-to-end.
-5. Publish Command Center under Kairoseth Software when the Phase 3 exit gate is met, then begin Phase 4 GitHub integration.
+1. Merge PR #7 when the final CI rerun is green.
+2. Add Milestone management UI and Decision Log UI.
+3. Add Decision supersede/reverse lifecycle and transaction/outbox consistency.
+4. Add the persistent multi-user local identity/password lifecycle needed beyond bootstrap mode.
+5. Close Phase 3 only when the standalone product is useful manually end-to-end.
+6. Publish Command Center under Kairoseth Software when the Phase 3 exit gate is met, then begin Phase 4 GitHub integration.
 
 ## Current blockers / Bloqueos actuales
 
-None documented.
+None documented. PR #7 is pending its final CI rerun after localization/documentation updates.
 
 ## Operating rule
 
