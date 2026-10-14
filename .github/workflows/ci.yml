@@ -51,7 +51,18 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build and start stack
-        run: docker compose up -d --build
+        run: |
+          export KCC_AUTH_MODE=local
+          export KCC_LOCAL_ADMIN_EMAIL=ci@kcc.local
+          export KCC_LOCAL_ADMIN_PASSWORD="ci-password-${GITHUB_RUN_ID}-valid"
+          export KCC_LOCAL_AUTH_SECRET="$(openssl rand -hex 32)"
+          {
+            echo "KCC_AUTH_MODE=$KCC_AUTH_MODE"
+            echo "KCC_LOCAL_ADMIN_EMAIL=$KCC_LOCAL_ADMIN_EMAIL"
+            echo "KCC_LOCAL_ADMIN_PASSWORD=$KCC_LOCAL_ADMIN_PASSWORD"
+            echo "KCC_LOCAL_AUTH_SECRET=$KCC_LOCAL_AUTH_SECRET"
+          } >> "$GITHUB_ENV"
+          docker compose up -d --build
 
       - name: Wait for API readiness
         run: |
@@ -72,39 +83,36 @@ jobs:
           curl --fail --silent http://localhost:3000/es >/dev/null
           curl --fail --silent http://localhost:3000/en >/dev/null
 
-      - name: Smoke test Mongo transactions and audit outbox
+      - name: Smoke test transactional Decision audit outbox
         run: |
           test "$(docker compose exec -T mongo mongosh --quiet --eval 'print(rs.status().ok)')" = "1"
-          docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval '
-            const now = new Date().toISOString();
-            db.audit_outbox.insertOne({
-              id: "ci-outbox-event",
-              event: {
-                id: "ci-timeline-event",
-                scope: { kind: "workspace", workspaceId: "ci-workspace" },
-                type: "ci.audit",
-                entityType: "system",
-                entityId: "ci",
-                summary: "CI audit outbox smoke",
-                source: "ci",
-                occurredAt: now,
-                metadata: {}
-              },
-              status: "pending",
-              attempts: 0,
-              availableAt: now,
-              createdAt: now,
-              updatedAt: now
-            });
-          '
+
+          login_response="$(curl --fail --silent \
+            -X POST http://localhost:4000/v1/auth/local/login \
+            -H 'content-type: application/json' \
+            --data "{\"email\":\"$KCC_LOCAL_ADMIN_EMAIL\",\"password\":\"$KCC_LOCAL_ADMIN_PASSWORD\"}")"
+          access_token="$(printf '%s' "$login_response" | python3 -c 'import json,sys; print(json.load(sys.stdin)["accessToken"])')"
+
+          decision_response="$(curl --fail --silent \
+            -X POST http://localhost:4000/v1/decision-lifecycle \
+            -H 'content-type: application/json' \
+            -H "authorization: Bearer $access_token" \
+            --data '{"scope":"workspace","title":"CI transaction decision","decision":"Verify transactional audit delivery"}')"
+          decision_id="$(printf '%s' "$decision_response" | python3 -c 'import json,sys; print(json.load(sys.stdin)["decision"]["id"])')"
+          test -n "$decision_id"
+
           for attempt in {1..20}; do
-            count="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval 'print(db.timeline_events.countDocuments({id:"ci-timeline-event"}))')"
+            count="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
+              "print(db.timeline_events.countDocuments({id:{\$exists:true},type:'decision.created',entityId:'$decision_id'}))")"
             if [ "$count" = "1" ]; then
+              outbox_status="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
+                "print(db.audit_outbox.findOne({'event.entityId':'$decision_id'}).status)")"
+              test "$outbox_status" = "delivered"
               exit 0
             fi
             sleep 2
           done
-          docker compose logs worker
+          docker compose logs worker api
           exit 1
 
       - name: Show service state on failure
