@@ -1,9 +1,9 @@
 # Project status / Estado del proyecto
 
-**Current phase:** Phase 1 — Core shell  
+**Current phase:** Phase 1 — Core shell complete  
 **Product:** Kairoseth Command Center  
 **Category:** Kairoseth Software  
-**Status:** Core shell scaffolded on `feat/phase-1-core-shell`; CI validation pending.
+**Status:** Phase 1 exit gate passed on PR #1; ready to merge and begin Phase 2.
 
 ## Completed / Completado
 
@@ -26,7 +26,7 @@
 - [x] Roadmap and release gates defined.
 - [x] Commercial packaging model documented.
 
-### Phase 1 — implemented on feature branch
+### Phase 1
 - [x] pnpm monorepo/workspace structure.
 - [x] Package boundaries: `domain`, `contracts`, `auth`, `integrations`, `config`, `ui`.
 - [x] Next.js web shell.
@@ -42,37 +42,51 @@
 - [x] Base CI workflow.
 - [x] API health/readiness tests.
 - [x] Local development guide.
+- [x] Security audit gate.
+- [x] Secret scanning.
+- [x] Docker Compose runtime smoke test.
 
-## Validation pending / Validación pendiente
+## Validation / Validación
 
-- [ ] GitHub Actions CI green on the feature PR.
-- [ ] clean install/build confirmed by CI.
-- [ ] Docker Compose build/runtime smoke test.
-- [ ] dependency audit reviewed.
-- [ ] secret scan green.
+CI run #6 passed all required Phase 1 checks:
+
+- [x] install.
+- [x] lint.
+- [x] TypeScript validation.
+- [x] automated tests.
+- [x] production build.
+- [x] dependency audit.
+- [x] secret scan.
+- [x] Docker images build.
+- [x] MongoDB + API + worker + web stack startup.
+- [x] `/health` and `/ready` smoke tests.
+- [x] `/es` and `/en` web route smoke tests.
+
+A critical `tinypool` advisory detected during validation was resolved by upgrading Vitest to the patched major before closing the gate.
 
 ## Next / Siguiente
 
-1. Open Phase 1 pull request.
-2. Let CI validate lint, types, tests, build, audit and secret scan.
-3. Fix any failures without weakening the quality gate.
-4. Smoke-test the Docker stack.
-5. Merge Phase 1 only when all required validation is green.
-6. Start Phase 2: Identity, workspaces and permissions.
+1. Merge PR #1 into `main`.
+2. Start Phase 2 — Identity, workspaces and permissions.
+3. Implement user/session context and workspace membership first.
+4. Add capability authorization and strict private-vs-workspace scope enforcement.
+5. Add local auth adapter and Kairoseth Identity adapter contract.
+6. Close Phase 2 only after cross-tenant and private-scope negative tests pass.
 
 ## Phase 1 exit gate
 
-Phase 1 closes only when:
+**PASSED.**
 
 - clean build/test succeeds;
-- local environment is reproducible;
+- local Docker stack is reproducible through CI;
 - health/readiness endpoints behave correctly;
-- ES/EN routes build;
-- package/adaptor boundaries remain portable.
+- ES/EN routes build and respond;
+- package/adaptor boundaries remain portable;
+- security and secret checks are green.
 
 ## Current blockers / Bloqueos actuales
 
-No product/architecture blocker. Runtime validation is pending through CI because the implementation environment used to create the scaffold cannot access external package registries.
+None.
 
 ## Operating rule
 
