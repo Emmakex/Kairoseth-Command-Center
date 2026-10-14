@@ -22,18 +22,35 @@ export interface GitHubConnectionStore {
   ensureIndexes(): Promise<void>;
   createConnection(input: CreateGitHubConnectionInput): Promise<IntegrationConnection>;
   listConnections(scope: WorkspaceScope): Promise<IntegrationConnection[]>;
+  getConnection(scope: WorkspaceScope, connectionId: string): Promise<IntegrationConnection | null>;
   rotateCredential(
     scope: WorkspaceScope,
     actorUserId: string,
     connectionId: string,
     token: string,
   ): Promise<IntegrationConnection | null>;
+  markValidationSuccess(
+    scope: WorkspaceScope,
+    actorUserId: string,
+    connectionId: string,
+    remoteAccount: { id: string; label: string },
+  ): Promise<IntegrationConnection | null>;
+  markValidationFailure(
+    scope: WorkspaceScope,
+    actorUserId: string,
+    connectionId: string,
+    errorCode: string,
+  ): Promise<IntegrationConnection | null>;
   deleteConnection(
     scope: WorkspaceScope,
     actorUserId: string,
     connectionId: string,
   ): Promise<DeleteGitHubConnectionResult>;
-  resolveCredential(scope: WorkspaceScope, connectionId: string): Promise<string | null>;
+  resolveCredential(
+    scope: WorkspaceScope,
+    connectionId: string,
+    options?: { requireActive?: boolean },
+  ): Promise<string | null>;
 }
 
 export class MongoGitHubConnectionStore implements GitHubConnectionStore {
@@ -83,7 +100,7 @@ export class MongoGitHubConnectionStore implements GitHubConnectionStore {
         scope: input.scope,
         provider: 'github',
         displayName: input.displayName.trim(),
-        status: 'active',
+        status: 'unverified',
         secretRef,
         createdAt: now,
         updatedAt: now,
@@ -99,7 +116,7 @@ export class MongoGitHubConnectionStore implements GitHubConnectionStore {
           entityId: connection.id,
           summary: connection.displayName,
           source: 'manual-api',
-          metadata: { provider: 'github', credentialConfigured: true },
+          metadata: { provider: 'github', credentialConfigured: true, status: 'unverified' },
         },
         session,
       );
@@ -112,6 +129,13 @@ export class MongoGitHubConnectionStore implements GitHubConnectionStore {
       .find({ scope, provider: 'github' })
       .sort({ updatedAt: -1 })
       .toArray();
+  }
+
+  async getConnection(
+    scope: WorkspaceScope,
+    connectionId: string,
+  ): Promise<IntegrationConnection | null> {
+    return this.connections.findOne({ scope, id: connectionId, provider: 'github' });
   }
 
   async rotateCredential(
@@ -133,7 +157,15 @@ export class MongoGitHubConnectionStore implements GitHubConnectionStore {
       const updatedAt = new Date().toISOString();
       const updated = await this.connections.findOneAndUpdate(
         { scope, id: connectionId, provider: 'github' },
-        { $set: { status: 'active', updatedAt } },
+        {
+          $set: { status: 'unverified', updatedAt },
+          $unset: {
+            lastValidatedAt: '',
+            remoteAccountId: '',
+            remoteAccountLabel: '',
+            lastErrorCode: '',
+          },
+        },
         { session, returnDocument: 'after' },
       );
       if (!updated) return null;
@@ -147,7 +179,85 @@ export class MongoGitHubConnectionStore implements GitHubConnectionStore {
           entityId: connectionId,
           summary: updated.displayName,
           source: 'manual-api',
-          metadata: { provider: 'github', credentialConfigured: true },
+          metadata: { provider: 'github', credentialConfigured: true, status: 'unverified' },
+        },
+        session,
+      );
+      return updated;
+    });
+  }
+
+  async markValidationSuccess(
+    scope: WorkspaceScope,
+    actorUserId: string,
+    connectionId: string,
+    remoteAccount: { id: string; label: string },
+  ): Promise<IntegrationConnection | null> {
+    return this.transaction(async (session) => {
+      const now = new Date().toISOString();
+      const updated = await this.connections.findOneAndUpdate(
+        { scope, id: connectionId, provider: 'github' },
+        {
+          $set: {
+            status: 'active',
+            lastValidatedAt: now,
+            remoteAccountId: remoteAccount.id,
+            remoteAccountLabel: remoteAccount.label,
+            updatedAt: now,
+          },
+          $unset: { lastErrorCode: '' },
+        },
+        { session, returnDocument: 'after' },
+      );
+      if (!updated) return null;
+      await this.outbox.enqueue(
+        {
+          scope,
+          type: 'integration.github.validation_succeeded',
+          actorUserId,
+          entityType: 'integration_connection',
+          entityId: connectionId,
+          summary: updated.displayName,
+          source: 'github-api',
+          metadata: {
+            provider: 'github',
+            remoteAccountId: remoteAccount.id,
+            remoteAccountLabel: remoteAccount.label,
+          },
+        },
+        session,
+      );
+      return updated;
+    });
+  }
+
+  async markValidationFailure(
+    scope: WorkspaceScope,
+    actorUserId: string,
+    connectionId: string,
+    errorCode: string,
+  ): Promise<IntegrationConnection | null> {
+    return this.transaction(async (session) => {
+      const now = new Date().toISOString();
+      const updated = await this.connections.findOneAndUpdate(
+        { scope, id: connectionId, provider: 'github' },
+        {
+          $set: { status: 'error', lastErrorCode: errorCode, updatedAt: now },
+          $unset: { lastValidatedAt: '', remoteAccountId: '', remoteAccountLabel: '' },
+        },
+        { session, returnDocument: 'after' },
+      );
+      if (!updated) return null;
+      await this.outbox.enqueue(
+        {
+          scope,
+          type: 'integration.github.validation_failed',
+          actorUserId,
+          entityType: 'integration_connection',
+          entityId: connectionId,
+          summary: updated.displayName,
+          source: 'github-api',
+          metadata: { provider: 'github', errorCode },
         },
         session,
       );
@@ -197,9 +307,14 @@ export class MongoGitHubConnectionStore implements GitHubConnectionStore {
     });
   }
 
-  async resolveCredential(scope: WorkspaceScope, connectionId: string): Promise<string | null> {
+  async resolveCredential(
+    scope: WorkspaceScope,
+    connectionId: string,
+    options: { requireActive?: boolean } = {},
+  ): Promise<string | null> {
     const connection = await this.connections.findOne({ scope, id: connectionId, provider: 'github' });
-    if (!connection?.secretRef || connection.status !== 'active') return null;
+    if (!connection?.secretRef || connection.status === 'disabled') return null;
+    if (options.requireActive && connection.status !== 'active') return null;
     return this.secrets.revealSecret(scope, connection.secretRef);
   }
 }
