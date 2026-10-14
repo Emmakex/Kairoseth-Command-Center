@@ -7,6 +7,8 @@ import type {
   DeleteGitHubConnectionResult,
   GitHubConnectionStore,
 } from '../src/github-connection-store';
+import { GitHubProviderError } from '../src/github-provider-client';
+import type { GitHubProviderClient } from '../src/github-provider-client';
 
 type WorkspaceScope = Extract<Scope, { kind: 'workspace' }>;
 
@@ -48,7 +50,7 @@ class MemoryGitHubConnectionStore implements GitHubConnectionStore {
       scope: input.scope,
       provider: 'github',
       displayName: input.displayName,
-      status: 'active',
+      status: 'unverified',
       secretRef: `secret-${this.connections.length + 1}`,
       createdAt: now,
       updatedAt: now,
@@ -64,19 +66,59 @@ class MemoryGitHubConnectionStore implements GitHubConnectionStore {
     );
   }
 
+  async getConnection(scope: WorkspaceScope, connectionId: string): Promise<IntegrationConnection | null> {
+    return this.connections.find(
+      (candidate) => candidate.id === connectionId && candidate.scope.workspaceId === scope.workspaceId,
+    ) ?? null;
+  }
+
   async rotateCredential(
     scope: WorkspaceScope,
     _actorUserId: string,
     connectionId: string,
     token: string,
   ): Promise<IntegrationConnection | null> {
-    const connection = this.connections.find(
-      (candidate) =>
-        candidate.id === connectionId && candidate.scope.workspaceId === scope.workspaceId,
-    );
+    const connection = await this.getConnection(scope, connectionId);
     if (!connection) return null;
     this.credentials.set(connection.id, token);
+    connection.status = 'unverified';
+    delete connection.lastValidatedAt;
+    delete connection.remoteAccountId;
+    delete connection.remoteAccountLabel;
+    delete connection.lastErrorCode;
     connection.updatedAt = '2026-10-14T19:00:00.000Z';
+    return connection;
+  }
+
+  async markValidationSuccess(
+    scope: WorkspaceScope,
+    _actorUserId: string,
+    connectionId: string,
+    remoteAccount: { id: string; label: string },
+  ): Promise<IntegrationConnection | null> {
+    const connection = await this.getConnection(scope, connectionId);
+    if (!connection) return null;
+    connection.status = 'active';
+    connection.lastValidatedAt = '2026-10-14T19:15:00.000Z';
+    connection.remoteAccountId = remoteAccount.id;
+    connection.remoteAccountLabel = remoteAccount.label;
+    delete connection.lastErrorCode;
+    return connection;
+  }
+
+  async markValidationFailure(
+    scope: WorkspaceScope,
+    _actorUserId: string,
+    connectionId: string,
+    errorCode: string,
+  ): Promise<IntegrationConnection | null> {
+    const connection = await this.getConnection(scope, connectionId);
+    if (!connection) return null;
+    connection.status = 'error';
+    connection.lastErrorCode = errorCode;
+    delete connection.lastValidatedAt;
+    delete connection.remoteAccountId;
+    delete connection.remoteAccountLabel;
     return connection;
   }
 
@@ -97,22 +139,44 @@ class MemoryGitHubConnectionStore implements GitHubConnectionStore {
     return { status: 'deleted', connection };
   }
 
-  async resolveCredential(scope: WorkspaceScope, connectionId: string): Promise<string | null> {
-    const connection = this.connections.find(
-      (candidate) =>
-        candidate.id === connectionId && candidate.scope.workspaceId === scope.workspaceId,
-    );
-    return connection ? this.credentials.get(connectionId) ?? null : null;
+  async resolveCredential(
+    scope: WorkspaceScope,
+    connectionId: string,
+    options: { requireActive?: boolean } = {},
+  ): Promise<string | null> {
+    const connection = await this.getConnection(scope, connectionId);
+    if (!connection || connection.status === 'disabled') return null;
+    if (options.requireActive && connection.status !== 'active') return null;
+    return this.credentials.get(connectionId) ?? null;
+  }
+}
+
+class MemoryGitHubProviderClient implements GitHubProviderClient {
+  shouldFail = false;
+  tokens: string[] = [];
+
+  async validateCredential(token: string) {
+    this.tokens.push(token);
+    if (this.shouldFail) throw new GitHubProviderError('unauthorized', 'fixture_invalid');
+    return { id: '101', login: 'fixture-owner' };
+  }
+
+  async getRepository() {
+    throw new Error('not_used');
+  }
+
+  async getLatestCommit() {
+    throw new Error('not_used');
   }
 }
 
 const headers = { authorization: 'Bearer valid-token' };
+const fixtureCredential = 'fixture-credential-12345678901234567890';
 
 describe('GitHub connection API', () => {
   it('derives workspace from the session and never returns token or secretRef', async () => {
     const store = new MemoryGitHubConnectionStore();
     const app = buildApp({ authProvider: provider, githubConnectionStore: store });
-    const token = 'github_pat_test_12345678901234567890';
 
     const response = await app.inject({
       method: 'POST',
@@ -121,17 +185,75 @@ describe('GitHub connection API', () => {
       payload: {
         workspaceId: 'workspace-attacker',
         displayName: 'Primary GitHub',
-        token,
+        token: fixtureCredential,
         secretRef: 'attacker-controlled',
       },
     });
 
     expect(response.statusCode).toBe(201);
     expect(store.lastCreateInput?.scope).toEqual({ kind: 'workspace', workspaceId: 'workspace-a' });
-    expect(store.lastCreateInput?.token).toBe(token);
-    expect(response.body).not.toContain(token);
+    expect(store.lastCreateInput?.token).toBe(fixtureCredential);
+    expect(response.body).not.toContain(fixtureCredential);
     expect(response.body).not.toContain('secretRef');
     expect(response.json().connection.credentialConfigured).toBe(true);
+    expect(response.json().connection.status).toBe('unverified');
+    await app.close();
+  });
+
+  it('validates remotely before promoting a connection to active', async () => {
+    const store = new MemoryGitHubConnectionStore();
+    const remote = new MemoryGitHubProviderClient();
+    const connection = await store.createConnection({
+      scope: { kind: 'workspace', workspaceId: 'workspace-a' },
+      actorUserId: 'user-admin',
+      displayName: 'Primary GitHub',
+      token: fixtureCredential,
+    });
+    const app = buildApp({
+      authProvider: provider,
+      githubConnectionStore: store,
+      githubProviderClient: remote,
+    });
+
+    const validated = await app.inject({
+      method: 'POST',
+      url: `/v1/integrations/github/connections/${connection.id}/validate`,
+      headers,
+    });
+    expect(validated.statusCode).toBe(200);
+    expect(validated.json().connection.status).toBe('active');
+    expect(validated.json().connection.remoteAccountId).toBe('101');
+    expect(validated.json().connection.remoteAccountLabel).toBe('fixture-owner');
+    expect(validated.body).not.toContain(fixtureCredential);
+    expect(remote.tokens).toEqual([fixtureCredential]);
+    await app.close();
+  });
+
+  it('normalizes provider rejection and persists error state', async () => {
+    const store = new MemoryGitHubConnectionStore();
+    const remote = new MemoryGitHubProviderClient();
+    remote.shouldFail = true;
+    const connection = await store.createConnection({
+      scope: { kind: 'workspace', workspaceId: 'workspace-a' },
+      actorUserId: 'user-admin',
+      displayName: 'Rejected GitHub',
+      token: fixtureCredential,
+    });
+    const app = buildApp({
+      authProvider: provider,
+      githubConnectionStore: store,
+      githubProviderClient: remote,
+    });
+
+    const validated = await app.inject({
+      method: 'POST',
+      url: `/v1/integrations/github/connections/${connection.id}/validate`,
+      headers,
+    });
+    expect(validated.statusCode).toBe(422);
+    expect(validated.json().error).toBe('github_connection_invalid_credential');
+    expect((await store.getConnection(connection.scope, connection.id))?.status).toBe('error');
+    expect((await store.getConnection(connection.scope, connection.id))?.lastErrorCode).toBe('unauthorized');
     await app.close();
   });
 
@@ -160,25 +282,26 @@ describe('GitHub connection API', () => {
       method: 'POST',
       url: '/v1/integrations/github/connections',
       headers,
-      payload: {
-        displayName: 'Blocked',
-        token: 'github_pat_test_12345678901234567890',
-      },
+      payload: { displayName: 'Blocked', token: fixtureCredential },
     });
     expect(created.statusCode).toBe(403);
     await app.close();
   });
 
-  it('rotates credentials without exposing them and protects in-use connections', async () => {
+  it('rotation returns a connection to unverified without exposing credential material', async () => {
     const store = new MemoryGitHubConnectionStore();
     const connection = await store.createConnection({
       scope: { kind: 'workspace', workspaceId: 'workspace-a' },
       actorUserId: 'user-admin',
       displayName: 'Primary GitHub',
-      token: 'github_pat_old_12345678901234567890',
+      token: fixtureCredential,
+    });
+    await store.markValidationSuccess(connection.scope, 'user-admin', connection.id, {
+      id: '101',
+      label: 'fixture-owner',
     });
     const app = buildApp({ authProvider: provider, githubConnectionStore: store });
-    const rotatedToken = 'github_pat_new_12345678901234567890';
+    const rotatedToken = 'fixture-credential-rotated-09876543210987654321';
 
     const rotated = await app.inject({
       method: 'PATCH',
@@ -187,11 +310,25 @@ describe('GitHub connection API', () => {
       payload: { token: rotatedToken },
     });
     expect(rotated.statusCode).toBe(200);
+    expect(rotated.json().connection.status).toBe('unverified');
+    expect(rotated.json().connection.lastValidatedAt).toBeUndefined();
     expect(rotated.body).not.toContain(rotatedToken);
     expect(rotated.body).not.toContain('secretRef');
     expect(await store.resolveCredential(connection.scope, connection.id)).toBe(rotatedToken);
+    await app.close();
+  });
 
+  it('protects in-use connections from deletion', async () => {
+    const store = new MemoryGitHubConnectionStore();
+    const connection = await store.createConnection({
+      scope: { kind: 'workspace', workspaceId: 'workspace-a' },
+      actorUserId: 'user-admin',
+      displayName: 'Primary GitHub',
+      token: fixtureCredential,
+    });
     store.inUseIds.add(connection.id);
+    const app = buildApp({ authProvider: provider, githubConnectionStore: store });
+
     const blockedDelete = await app.inject({
       method: 'DELETE',
       url: `/v1/integrations/github/connections/${connection.id}`,
