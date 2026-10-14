@@ -71,23 +71,24 @@ describe('parseOperationalMutation', () => {
     });
   });
 
-  it('builds workspace decision creation, strips project references and rejects private decisions', () => {
+  it('builds validated workspace decision creation and rejects private decisions', () => {
     expect(
       parseOperationalMutation(
         form({
           operation: 'decision-create',
           scope: 'workspace',
-          projectId: 'unvalidated-project-reference',
+          projectId: 'validated-project-reference',
           title: 'Launch path',
           context: 'We need one deployment model for v1.',
           decision: 'Ship standalone first.',
         }),
       ),
     ).toEqual({
-      path: '/v1/decisions',
+      path: '/v1/decision-lifecycle',
       method: 'POST',
       body: {
         scope: 'workspace',
+        projectId: 'validated-project-reference',
         title: 'Launch path',
         context: 'We need one deployment model for v1.',
         decision: 'Ship standalone first.',
