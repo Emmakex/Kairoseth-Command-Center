@@ -75,6 +75,10 @@ export const dictionary = {
     statusAcknowledged: 'Reconocida',
     statusResolved: 'Resuelta',
     statusDismissed: 'Descartada',
+    severityInfo: 'Informativa',
+    severityWarning: 'Aviso',
+    severityUrgent: 'Urgente',
+    severityCritical: 'Crítica',
   },
   en: {
     eyebrow: 'Kairoseth Software',
@@ -145,5 +149,9 @@ export const dictionary = {
     statusAcknowledged: 'Acknowledged',
     statusResolved: 'Resolved',
     statusDismissed: 'Dismissed',
+    severityInfo: 'Info',
+    severityWarning: 'Warning',
+    severityUrgent: 'Urgent',
+    severityCritical: 'Critical',
   },
 } as const;
