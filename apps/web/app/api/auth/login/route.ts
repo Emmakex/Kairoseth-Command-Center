@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import { apiBaseUrl, SESSION_COOKIE } from '../../../../lib/api';
 
 function safeLocale(value: FormDataEntryValue | null): 'es' | 'en' {
