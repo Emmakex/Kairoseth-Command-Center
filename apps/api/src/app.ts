@@ -232,12 +232,13 @@ export function buildApp(options: AppOptions = {}) {
 
     const dueAt = body.dueAt === undefined ? undefined : validIsoDate(body.dueAt);
     if (body.dueAt !== undefined && !dueAt) return reply.code(400).send({ error: 'invalid_due_at' });
+    const description = optionalString(body.description, 4000);
 
     const project = await options.operationalStore.createProject({
       scope,
       name,
       ownerUserId: session.user.id,
-      ...(optionalString(body.description, 4000) ? { description: optionalString(body.description, 4000) } : {}),
+      ...(description ? { description } : {}),
       ...(dueAt ? { dueAt } : {}),
     });
 
@@ -302,7 +303,12 @@ export function buildApp(options: AppOptions = {}) {
     const query = request.query as { scope?: string };
     const scope = resolveManualScope(session, query.scope);
     if (!scope) return reply.code(400).send({ error: 'workspace_required' });
-    if (!canUseCommandCenter(session, scope, 'tasks.read')) {
+
+    const canReadToday =
+      canUseCommandCenter(session, scope, 'tasks.read') &&
+      canUseCommandCenter(session, scope, 'projects.read') &&
+      canUseCommandCenter(session, scope, 'alerts.read');
+    if (!canReadToday) {
       return reply.code(403).send({ error: 'forbidden' });
     }
 
