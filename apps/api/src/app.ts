@@ -1,9 +1,12 @@
 import Fastify from 'fastify';
+import type { AuthProvider } from '@kcc/auth';
 import type { HealthResponse, ReadyResponse } from '@kcc/contracts';
 
 export type ReadinessCheck = () => Promise<Record<string, 'ok' | 'error' | 'not_configured'>>;
 
-export function buildApp(options: { readinessCheck?: ReadinessCheck; logger?: boolean } = {}) {
+export function buildApp(
+  options: { readinessCheck?: ReadinessCheck; logger?: boolean; authProvider?: AuthProvider } = {},
+) {
   const app = Fastify({ logger: options.logger ?? false });
   const readinessCheck = options.readinessCheck ?? (async () => ({ process: 'ok' as const }));
 
@@ -24,6 +27,34 @@ export function buildApp(options: { readinessCheck?: ReadinessCheck; logger?: bo
       status: ready ? 'ready' : 'not_ready',
       checks,
       timestamp: new Date().toISOString(),
+    };
+  });
+
+  app.get('/v1/session', async (request, reply) => {
+    reply.header('cache-control', 'no-store');
+
+    if (!options.authProvider) {
+      return reply.code(401).send({ error: 'unauthorized' });
+    }
+
+    const authorization = request.headers.authorization;
+    const cookie = request.headers.cookie;
+    const session = await options.authProvider.resolveSession({
+      ...(authorization ? { authorization } : {}),
+      ...(cookie ? { cookie } : {}),
+    });
+
+    if (!session) {
+      return reply.code(401).send({ error: 'unauthorized' });
+    }
+
+    return {
+      user: session.user,
+      activeWorkspaceId: session.activeWorkspaceId ?? null,
+      membershipId: session.membershipId ?? null,
+      role: session.role ?? null,
+      capabilities: session.capabilities,
+      productEntitlements: session.productEntitlements,
     };
   });
 
