@@ -11,6 +11,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@kcc/auth": "workspace:*",
     "@kcc/config": "workspace:*",
     "@kcc/contracts": "workspace:*",
     "fastify": "^5.6.1",
