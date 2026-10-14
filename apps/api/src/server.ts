@@ -20,6 +20,7 @@ try {
 const app = buildApp({
   logger: true,
   operationalStore,
+  milestoneStore: operationalStore,
   readinessCheck: async () => {
     if (!mongoReady) {
       try {
