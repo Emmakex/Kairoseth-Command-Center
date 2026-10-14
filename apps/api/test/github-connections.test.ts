@@ -8,7 +8,11 @@ import type {
   GitHubConnectionStore,
 } from '../src/github-connection-store';
 import { GitHubProviderError } from '../src/github-provider-client';
-import type { GitHubProviderClient } from '../src/github-provider-client';
+import type {
+  GitHubProviderClient,
+  GitHubRemoteCommit,
+  GitHubRemoteRepository,
+} from '../src/github-provider-client';
 
 type WorkspaceScope = Extract<Scope, { kind: 'workspace' }>;
 
@@ -161,11 +165,11 @@ class MemoryGitHubProviderClient implements GitHubProviderClient {
     return { id: '101', login: 'fixture-owner' };
   }
 
-  async getRepository() {
+  async getRepository(): Promise<GitHubRemoteRepository> {
     throw new Error('not_used');
   }
 
-  async getLatestCommit() {
+  async getLatestCommit(): Promise<GitHubRemoteCommit> {
     throw new Error('not_used');
   }
 }
