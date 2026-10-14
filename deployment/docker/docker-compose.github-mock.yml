@@ -1,0 +1,21 @@
+services:
+  github-mock:
+    image: node:22-alpine
+    environment:
+      PORT: 8080
+      KCC_GITHUB_MOCK_TOKEN: ${KCC_GITHUB_MOCK_TOKEN:?Set KCC_GITHUB_MOCK_TOKEN}
+    command: ["node", "/mock/github-mock-server.mjs"]
+    volumes:
+      - ./deployment/docker/github-mock-server.mjs:/mock/github-mock-server.mjs:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8080/health >/dev/null"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+
+  api:
+    environment:
+      KCC_GITHUB_API_BASE_URL: http://github-mock:8080
+    depends_on:
+      github-mock:
+        condition: service_healthy
