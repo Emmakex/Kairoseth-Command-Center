@@ -61,24 +61,26 @@ export function DecisionPanel({
 
       <div className="decision-list">
         {decisions?.length ? (
-          decisions.map((decision) => (
-            <section className="decision-card" key={decision.id}>
-              <div className="decision-card-heading">
-                <div>
-                  <strong>{decision.title}</strong>
-                  <span>
-                    {decision.projectId ? projectNames.get(decision.projectId) ?? decision.projectId : copy.noProject} ·{' '}
-                    {formatDecisionDate(decision.madeAt, locale)}
+          decisions.map((decision) => {
+            const verifiedProjectName = decision.projectId ? projectNames.get(decision.projectId) : undefined;
+            return (
+              <section className="decision-card" key={decision.id}>
+                <div className="decision-card-heading">
+                  <div>
+                    <strong>{decision.title}</strong>
+                    <span>
+                      {verifiedProjectName ?? copy.noProject} · {formatDecisionDate(decision.madeAt, locale)}
+                    </span>
+                  </div>
+                  <span className={`decision-status decision-status-${decision.status}`}>
+                    {statuses[decision.status] ?? decision.status}
                   </span>
                 </div>
-                <span className={`decision-status decision-status-${decision.status}`}>
-                  {statuses[decision.status] ?? decision.status}
-                </span>
-              </div>
-              {decision.context ? <p className="decision-context">{decision.context}</p> : null}
-              <p className="decision-body">{decision.decision}</p>
-            </section>
-          ))
+                {decision.context ? <p className="decision-context">{decision.context}</p> : null}
+                <p className="decision-body">{decision.decision}</p>
+              </section>
+            );
+          })
         ) : (
           <p className="empty-state">{copy.noDecisions}</p>
         )}
