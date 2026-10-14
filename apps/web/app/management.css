@@ -44,11 +44,16 @@
 }
 
 .decision-create-form {
-  grid-template-columns: minmax(180px, 0.8fr) minmax(240px, 1.2fr) minmax(260px, 1.4fr) minmax(260px, 1.4fr);
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+}
+
+.decision-context-field,
+.decision-body-field {
+  grid-column: span 1;
 }
 
 .decision-submit {
-  grid-column: 4;
+  grid-column: 3;
   justify-self: end;
   min-width: 150px;
   padding: 0 18px;
@@ -141,6 +146,27 @@
   line-height: 1.55;
 }
 
+.decision-reverse-form {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.danger-button {
+  border-color: #fecaca;
+  background: #ffffff;
+  color: #b91c1c;
+}
+
+.danger-button:hover {
+  border-color: #fca5a5;
+  background: #fff1f2;
+}
+
 .workspace-only-panel .empty-state {
   padding-top: 6px;
   max-width: 720px;
@@ -180,6 +206,10 @@
   .decision-submit {
     grid-column: 2;
   }
+
+  .decision-reverse-form {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 520px) {
@@ -190,6 +220,8 @@
   }
 
   .management-title-field,
+  .decision-project-field,
+  .decision-supersedes-field,
   .decision-context-field,
   .decision-body-field,
   .decision-submit {
@@ -197,7 +229,8 @@
   }
 
   .decision-submit,
-  .management-form button {
+  .management-form button,
+  .decision-reverse-form button {
     width: 100%;
   }
 
