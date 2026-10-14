@@ -94,12 +94,10 @@ export function parseOperationalMutation(form: FormData): OperationalMutation | 
     const title = requiredText(form.get('title'), 240);
     const decision = requiredText(form.get('decision'), 8000);
     const context = optionalText(form.get('context'), 8000);
-    const projectId = optionalText(form.get('projectId'), 100);
-    if (!title || !decision || context === null || projectId === null) return null;
+    if (!title || !decision || context === null) return null;
 
     const body: Record<string, string | number> = { scope, title, decision };
     if (context) body.context = context;
-    if (projectId) body.projectId = projectId;
     return { path: '/v1/decisions', method: 'POST', body };
   }
 
