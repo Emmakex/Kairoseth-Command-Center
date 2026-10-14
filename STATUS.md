@@ -3,7 +3,7 @@
 **Current phase:** Phase 3 — Operational core  
 **Product:** Kairoseth Command Center  
 **Category:** Kairoseth Software  
-**Status:** PR #7 open; ES/EN Quick Capture plus project/task/alert operational controls are implemented. Initial full quality gate is green; final localization/documentation CI rerun is pending.
+**Status:** PR #7 merged and post-merge CI #36 green. Milestone management + workspace Decision Log UI are implemented on `feat/phase-3-milestones-decisions-ui` and pending PR validation.
 
 ## Completed / Completado
 
@@ -43,44 +43,44 @@
 - [x] PR #4 merged after lint, typecheck, tests, build, audit, secret scan and Docker smoke passed.
 
 ### Phase 3 — weighted milestones merged
-- [x] Added `milestones.read` and `milestones.write` capabilities.
-- [x] Added milestone Mongo persistence and scoped indexes.
-- [x] Added milestone create/list/status API routes as a modular route package.
-- [x] Milestones support workspace and strict private-user scopes.
-- [x] Milestone creation verifies the referenced project exists in the same scope.
-- [x] Weighted milestones automatically recalculate project progress.
-- [x] Cancelled milestones are excluded from weighted project progress.
-- [x] Milestone mutations write server-authored Timeline events.
-- [x] Added tests for scope injection, weighted progress, private/workspace isolation and read-only permissions.
-- [x] Added a composed API application layer so new route modules can be added without growing the core `app.ts` indefinitely.
-- [x] PR #5 merged.
-- [x] Main CI #22 green after merge.
+- [x] Milestone scoped persistence/API and separate read/write capabilities.
+- [x] Same-scope project validation for milestone creation.
+- [x] Weighted milestone progress recalculation; cancelled milestones excluded.
+- [x] Server-authored Timeline events for milestone mutations.
+- [x] Milestone scope/permission/progress tests.
+- [x] PR #5 merged with full gate green; main CI #22 green.
 
 ### Phase 3 — standalone manual-use slice merged
-- [x] Added explicit local standalone auth configuration with no production default password/secret.
-- [x] Added signed, expiring HMAC session tokens.
-- [x] Added local owner bootstrap using the normal owner RBAC preset and `command-center` entitlement.
-- [x] Added `/v1/auth/local/login` without trusting client-provided scope IDs.
-- [x] Added tests for successful login/session resolution, invalid credentials and token tampering.
-- [x] Added HTTP-only SameSite session cookie in the Next.js layer.
-- [x] Added ES/EN standalone login screen.
-- [x] Connected the first useful Today UI to `/v1/session` and `/v1/today`.
-- [x] Added workspace/private Today switch without sending tenant/user IDs as authorization scope.
-- [x] Added live project/task/alert metrics and operational lists.
-- [x] Added Docker/internal API runtime wiring and standalone-auth documentation.
-- [x] PR #6 merged to `main`.
-- [x] Main CI #30 green after merge.
+- [x] Explicit standalone auth configuration with no production default password/secret.
+- [x] Signed expiring HMAC sessions and local owner bootstrap through normal RBAC.
+- [x] HTTP-only SameSite browser session cookie.
+- [x] ES/EN login and authenticated Today dashboard.
+- [x] Workspace/private Today switch with server-derived scope.
+- [x] Live project/task/alert metrics and lists.
+- [x] PR #6 merged; post-merge main CI #30 green.
 
-### Phase 3 — operational UI slice implemented
-- [x] Added ES/EN Quick Capture for workspace/private projects and tasks.
-- [x] Added project status/progress controls.
-- [x] Added task start/block/complete controls.
-- [x] Added alert acknowledge/resolve/dismiss controls.
-- [x] Added localized statuses, severities and mutation feedback.
-- [x] Added responsive desktop/mobile operational controls.
-- [x] Added a fixed server-side mutation proxy so the HTTP-only bearer credential never reaches client code.
-- [x] Added an allowlisted operation parser with scope, enum, numeric range and encoded-ID validation.
-- [x] Added tests for Quick Capture shape, path-injection resistance and invalid scope/status/progress rejection.
+### Phase 3 — operational Today UI merged
+- [x] ES/EN Quick Capture for workspace/private projects and tasks.
+- [x] Project status/progress controls.
+- [x] Task start/block/complete controls.
+- [x] Alert acknowledge/resolve/dismiss controls.
+- [x] Localized statuses, severities and mutation feedback.
+- [x] Fixed server-side mutation proxy; HTTP-only bearer credential never reaches client code.
+- [x] Allowlisted operation parser with scope/enum/range/encoded-ID validation and negative tests.
+- [x] Responsive desktop/mobile controls.
+- [x] PR #7 merged; post-merge main CI #36 green.
+
+### Phase 3 — milestone + Decision Log UI implemented
+- [x] Refactored Today from a monolithic page into feature components for Quick Capture, operational panels, Milestones and Decisions.
+- [x] Added full scoped project catalog reader instead of reusing Today’s limited project list.
+- [x] Added Milestone list/create/status management in workspace and private scope.
+- [x] Milestone creation uses only projects returned from the same authenticated scope.
+- [x] Added workspace-only Decision Log list/create UI with ES/EN copy and localized timestamps/statuses.
+- [x] Private view replaces Decision Log with an explicit workspace-only explanation.
+- [x] Decision creation proxy rejects private scope.
+- [x] Decision project association is intentionally read-only/not offered for new decisions until API same-workspace reference validation is implemented.
+- [x] Added parser tests for milestone mutations and Decision workspace/private boundaries.
+- [x] Updated UX documentation with the new feature/component boundaries.
 
 ## Validation / Validación
 
@@ -100,18 +100,21 @@
 - [x] Post-merge `main` CI #30 green.
 
 ### PR #7 — Operational Today UI
-- [x] Pull request opened.
-- [x] Initial lint/typecheck/tests/build green.
-- [x] Initial dependency audit green.
-- [x] Initial secret scan green.
-- [x] Initial Docker Compose smoke green, including API readiness and ES/EN web routes.
-- [ ] Final localization/documentation CI rerun green.
-- [ ] Merged to `main`.
+- [x] Full quality gate green, including final ES/EN rerun.
+- [x] Merged to `main`.
+- [x] Post-merge `main` CI #36 green.
+
+### Milestone + Decision Log UI slice
+- [ ] Pull request opened.
+- [ ] lint/typecheck/tests/build green.
+- [ ] dependency audit green.
+- [ ] secret scan green.
+- [ ] Docker Compose smoke green.
 
 ## Phase 3 still pending / Pendiente de la fase 3
 
-- [ ] Milestone management UI.
-- [ ] Decision management UI plus supersede/reverse lifecycle.
+- [ ] Decision same-workspace project-reference validation plus supersede/reverse lifecycle.
+- [ ] Manual Timeline/audit visibility in the UI.
 - [ ] Persistent multi-user local identities and password lifecycle beyond the single-owner bootstrap.
 - [ ] Transaction/outbox hardening for mutation + Timeline audit consistency.
 
@@ -134,19 +137,20 @@
 15. Missing standalone credentials do not create an insecure default account.
 16. Browser operational forms post only to a fixed same-product server proxy; they cannot choose an arbitrary upstream API path.
 17. Operational proxy scope is limited to `workspace` or `private`, and entity IDs are URL-encoded before upstream routing.
+18. Decision creation through the browser proxy is workspace-only and does not forward project references until backend referential validation exists.
 
 ## Next / Siguiente
 
-1. Merge PR #7 when the final CI rerun is green.
-2. Add Milestone management UI and Decision Log UI.
-3. Add Decision supersede/reverse lifecycle and transaction/outbox consistency.
+1. Open and validate the Milestone + Decision Log UI PR; merge only when the complete gate is green.
+2. Implement Decision same-workspace project validation and supersede/reverse lifecycle.
+3. Add a manual Timeline/audit surface and transaction/outbox consistency hardening.
 4. Add the persistent multi-user local identity/password lifecycle needed beyond bootstrap mode.
 5. Close Phase 3 only when the standalone product is useful manually end-to-end.
 6. Publish Command Center under Kairoseth Software when the Phase 3 exit gate is met, then begin Phase 4 GitHub integration.
 
 ## Current blockers / Bloqueos actuales
 
-None documented. PR #7 is pending its final CI rerun after localization/documentation updates.
+None documented. The Milestone + Decision Log UI slice is ready for PR validation.
 
 ## Operating rule
 
