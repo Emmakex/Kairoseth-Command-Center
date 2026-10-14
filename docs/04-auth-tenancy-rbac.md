@@ -17,6 +17,27 @@ Command Center must use an authentication provider contract:
 
 Authentication answers “who are you?”. Authorization separately answers “what can you access?”.
 
+## Persistent standalone local identities
+
+Standalone/local mode persists identity state in MongoDB instead of keeping a single owner only in process memory.
+
+The current local model stores:
+
+- `users`;
+- `workspaces`;
+- `memberships`;
+- separate `local_credentials` records.
+
+Passwords are never stored in plaintext. Local credentials use `scrypt-v1` with a random per-password salt and persist only the derived password material plus a monotonically increasing `passwordVersion`.
+
+The bootstrap owner is created only when the local credential store is empty. After bootstrap, restarts resolve the persisted owner and do not require the bootstrap password to recreate identity state.
+
+Local session tokens contain only the persistent user/workspace identity, password version and expiry metadata. Every authenticated request re-resolves the current User, Workspace, Membership and credential version from persistence. This means role/status changes are effective on the next request and a password change/reset immediately invalidates all tokens issued with an older password version.
+
+Managed standalone roles are limited to `admin` and `member`; the bootstrap `owner` is protected from member-management mutations and password reset by another user. Owner password changes use the authenticated self-service password-change flow.
+
+Member-management routes require the `members.manage` capability. A normal `member` cannot list, create, promote, suspend, disable or reset other members.
+
 ## Tenant model
 
 A customer company is represented by a `Workspace`/organization security boundary. A user can belong to multiple workspaces.
@@ -101,4 +122,5 @@ Every authenticated request should resolve:
 - Rate limiting on login and sensitive endpoints.
 - MFA/SSO readiness.
 - Session invalidation after membership/role revocation.
-- Audit events for role, entitlement and integration changes.
+- Immediate local-session invalidation after password change/reset through `passwordVersion`.
+- Audit events for membership, role, status and password-lifecycle changes.
