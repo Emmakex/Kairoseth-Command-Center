@@ -38,7 +38,7 @@ Suggested sections:
 - private reminders when enabled;
 - quick capture.
 
-The Phase 3 standalone surface composes Today from feature-level components rather than one monolithic page: Quick Capture, metrics, Projects/Tasks/Alerts, Milestones and the workspace Decision Log. The route page owns authentication, scope selection and data orchestration; feature components own their forms and presentation.
+The Phase 3 standalone surface composes Today from feature-level components rather than one monolithic page: Quick Capture, metrics, Projects/Tasks/Alerts, Milestones, the workspace Decision Log and Timeline. The route page owns authentication, scope selection and data orchestration; feature components own their forms and presentation.
 
 ## Progressive disclosure
 
@@ -82,6 +82,21 @@ The initial manual-use surface supports creating and reading a decision with:
 
 Project association is intentionally not offered by the creation form until the API enforces same-workspace referential validation. Supersede/reverse actions are also deferred until the Decision lifecycle API is implemented so the UI cannot imply semantics the backend does not yet guarantee.
 
+## Timeline / Actividad
+
+Timeline is a read-only manual audit surface backed exclusively by server-authored events. The browser cannot create arbitrary audit entries.
+
+The Timeline follows the same authenticated `workspace` or `private` scope as the rest of Today. It should present human-readable activity rather than implementation detail:
+
+- localize known event types in ES/EN;
+- localize status metadata instead of displaying raw enum values;
+- format timestamps with the signed-in user locale/timezone;
+- show a concise entity summary;
+- never expose raw actor IDs, tenant IDs, source internals or event JSON in the main dashboard;
+- keep technical metadata behind a future diagnostic/detail view.
+
+The API may retain/return a larger scoped history, while Today shows only the 30 most recent events to keep the dashboard operational and readable.
+
 ## Alert UX
 
 Severity mapping:
@@ -102,7 +117,7 @@ A persistent `+ Capture` action should accept plain language and allow immediate
 
 Private items must have a clear private indicator. Shared/workspace items should show the active workspace/team. Users should never have to guess whether a reminder is visible to colleagues.
 
-The Decision Log is hidden/replaced by an explanatory workspace-only state in private view. Milestones remain available in private view only when their parent project is private.
+The Decision Log is hidden/replaced by an explanatory workspace-only state in private view. Milestones remain available in private view only when their parent project is private. Timeline switches with the same scope selector so private audit history cannot bleed into workspace history or vice versa.
 
 ## Role-aware interface
 
@@ -117,9 +132,10 @@ Desktop-first for dense operations, fully responsive for tablet/mobile quick act
 - My Tasks;
 - alerts;
 - project status;
-- reminders.
+- reminders;
+- recent activity.
 
-Milestone and Decision forms collapse to one column on small screens, and mutation actions remain usable without horizontal scrolling.
+Milestone and Decision forms collapse to one column on small screens, mutation actions remain usable without horizontal scrolling, and Timeline labels/statuses stack vertically when needed.
 
 ## Accessibility
 
@@ -129,6 +145,7 @@ Milestone and Decision forms collapse to one column on small screens, and mutati
 - Sufficient contrast.
 - Status not communicated by color alone.
 - Screen-reader labels for icons and status controls.
+- Timeline timestamps use semantic `time` elements.
 
 ## Internationalization
 
