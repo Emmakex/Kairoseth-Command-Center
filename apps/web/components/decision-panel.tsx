@@ -42,17 +42,6 @@ export function DecisionPanel({
         <input type="hidden" name="locale" value={locale} />
         <input type="hidden" name="scope" value="workspace" />
         <input type="hidden" name="operation" value="decision-create" />
-        <label className="field">
-          <span>{copy.linkedProject}</span>
-          <select name="projectId" defaultValue="">
-            <option value="">{copy.noProject}</option>
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
-            ))}
-          </select>
-        </label>
         <label className="field management-title-field">
           <span>{copy.titleLabel}</span>
           <input name="title" required maxLength={240} placeholder={copy.decisionTitlePlaceholder} />
