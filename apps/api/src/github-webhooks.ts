@@ -76,11 +76,11 @@ function repositoryFullName(rawBody: Buffer): string | null {
   }
 }
 
-async function manageableConnection(
+async function manageableWebhook(
   request: FastifyRequest,
   options: WebhookRouteOptions,
 ): Promise<
-  | { ok: true; scope: WorkspaceScope; connectionId: string }
+  | { ok: true; scope: WorkspaceScope; actorUserId: string; connectionId: string }
   | { ok: false; status: number; error: string }
 > {
   const session = await resolveSession(request, options.authProvider);
@@ -90,24 +90,19 @@ async function manageableConnection(
   if (!canManageIntegrations(session, scope)) {
     return { ok: false, status: 403, error: 'forbidden' };
   }
-  if (!options.githubConnectionStore || !options.githubWebhookStore) {
+  if (!options.githubWebhookStore) {
     return { ok: false, status: 503, error: 'github_webhook_store_unavailable' };
   }
 
   const params = request.params as { id?: string };
   const connectionId = nonEmptyString(params.id, 100);
   if (!connectionId) return { ok: false, status: 400, error: 'invalid_connection_id' };
-  const connection = await options.githubConnectionStore.getConnection(scope, connectionId);
-  if (!connection) return { ok: false, status: 404, error: 'github_connection_not_found' };
-  if (connection.status !== 'active' || !connection.lastValidatedAt) {
-    return { ok: false, status: 409, error: 'github_connection_not_validated' };
-  }
-  return { ok: true, scope, connectionId };
+  return { ok: true, scope, actorUserId: session.user.id, connectionId };
 }
 
 export function registerGitHubWebhookRoutes(app: FastifyInstance, options: WebhookRouteOptions): void {
   app.get('/v1/integrations/github/connections/:id/webhook', async (request, reply) => {
-    const context = await manageableConnection(request, options);
+    const context = await manageableWebhook(request, options);
     if (!context.ok) return reply.code(context.status).send({ error: context.error });
     const endpoint = await options.githubWebhookStore!.get(context.scope, context.connectionId);
     if (!endpoint) return reply.code(404).send({ error: 'github_webhook_not_configured' });
@@ -115,9 +110,22 @@ export function registerGitHubWebhookRoutes(app: FastifyInstance, options: Webho
   });
 
   app.post('/v1/integrations/github/connections/:id/webhook', async (request, reply) => {
-    const context = await manageableConnection(request, options);
+    const context = await manageableWebhook(request, options);
     if (!context.ok) return reply.code(context.status).send({ error: context.error });
-    const result = await options.githubWebhookStore!.provision(context.scope, context.connectionId);
+    if (!options.githubConnectionStore) {
+      return reply.code(503).send({ error: 'github_connection_store_unavailable' });
+    }
+    const connection = await options.githubConnectionStore.getConnection(context.scope, context.connectionId);
+    if (!connection) return reply.code(404).send({ error: 'github_connection_not_found' });
+    if (connection.status !== 'active' || !connection.lastValidatedAt) {
+      return reply.code(409).send({ error: 'github_connection_not_validated' });
+    }
+
+    const result = await options.githubWebhookStore!.provision(
+      context.scope,
+      context.actorUserId,
+      context.connectionId,
+    );
     if (result.status === 'exists') {
       return reply.code(409).send({
         error: 'github_webhook_already_configured',
@@ -132,9 +140,13 @@ export function registerGitHubWebhookRoutes(app: FastifyInstance, options: Webho
   });
 
   app.post('/v1/integrations/github/connections/:id/webhook/rotate', async (request, reply) => {
-    const context = await manageableConnection(request, options);
+    const context = await manageableWebhook(request, options);
     if (!context.ok) return reply.code(context.status).send({ error: context.error });
-    const result = await options.githubWebhookStore!.rotateSecret(context.scope, context.connectionId);
+    const result = await options.githubWebhookStore!.rotateSecret(
+      context.scope,
+      context.actorUserId,
+      context.connectionId,
+    );
     if (result.status === 'not_found') {
       return reply.code(404).send({ error: 'github_webhook_not_configured' });
     }
@@ -146,9 +158,13 @@ export function registerGitHubWebhookRoutes(app: FastifyInstance, options: Webho
   });
 
   app.delete('/v1/integrations/github/connections/:id/webhook', async (request, reply) => {
-    const context = await manageableConnection(request, options);
+    const context = await manageableWebhook(request, options);
     if (!context.ok) return reply.code(context.status).send({ error: context.error });
-    const deleted = await options.githubWebhookStore!.delete(context.scope, context.connectionId);
+    const deleted = await options.githubWebhookStore!.delete(
+      context.scope,
+      context.actorUserId,
+      context.connectionId,
+    );
     if (!deleted) return reply.code(404).send({ error: 'github_webhook_not_configured' });
     return { deleted: true };
   });
