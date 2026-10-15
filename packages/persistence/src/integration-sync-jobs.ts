@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { Collection, Db } from 'mongodb';
+import type { Collection, Db, Filter } from 'mongodb';
 
 export type IntegrationSyncJobStatus = 'pending' | 'processing' | 'retry' | 'completed' | 'dead';
 
@@ -34,6 +34,13 @@ export type EnqueueIntegrationSyncJobInput = {
   maxAttempts?: number;
 };
 
+export type ClaimIntegrationSyncJobOptions = {
+  now?: Date;
+  leaseMs?: number;
+  provider?: string;
+  kind?: string;
+};
+
 export type RetryIntegrationSyncJobInput = {
   jobId: string;
   claimToken: string;
@@ -46,7 +53,7 @@ export type RetryIntegrationSyncJobInput = {
 export interface IntegrationSyncJobStore {
   ensureIndexes(): Promise<void>;
   enqueue(input: EnqueueIntegrationSyncJobInput): Promise<IntegrationSyncJob>;
-  claimDue(options?: { now?: Date; leaseMs?: number }): Promise<IntegrationSyncJob | null>;
+  claimDue(options?: ClaimIntegrationSyncJobOptions): Promise<IntegrationSyncJob | null>;
   complete(jobId: string, claimToken: string, now?: Date): Promise<boolean>;
   fail(jobId: string, claimToken: string, errorCode: string, now?: Date): Promise<boolean>;
   retry(input: RetryIntegrationSyncJobInput): Promise<IntegrationSyncJob | null>;
@@ -93,7 +100,7 @@ export class MongoIntegrationSyncJobStore implements IntegrationSyncJobStore {
         { workspaceId: 1, activeDedupeKey: 1 },
         { unique: true, sparse: true },
       ),
-      this.jobs.createIndex({ status: 1, availableAt: 1, createdAt: 1 }),
+      this.jobs.createIndex({ status: 1, provider: 1, kind: 1, availableAt: 1, createdAt: 1 }),
       this.jobs.createIndex({ status: 1, leaseExpiresAt: 1 }),
       this.jobs.createIndex({ workspaceId: 1, resourceId: 1, updatedAt: -1 }),
     ]);
@@ -138,12 +145,19 @@ export class MongoIntegrationSyncJobStore implements IntegrationSyncJobStore {
     }
   }
 
-  async claimDue(options: { now?: Date; leaseMs?: number } = {}): Promise<IntegrationSyncJob | null> {
+  async claimDue(options: ClaimIntegrationSyncJobOptions = {}): Promise<IntegrationSyncJob | null> {
     const now = options.now ?? new Date();
     const leaseMs = Math.min(30 * 60_000, Math.max(10_000, Math.floor(options.leaseMs ?? 120_000)));
     const claimToken = randomUUID();
+    const filter: Filter<IntegrationSyncJob> = {
+      status: { $in: ['pending', 'retry'] },
+      availableAt: { $lte: iso(now) },
+    };
+    if (options.provider) filter.provider = validText(options.provider, 'provider', 100);
+    if (options.kind) filter.kind = validText(options.kind, 'kind', 100);
+
     return this.jobs.findOneAndUpdate(
-      { status: { $in: ['pending', 'retry'] }, availableAt: { $lte: iso(now) } },
+      filter,
       {
         $set: {
           status: 'processing',
@@ -176,21 +190,12 @@ export class MongoIntegrationSyncJobStore implements IntegrationSyncJobStore {
     return result.modifiedCount === 1;
   }
 
-  async fail(
-    jobId: string,
-    claimToken: string,
-    errorCode: string,
-    now = new Date(),
-  ): Promise<boolean> {
+  async fail(jobId: string, claimToken: string, errorCode: string, now = new Date()): Promise<boolean> {
     const normalizedErrorCode = validText(errorCode, 'error_code', 200);
     const result = await this.jobs.updateOne(
       { id: jobId, status: 'processing', claimToken },
       {
-        $set: {
-          status: 'dead',
-          lastErrorCode: normalizedErrorCode,
-          updatedAt: iso(now),
-        },
+        $set: { status: 'dead', lastErrorCode: normalizedErrorCode, updatedAt: iso(now) },
         $unset: {
           activeDedupeKey: '',
           claimToken: '',
