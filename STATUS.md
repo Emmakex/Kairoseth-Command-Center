@@ -4,7 +4,7 @@
 **Technical/internal project:** Kairoseth Command Center  
 **Commercial names:** Gestor de Trabajo (ES) / Work Manager (EN)  
 **Category:** Kairoseth Software  
-**Status:** Phase 3 is closed. Phase 4 Slices 1–2 are merged and post-merge green. PR #17 is the active Slice 3 front: live GitHub credential validation, validated repository binding and manual repository sync.
+**Status:** Phase 3 is closed. Phase 4 Slices 1–3 are merged and post-merge validated. PR #18 is the active Slice 4a front: normalized GitHub pull request, issue and CI signals for the dashboard.
 
 ## Naming rule / Regla de naming
 
@@ -75,7 +75,7 @@
 - [x] API redacts token, `secretRef`, ciphertext, IV and auth tag.
 - [x] Missing vault key fails closed for credential operations without breaking core Work Manager features.
 - [x] Transactional credential rotation/deletion and audit delivery.
-- [x] Delete refuses while `ExternalResource.connectionId` references the connection.
+- [x] Delete refuses while an `ExternalResource.connectionId` references the connection.
 - [x] Unit tests for permissions, redaction and ciphertext workspace/ref isolation.
 - [x] Dedicated encrypted-connection Docker smoke.
 - [x] Gitleaks false-positive fixture removed from PR history without adding scanner exceptions.
@@ -90,11 +90,9 @@
 
 ### Slice 3 — live validation + manual repository sync (PR #17)
 
-Implemented in the active branch:
-
 - [x] Trusted deployment-level `KCC_GITHUB_API_BASE_URL`, defaulting to `https://api.github.com`.
 - [x] Isolated `GitHubRestClient` with bearer auth, provider timeout and normalized error categories.
-- [x] `IntegrationConnectionStatus` now includes `unverified`.
+- [x] `IntegrationConnectionStatus` includes `unverified`.
 - [x] New/rotated credentials become `unverified`; only provider validation promotes to `active`.
 - [x] Generic validation fields: `lastValidatedAt`, remote account ID/label and normalized last error code.
 - [x] `POST /v1/integrations/github/connections/:id/validate`.
@@ -103,21 +101,40 @@ Implemented in the active branch:
 - [x] `PATCH /v1/integrations/github/repositories/:resourceId/connection`.
 - [x] Manual repository sync by `resourceId`; token/owner/repository are resolved server-side.
 - [x] `POST /v1/integrations/github/repositories/:resourceId/sync`.
-- [x] Normalized sync snapshot includes GitHub repository ID, remote full name, default branch, latest commit SHA/URL/date, private/archived flags, remote update time and local sync time.
+- [x] Normalized repository snapshot includes GitHub repository ID, remote full name, default branch, latest commit SHA/URL/date, private/archived flags, remote update time and local sync time.
 - [x] Validation success/failure, binding, sync success/failure audited without raw provider bodies or credentials.
 - [x] Provider 401 discovered during sync invalidates the connection; repository-specific 403/404 does not automatically invalidate the credential.
-- [x] Unit tests updated for `unverified → active` and validated binding.
-- [x] Provider-adapter tests cover bearer URL, response normalization, rate limiting and malformed provider responses.
-- [x] Strict GitHub HTTP mock added for Docker CI.
-- [x] Dedicated live validation/sync Docker smoke and workflow added.
-- [ ] Final PR #17 CI/type/test/build/security/Docker gates.
+- [x] Strict GitHub HTTP mock and dedicated live validation/sync Docker smoke.
+- [x] PR #17 final head passed CI, Local identities, Standalone, Repository links, GitHub connections and GitHub live sync gates.
+- [x] PR #17 merged as `2e9062b373bcef4ffea407eecfe7863c1b5336f4`.
+- [x] Post-merge `main` validation completed without a failed gate.
+
+**Slice 3: CLOSED / CERRADA.**
+
+### Slice 4a — normalized dashboard signals (PR #18)
+
+Implemented in the active branch:
+
+- [x] Extend `GitHubProviderClient` with normalized pull request, issue and Actions workflow-run reads.
+- [x] Reuse provider-neutral `IntegrationSignal` rather than introduce GitHub-specific dashboard contracts.
+- [x] Exclude pull requests returned by GitHub's issues endpoint to prevent duplicate signals.
+- [x] `GET /v1/integrations/github/repositories/:resourceId/signals?limit=20`.
+- [x] Require `projects.read` + `command-center` entitlement for signal consumption.
+- [x] Derive workspace, repository coordinates and encrypted credential server-side.
+- [x] Require a validated active GitHub connection.
+- [x] Sort combined signals by latest provider activity and cap the response at 50.
+- [x] Normalize provider 401 and invalidate the affected connection without credential leakage.
+- [x] Tolerate historical workflow runs without `head_branch`.
+- [x] Provider/API tests cover PR/issue/CI normalization, issue deduplication, authorization, ordering and credential redaction.
+- [ ] Final PR #18 CI/type/test/build/security/Docker gates.
 - [ ] Merge and post-merge validation.
 
 ### Deferred Phase 4 slices
 
-- [ ] PR/issue/workflow/release ingestion and normalized dashboard signals.
-- [ ] Verified GitHub webhooks.
+- [ ] Release signals.
+- [ ] Persist normalized signals for dashboard history and offline reads.
 - [ ] Scheduled/retryable sync jobs and rate-limit-aware backoff.
+- [ ] Verified GitHub webhooks.
 - [ ] GitHub-derived alerts and rule automation.
 - [ ] OAuth/GitHub App authorization flow after the token-backed adapter boundary is proven.
 
@@ -137,25 +154,27 @@ Implemented in the active branch:
 12. Missing vault configuration disables credential-backed actions rather than weakening encryption.
 13. Public API responses never expose provider token, `secretRef`, ciphertext, IV or auth tag.
 14. GitHub provider base URL is deployment configuration, never HTTP request input.
-15. Validation and sync calls derive credentials and repository coordinates server-side.
-16. A repository may bind only to a same-workspace connection with `active` + `lastValidatedAt`.
+15. Validation, sync and signal reads derive credentials and repository coordinates server-side.
+16. A repository may use credential-backed reads only through a same-workspace connection with `active` + `lastValidatedAt`.
 17. Provider responses are normalized before persistence or client exposure.
 18. Provider errors are reduced to stable error categories; raw provider bodies are not returned.
 19. Credential rotation returns a connection to `unverified` and clears prior validation metadata.
-20. A provider 401 during sync marks the connection invalid; repo-specific access errors do not silently invalidate it.
+20. A provider 401 during sync or signal retrieval marks the connection invalid; repo-specific access errors do not silently invalidate it.
+21. Signal consumption is read-only and requires `projects.read`; integration configuration remains restricted to `integrations.manage`.
 
 ## Next / Siguiente
 
-1. Finish PR #17 validation and merge only when all existing gates plus `GitHub live sync smoke` are green.
+1. Finish PR #18 validation and merge only when all final-head gates are green.
 2. Verify the same gates on `main` after merge.
-3. Start the next small slice for normalized PR/issue/workflow signals.
-4. Add verified webhooks only after polling/manual normalization is stable.
-5. When commercial publication is scheduled, create the Kairoseth Software catalog entry as **Gestor de Trabajo / Work Manager**.
+3. Add release normalization as a small follow-up slice.
+4. Persist provider-neutral signals before adding background scheduling or verified webhooks.
+5. Add verified webhooks only after polling/manual normalization is stable.
+6. When commercial publication is scheduled, create the Kairoseth Software catalog entry as **Gestor de Trabajo / Work Manager**.
 
 ## Current blockers / Bloqueos actuales
 
-No known product blocker. PR #17 is the active development front.
+No known product blocker. PR #18 is the active development front; final CI validation is in progress.
 
 ## Operating rule
 
-Update this file at meaningful milestones. Keep Phase 4 slices small; do not mix live sync, PR/issues/workflows, webhooks and automation rules in one PR.
+Update this file at meaningful milestones. Keep Phase 4 slices small; do not mix provider reads, persistence, webhooks and automation rules in one PR.
