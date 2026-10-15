@@ -63,7 +63,7 @@ export type GitHubRemoteWorkflowRun = {
   status: string;
   conclusion?: string;
   event: string;
-  headBranch: string;
+  headBranch?: string;
   headSha: string;
   htmlUrl: string;
   updatedAt: string;
@@ -359,7 +359,7 @@ export class GitHubRestClient implements GitHubProviderClient {
       const headSha = stringValue(item?.head_sha, 200);
       const htmlUrl = stringValue(item?.html_url, 2000);
       const updatedAt = stringValue(item?.updated_at, 100);
-      if (!id || !name || !status || !event || !headBranch || !headSha || !htmlUrl || !updatedAt) {
+      if (!id || !name || !status || !event || !headSha || !htmlUrl || !updatedAt) {
         throw new GitHubProviderError('upstream_error', 'github_invalid_workflow_run_response');
       }
       return {
@@ -368,7 +368,7 @@ export class GitHubRestClient implements GitHubProviderClient {
         status,
         ...(stringValue(item?.conclusion, 100) ? { conclusion: String(item?.conclusion) } : {}),
         event,
-        headBranch,
+        ...(headBranch ? { headBranch } : {}),
         headSha,
         htmlUrl,
         updatedAt,
