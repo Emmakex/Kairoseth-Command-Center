@@ -95,6 +95,46 @@ jobs:
           STATUS="$(printf '%s' "$STATE" | sed -n 's/.*\"status\":\"\([^\"]*\)\".*/\1/p')"
           [[ "$STATUS" == "completed" ]]
 
+      - name: Repeat state is pending
+        if: failure()
+        run: |
+          docker compose -f docker-compose.yml -f deployment/docker/docker-compose.github-mock.yml -f deployment/docker/docker-compose.github-background-mock.yml exec -T mongo mongosh --quiet kairoseth_command_center --eval "const d=db.integration_sync_jobs.findOne({id:'background-smoke-${GITHUB_RUN_ID}-repeat'}); if (!d || d.status !== 'pending') quit(2);"
+
+      - name: Repeat state is processing
+        if: failure()
+        run: |
+          docker compose -f docker-compose.yml -f deployment/docker/docker-compose.github-mock.yml -f deployment/docker/docker-compose.github-background-mock.yml exec -T mongo mongosh --quiet kairoseth_command_center --eval "const d=db.integration_sync_jobs.findOne({id:'background-smoke-${GITHUB_RUN_ID}-repeat'}); if (!d || d.status !== 'processing') quit(2);"
+
+      - name: Repeat state is retry
+        if: failure()
+        run: |
+          docker compose -f docker-compose.yml -f deployment/docker/docker-compose.github-mock.yml -f deployment/docker/docker-compose.github-background-mock.yml exec -T mongo mongosh --quiet kairoseth_command_center --eval "const d=db.integration_sync_jobs.findOne({id:'background-smoke-${GITHUB_RUN_ID}-repeat'}); if (!d || d.status !== 'retry') quit(2);"
+
+      - name: Repeat state is dead
+        if: failure()
+        run: |
+          docker compose -f docker-compose.yml -f deployment/docker/docker-compose.github-mock.yml -f deployment/docker/docker-compose.github-background-mock.yml exec -T mongo mongosh --quiet kairoseth_command_center --eval "const d=db.integration_sync_jobs.findOne({id:'background-smoke-${GITHUB_RUN_ID}-repeat'}); if (!d || d.status !== 'dead') quit(2);"
+
+      - name: Repeat error is signal fetch
+        if: failure()
+        run: |
+          docker compose -f docker-compose.yml -f deployment/docker/docker-compose.github-mock.yml -f deployment/docker/docker-compose.github-background-mock.yml exec -T mongo mongosh --quiet kairoseth_command_center --eval "const d=db.integration_sync_jobs.findOne({id:'background-smoke-${GITHUB_RUN_ID}-repeat'}); if (!d || d.lastError !== 'github_worker_signal_fetch_error') quit(2);"
+
+      - name: Repeat error is signal persistence
+        if: failure()
+        run: |
+          docker compose -f docker-compose.yml -f deployment/docker/docker-compose.github-mock.yml -f deployment/docker/docker-compose.github-background-mock.yml exec -T mongo mongosh --quiet kairoseth_command_center --eval "const d=db.integration_sync_jobs.findOne({id:'background-smoke-${GITHUB_RUN_ID}-repeat'}); if (!d || d.lastError !== 'github_worker_signal_persistence_error') quit(2);"
+
+      - name: Repeat error is alert materialization
+        if: failure()
+        run: |
+          docker compose -f docker-compose.yml -f deployment/docker/docker-compose.github-mock.yml -f deployment/docker/docker-compose.github-background-mock.yml exec -T mongo mongosh --quiet kairoseth_command_center --eval "const d=db.integration_sync_jobs.findOne({id:'background-smoke-${GITHUB_RUN_ID}-repeat'}); if (!d || d.lastError !== 'github_worker_alert_materialization_error') quit(2);"
+
+      - name: Repeat error is job completion
+        if: failure()
+        run: |
+          docker compose -f docker-compose.yml -f deployment/docker/docker-compose.github-mock.yml -f deployment/docker/docker-compose.github-background-mock.yml exec -T mongo mongosh --quiet kairoseth_command_center --eval "const d=db.integration_sync_jobs.findOne({id:'background-smoke-${GITHUB_RUN_ID}-repeat'}); if (!d || d.lastError !== 'github_worker_job_completion_error') quit(2);"
+
       - name: Diagnose normalized signal set
         if: failure()
         run: |
