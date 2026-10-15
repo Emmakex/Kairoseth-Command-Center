@@ -184,14 +184,16 @@ describe('GitHub background refresh enqueue API', () => {
   });
 
   it('refuses to enqueue work for an unvalidated connection', async () => {
+    const unvalidatedConnection: IntegrationConnection = {
+      ...activeConnection,
+      status: 'unverified',
+    };
+    delete unvalidatedConnection.lastValidatedAt;
+
     const app = buildApp({
       authProvider: authProvider(),
       githubRepositoryStore: repositoryStore(),
-      githubConnectionStore: connectionStore({
-        ...activeConnection,
-        status: 'unverified',
-        lastValidatedAt: undefined,
-      }),
+      githubConnectionStore: connectionStore(unvalidatedConnection),
       integrationSyncJobStore: new MemorySyncJobStore(),
     });
 
