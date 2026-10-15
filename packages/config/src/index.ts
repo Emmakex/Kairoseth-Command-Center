@@ -4,6 +4,10 @@ function optionalSecret(schema: z.ZodString) {
   return z.preprocess((value) => (value === '' ? undefined : value), schema.optional());
 }
 
+const integrationSecretKey = optionalSecret(
+  z.string().regex(/^[0-9a-fA-F]{64}$/, 'KCC_INTEGRATION_SECRET_KEY must be 64 hexadecimal characters'),
+);
+
 const apiSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   KCC_API_HOST: z.string().default('0.0.0.0'),
@@ -20,9 +24,7 @@ const apiSchema = z.object({
   KCC_LOCAL_WORKSPACE_ID: z.string().min(1).max(160).default('local-workspace'),
   KCC_LOCAL_WORKSPACE_NAME: z.string().min(1).max(160).default('Local Workspace'),
   KCC_LOCAL_SESSION_TTL_SECONDS: z.coerce.number().int().min(900).max(604800).default(43200),
-  KCC_INTEGRATION_SECRET_KEY: optionalSecret(
-    z.string().regex(/^[0-9a-fA-F]{64}$/, 'KCC_INTEGRATION_SECRET_KEY must be 64 hexadecimal characters'),
-  ),
+  KCC_INTEGRATION_SECRET_KEY: integrationSecretKey,
   KCC_GITHUB_API_BASE_URL: z.string().url().default('https://api.github.com'),
 });
 
@@ -30,6 +32,8 @@ const workerSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   KCC_WORKER_POLL_MS: z.coerce.number().int().positive().default(30000),
   MONGODB_URI: z.string().min(1).default('mongodb://localhost:27017/kairoseth_command_center'),
+  KCC_INTEGRATION_SECRET_KEY: integrationSecretKey,
+  KCC_GITHUB_API_BASE_URL: z.string().url().default('https://api.github.com'),
 });
 
 export type ApiConfig = z.infer<typeof apiSchema>;
