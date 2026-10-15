@@ -64,6 +64,51 @@ jobs:
           KCC_SMOKE_RUN_ID="$GITHUB_RUN_ID" \
             bash deployment/docker/smoke-github-background-refresh.sh
 
+      - name: Diagnose queue completion
+        if: failure()
+        run: |
+          docker compose \
+            -f docker-compose.yml \
+            -f deployment/docker/docker-compose.github-mock.yml \
+            -f deployment/docker/docker-compose.github-background-mock.yml \
+            exec -T mongo mongosh --quiet kairoseth_command_center --eval "
+          const ids=['background-smoke-${GITHUB_RUN_ID}','background-smoke-${GITHUB_RUN_ID}-repeat'];
+          const docs=db.integration_sync_jobs.find({id:{\$in:ids}}).toArray();
+          print(JSON.stringify(docs.map(({id,status,attempt,lastError,availableAt})=>({id,status,attempt,lastError,availableAt}))));
+          if (docs.length !== 2 || docs.some((doc) => doc.status !== 'completed')) quit(2);
+          "
+
+      - name: Diagnose derived alert state
+        if: failure()
+        run: |
+          docker compose \
+            -f docker-compose.yml \
+            -f deployment/docker/docker-compose.github-mock.yml \
+            -f deployment/docker/docker-compose.github-background-mock.yml \
+            exec -T mongo mongosh --quiet kairoseth_command_center --eval "
+          const fingerprint='integration-rule:repository.ci.failed.v1:github:workflow-run:701';
+          const docs=db.alerts.find({fingerprint}).toArray();
+          print(JSON.stringify(docs.map(({id,severity,status,scope})=>({id,severity,status,scope}))));
+          if (docs.length !== 1 || docs[0].severity !== 'urgent' || docs[0].status !== 'open') quit(2);
+          "
+
+      - name: Diagnose derived alert audit state
+        if: failure()
+        run: |
+          docker compose \
+            -f docker-compose.yml \
+            -f deployment/docker/docker-compose.github-mock.yml \
+            -f deployment/docker/docker-compose.github-background-mock.yml \
+            exec -T mongo mongosh --quiet kairoseth_command_center --eval "
+          const fingerprint='integration-rule:repository.ci.failed.v1:github:workflow-run:701';
+          const alert=db.alerts.findOne({fingerprint});
+          if (!alert) { print('alert missing'); quit(2); }
+          const count=db.timeline_events.countDocuments({type:'alert.derived',entityId:alert.id,'scope.workspaceId':alert.scope.workspaceId});
+          const outbox=db.audit_outbox.find({'event.type':'alert.derived','event.entityId':alert.id}).toArray();
+          print(JSON.stringify({count,outbox:outbox.map(({status,attempts,lastError})=>({status,attempts,lastError}))}));
+          if (count !== 1) quit(2);
+          "
+
       - name: Show service state on failure
         if: failure()
         run: |
