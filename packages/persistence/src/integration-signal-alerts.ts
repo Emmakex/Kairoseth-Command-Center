@@ -54,6 +54,11 @@ export class MongoIntegrationSignalAlertStore {
 
   async materialize(workspaceId: string, candidate: DerivedSignalAlert): Promise<MaterializeSignalAlertResult> {
     const scope: WorkspaceScope = { kind: 'workspace', workspaceId };
+    const filter = {
+      'scope.kind': 'workspace' as const,
+      'scope.workspaceId': workspaceId,
+      fingerprint: candidate.fingerprint,
+    };
     const now = new Date().toISOString();
     const alert: Alert = {
       id: randomUUID(),
@@ -71,11 +76,11 @@ export class MongoIntegrationSignalAlertStore {
     try {
       return await this.transaction(async (session) => {
         const result = await this.alerts.updateOne(
-          { scope, fingerprint: candidate.fingerprint },
+          filter,
           { $setOnInsert: alert },
           { upsert: true, session },
         );
-        const stored = await this.alerts.findOne({ scope, fingerprint: candidate.fingerprint }, { session });
+        const stored = await this.alerts.findOne(filter, { session });
         if (!stored) throw new Error('integration_signal_alert_materialization_failed');
         if (result.upsertedCount === 0) return { status: 'existing', alert: stored };
 
@@ -101,7 +106,7 @@ export class MongoIntegrationSignalAlertStore {
       });
     } catch (error) {
       if (error instanceof MongoServerError && error.code === 11000) {
-        const existing = await this.alerts.findOne({ scope, fingerprint: candidate.fingerprint });
+        const existing = await this.alerts.findOne(filter);
         if (existing) return { status: 'existing', alert: existing };
       }
       throw error;
