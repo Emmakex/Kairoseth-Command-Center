@@ -13,9 +13,10 @@ La microfase 5b convierte la cola durable de jobs en un flujo real de refresh Gi
 3. The API enqueues a provider-neutral durable job containing only workspace/resource metadata.
 4. The worker claims only `provider=github` + `kind=repository_signals` jobs with a bounded lease.
 5. The worker resolves the repository, validated connection and encrypted secret server-side.
-6. The shared GitHub client reads pull requests, issues, workflow runs and releases.
-7. The shared normalizer produces the same provider-neutral `IntegrationSignal` records used by the live API path.
-8. Signals are upserted idempotently and the job is completed.
+6. API and worker call the same shared GitHub signal executor.
+7. The executor reads pull requests, issues, workflow runs and releases through the shared provider client.
+8. The shared normalizer produces the same provider-neutral `IntegrationSignal` records for live and background refreshes.
+9. Signals are upserted idempotently and the job is completed.
 
 ## API / API
 
@@ -35,10 +36,13 @@ The response is `202 Accepted` with safe operational job metadata only. It never
 
 The API and worker now reuse:
 
+- `@kcc/integrations/github-signal-executor` as the single fetch + normalize execution path;
 - `@kcc/integrations/github` for provider requests and normalized provider errors;
 - `@kcc/integrations/github-signals` for signal mapping and ordering;
 - `@kcc/persistence/integration-secrets` for the AES-256-GCM credential vault;
 - `@kcc/persistence/github-signal-runtime` for workspace-scoped repository → connection → credential resolution.
+
+The shared executor accepts already-authorized runtime inputs; it does not resolve tenants, permissions or secrets itself. API authorization remains in the API boundary and encrypted-secret resolution remains server-side.
 
 The former API provider/vault modules remain compatibility shims so existing API routes and tests keep the same import surface while implementation lives in shared packages.
 
@@ -47,7 +51,7 @@ The former API provider/vault modules remain compatibility shims so existing API
 - GitHub `401`: invalidate the connection and terminate the job as `dead`.
 - GitHub `403`: terminal `dead` job.
 - GitHub `404`: terminal `dead` job.
-- Rate limit: retry with a longer initial delay (5 minutes) and 60-minute cap.
+- Rate limit: retry with a longer initial delay (5 minutes) and 60-minute cap in Slice 5b.
 - Timeout: retry through the durable exponential backoff policy.
 - Upstream/transient error: retry through the durable exponential backoff policy.
 - Missing/invalid repository, connection or credential runtime: terminal `dead` job.
@@ -67,8 +71,8 @@ A dedicated Docker smoke uses two provider mocks:
 - the existing strict GitHub mock for credential validation and repository binding;
 - a separate worker-only signal mock for PR/issues/CI/releases.
 
-The smoke proves that a durable job is claimed by the worker, signals are persisted, the job reaches `completed`, and worker logs do not expose the provider token.
+The smoke proves that a durable job is claimed by the worker, signals are persisted, the job reaches `completed`, and worker logs do not expose the provider token. The normal CI/type/test/build gates also compile API and worker against the same exported executor contract.
 
 ## Deliberately deferred / Aplazado expresamente
 
-Slice 5b does not generate recurring jobs yet and does not add webhooks or signal-derived alerts. Slice 5c will add recurring schedule generation and rate-limit-aware next-run timing after this worker execution path is stable.
+Slice 5b does not generate recurring jobs yet and does not add webhooks or signal-derived alerts. Slice 5c adds recurring schedule generation and provider-header-aware next-run timing after this shared worker execution path is stable.
