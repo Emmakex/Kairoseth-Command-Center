@@ -64,7 +64,7 @@ jobs:
           KCC_SMOKE_RUN_ID="$GITHUB_RUN_ID" \
             bash deployment/docker/smoke-github-background-refresh.sh
 
-      - name: Diagnose queue completion
+      - name: Diagnose initial background job
         if: failure()
         run: |
           docker compose \
@@ -72,10 +72,38 @@ jobs:
             -f deployment/docker/docker-compose.github-mock.yml \
             -f deployment/docker/docker-compose.github-background-mock.yml \
             exec -T mongo mongosh --quiet kairoseth_command_center --eval "
-          const ids=['background-smoke-${GITHUB_RUN_ID}','background-smoke-${GITHUB_RUN_ID}-repeat'];
-          const docs=db.integration_sync_jobs.find({id:{\$in:ids}}).toArray();
-          print(JSON.stringify(docs.map(({id,status,attempt,lastError,availableAt})=>({id,status,attempt,lastError,availableAt}))));
-          if (docs.length !== 2 || docs.some((doc) => doc.status !== 'completed')) quit(2);
+          const id='background-smoke-${GITHUB_RUN_ID}';
+          const doc=db.integration_sync_jobs.findOne({id});
+          print(JSON.stringify(doc ? {id:doc.id,status:doc.status,attempt:doc.attempt,lastError:doc.lastError,availableAt:doc.availableAt,claimToken:doc.claimToken,leaseExpiresAt:doc.leaseExpiresAt} : null));
+          if (!doc || doc.status !== 'completed') quit(2);
+          "
+
+      - name: Diagnose repeat background job
+        if: failure()
+        run: |
+          docker compose \
+            -f docker-compose.yml \
+            -f deployment/docker/docker-compose.github-mock.yml \
+            -f deployment/docker/docker-compose.github-background-mock.yml \
+            exec -T mongo mongosh --quiet kairoseth_command_center --eval "
+          const id='background-smoke-${GITHUB_RUN_ID}-repeat';
+          const doc=db.integration_sync_jobs.findOne({id});
+          print(JSON.stringify(doc ? {id:doc.id,status:doc.status,attempt:doc.attempt,lastError:doc.lastError,availableAt:doc.availableAt,claimToken:doc.claimToken,leaseExpiresAt:doc.leaseExpiresAt} : null));
+          if (!doc || doc.status !== 'completed') quit(2);
+          "
+
+      - name: Diagnose normalized signal set
+        if: failure()
+        run: |
+          docker compose \
+            -f docker-compose.yml \
+            -f deployment/docker/docker-compose.github-mock.yml \
+            -f deployment/docker/docker-compose.github-background-mock.yml \
+            exec -T mongo mongosh --quiet kairoseth_command_center --eval "
+          const expected=['github:pull-request:501','github:issue:601','github:workflow-run:701','github:release:801'];
+          const ids=db.integration_signals.find({id:{\$in:expected}},{id:1,_id:0}).toArray().map((doc)=>doc.id).sort();
+          print(JSON.stringify(ids));
+          if (expected.some((id)=>!ids.includes(id))) quit(2);
           "
 
       - name: Diagnose derived alert state
