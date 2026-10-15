@@ -35,7 +35,8 @@
 
 .github-setup-section-heading > span,
 .github-project-label,
-.github-connection-status {
+.github-connection-status,
+.github-webhook-state {
   flex: 0 0 auto;
   padding: 4px 8px;
   border-radius: 999px;
@@ -45,17 +46,20 @@
   font-weight: 800;
 }
 
-.github-connection-status-active {
+.github-connection-status-active,
+.github-webhook-state-configured {
   background: #ecfdf5;
   color: #047857;
 }
 
-.github-connection-status-error {
+.github-connection-status-error,
+.github-webhook-state-unavailable {
   background: #fff1f2;
   color: #be123c;
 }
 
-.github-connection-status-unverified {
+.github-connection-status-unverified,
+.github-webhook-state-not-configured {
   background: #fff7ed;
   color: #c2410c;
 }
@@ -154,7 +158,8 @@
 .github-connection-actions,
 .github-repository-actions,
 .github-bind-form,
-.github-rotate-form {
+.github-rotate-form,
+.github-webhook-actions {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -172,6 +177,65 @@
 
 .github-bind-form select {
   min-width: 150px;
+}
+
+.github-webhook-box {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.github-webhook-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.github-webhook-heading > div {
+  display: grid;
+  gap: 3px;
+}
+
+.github-webhook-heading strong {
+  font-size: 0.84rem;
+}
+
+.github-webhook-heading > div > span,
+.github-webhook-path small {
+  color: #64748b;
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.github-webhook-path {
+  display: grid;
+  gap: 5px;
+}
+
+.github-webhook-path > span {
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.github-webhook-path code {
+  display: block;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #0f172a;
+  color: #f8fafc;
+  overflow-wrap: anywhere;
+}
+
+.github-webhook-provision-row {
+  flex-wrap: wrap;
 }
 
 .sr-only {
@@ -215,7 +279,9 @@
   .github-connection-actions,
   .github-repository-actions,
   .github-bind-form,
-  .github-rotate-form {
+  .github-rotate-form,
+  .github-webhook-actions,
+  .github-webhook-heading {
     align-items: stretch;
     flex-direction: column;
   }
@@ -224,7 +290,8 @@
   .github-rotate-form input,
   .github-setup-card button,
   .github-connection-form button,
-  .github-repository-form button {
+  .github-repository-form button,
+  .github-webhook-actions button {
     width: 100%;
   }
 }
