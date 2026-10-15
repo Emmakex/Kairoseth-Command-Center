@@ -59,6 +59,14 @@ export class MongoIntegrationSignalAlertStore {
       'scope.workspaceId': workspaceId,
       fingerprint: candidate.fingerprint,
     };
+
+    // Reprocessing an already materialized signal is the common idempotent path.
+    // Avoid opening a creation transaction when the durable alert is already present.
+    // The unique index plus the duplicate-key fallback below still protects concurrent
+    // first materializations that race after this read.
+    const existing = await this.alerts.findOne(filter);
+    if (existing) return { status: 'existing', alert: existing };
+
     const now = new Date().toISOString();
     const alert: Alert = {
       id: randomUUID(),
@@ -106,8 +114,8 @@ export class MongoIntegrationSignalAlertStore {
       });
     } catch (error) {
       if (error instanceof MongoServerError && error.code === 11000) {
-        const existing = await this.alerts.findOne(filter);
-        if (existing) return { status: 'existing', alert: existing };
+        const concurrentExisting = await this.alerts.findOne(filter);
+        if (concurrentExisting) return { status: 'existing', alert: concurrentExisting };
       }
       throw error;
     }
