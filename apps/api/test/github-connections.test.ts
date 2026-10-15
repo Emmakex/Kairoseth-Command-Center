@@ -11,7 +11,10 @@ import { GitHubProviderError } from '../src/github-provider-client';
 import type {
   GitHubProviderClient,
   GitHubRemoteCommit,
+  GitHubRemoteIssue,
+  GitHubRemotePullRequest,
   GitHubRemoteRepository,
+  GitHubRemoteWorkflowRun,
 } from '../src/github-provider-client';
 
 type WorkspaceScope = Extract<Scope, { kind: 'workspace' }>;
@@ -173,15 +176,15 @@ class MemoryGitHubProviderClient implements GitHubProviderClient {
     throw new Error('not_used');
   }
 
-  async listPullRequests() {
+  async listPullRequests(): Promise<GitHubRemotePullRequest[]> {
     throw new Error('not_used');
   }
 
-  async listIssues() {
+  async listIssues(): Promise<GitHubRemoteIssue[]> {
     throw new Error('not_used');
   }
 
-  async listWorkflowRuns() {
+  async listWorkflowRuns(): Promise<GitHubRemoteWorkflowRun[]> {
     throw new Error('not_used');
   }
 }
