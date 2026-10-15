@@ -99,7 +99,7 @@ class MemoryWebhookStore implements GitHubWebhookStore {
 
   async ensureIndexes(): Promise<void> {}
 
-  async provision(requestScope: WorkspaceScope, connectionId: string) {
+  async provision(requestScope: WorkspaceScope, _actorUserId: string, connectionId: string) {
     if (this.configured) return { status: 'exists' as const, endpoint };
     this.configured = true;
     return {
@@ -116,14 +116,14 @@ class MemoryWebhookStore implements GitHubWebhookStore {
     return endpoint;
   }
 
-  async rotateSecret(requestScope: WorkspaceScope, connectionId: string) {
+  async rotateSecret(requestScope: WorkspaceScope, _actorUserId: string, connectionId: string) {
     const current = await this.get(requestScope, connectionId);
     return current
       ? { status: 'rotated' as const, endpoint: current, secret: `${webhookSecret}-rotated` }
       : { status: 'not_found' as const };
   }
 
-  async delete(requestScope: WorkspaceScope, connectionId: string) {
+  async delete(requestScope: WorkspaceScope, _actorUserId: string, connectionId: string) {
     const current = await this.get(requestScope, connectionId);
     if (!current) return false;
     this.configured = false;
@@ -200,10 +200,14 @@ function signedHeaders(rawBody: string, deliveryId = 'delivery-1', event = 'pull
   };
 }
 
-function webhookApp(webhooks = new MemoryWebhookStore(), jobs = new MemorySyncJobStore()) {
+function webhookApp(
+  webhooks = new MemoryWebhookStore(),
+  jobs = new MemorySyncJobStore(),
+  connection = activeConnection,
+) {
   const app = buildApp({
     authProvider: authProvider(),
-    githubConnectionStore: connectionStore(),
+    githubConnectionStore: connectionStore(connection),
     githubWebhookStore: webhooks,
     integrationSyncJobStore: jobs,
   });
@@ -233,6 +237,58 @@ describe('verified GitHub webhook ingestion', () => {
     expect(created.body).not.toContain('secretRef');
     expect(existing.statusCode).toBe(409);
     expect(existing.body).not.toContain(webhookSecret);
+    await app.close();
+  });
+
+  it('requires an active validated provider connection only for initial provisioning', async () => {
+    const webhooks = new MemoryWebhookStore();
+    webhooks.configured = false;
+    const unverified: IntegrationConnection = { ...activeConnection, status: 'unverified' };
+    delete unverified.lastValidatedAt;
+    const { app } = webhookApp(webhooks, new MemorySyncJobStore(), unverified);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/v1/integrations/github/connections/${activeConnection.id}/webhook`,
+      headers,
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toEqual({ error: 'github_connection_not_validated' });
+    await app.close();
+  });
+
+  it('keeps existing webhook management available during provider credential failures', async () => {
+    const webhooks = new MemoryWebhookStore();
+    const invalid: IntegrationConnection = {
+      ...activeConnection,
+      status: 'error',
+      lastErrorCode: 'unauthorized',
+    };
+    delete invalid.lastValidatedAt;
+    const { app } = webhookApp(webhooks, new MemorySyncJobStore(), invalid);
+
+    const read = await app.inject({
+      method: 'GET',
+      url: `/v1/integrations/github/connections/${activeConnection.id}/webhook`,
+      headers,
+    });
+    const rotated = await app.inject({
+      method: 'POST',
+      url: `/v1/integrations/github/connections/${activeConnection.id}/webhook/rotate`,
+      headers,
+    });
+    const deleted = await app.inject({
+      method: 'DELETE',
+      url: `/v1/integrations/github/connections/${activeConnection.id}/webhook`,
+      headers,
+    });
+
+    expect(read.statusCode).toBe(200);
+    expect(rotated.statusCode).toBe(200);
+    expect(rotated.json().secretVisibleOnce).toBe(true);
+    expect(deleted.statusCode).toBe(200);
+    expect(deleted.json()).toEqual({ deleted: true });
     await app.close();
   });
 
