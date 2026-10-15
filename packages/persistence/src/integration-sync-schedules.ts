@@ -117,12 +117,11 @@ export class MongoIntegrationSyncScheduleStore implements IntegrationSyncSchedul
     const resourceId = validText(input.resourceId, 'resource_id', 200);
     const intervalSeconds = normalizeIntegrationScheduleIntervalSeconds(input.intervalSeconds);
     const now = new Date();
-    const requestedNextRunAt = validIso(input.nextRunAt ?? iso(now), 'next_run_at');
-    const nextRunAt = input.enabled ? requestedNextRunAt : nextIntegrationScheduleAt(now, intervalSeconds);
     const identity = { workspaceId, provider, kind, resourceId };
-
     const existing = await this.schedules.findOne(identity);
+
     if (!existing) {
+      const nextRunAt = validIso(input.nextRunAt ?? iso(now), 'next_run_at');
       const schedule: IntegrationSyncSchedule = {
         id: randomUUID(),
         ...identity,
@@ -136,6 +135,9 @@ export class MongoIntegrationSyncScheduleStore implements IntegrationSyncSchedul
       return schedule;
     }
 
+    const nextRunAt = input.nextRunAt
+      ? validIso(input.nextRunAt, 'next_run_at')
+      : existing.nextRunAt;
     const updated = await this.schedules.findOneAndUpdate(
       { id: existing.id, workspaceId },
       {
