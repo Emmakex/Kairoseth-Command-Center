@@ -69,7 +69,9 @@ export class MongoGitHubSignalRuntimeStore {
     const repository = text(resource.metadata.repository, 100);
     if (!owner || !repository) return { status: 'repository_metadata_invalid' };
 
-    const token = await this.secretStore.revealSecret(scope, connection.secretRef);
+    const secretRef = connection.secretRef;
+    if (!secretRef) return { status: 'credential_unavailable' };
+    const token = await this.secretStore.revealSecret(scope, secretRef);
     if (!token) return { status: 'credential_unavailable' };
 
     return {
