@@ -10,6 +10,7 @@ export type IntegrationSyncJob = {
   kind: string;
   resourceId: string;
   dedupeKey: string;
+  activeDedupeKey?: string;
   status: IntegrationSyncJobStatus;
   attempt: number;
   maxAttempts: number;
@@ -88,11 +89,8 @@ export class MongoIntegrationSyncJobStore implements IntegrationSyncJobStore {
     await Promise.all([
       this.jobs.createIndex({ id: 1 }, { unique: true }),
       this.jobs.createIndex(
-        { workspaceId: 1, dedupeKey: 1 },
-        {
-          unique: true,
-          partialFilterExpression: { status: { $in: ['pending', 'processing', 'retry'] } },
-        },
+        { workspaceId: 1, activeDedupeKey: 1 },
+        { unique: true, sparse: true },
       ),
       this.jobs.createIndex({ status: 1, availableAt: 1, createdAt: 1 }),
       this.jobs.createIndex({ status: 1, leaseExpiresAt: 1 }),
@@ -110,11 +108,7 @@ export class MongoIntegrationSyncJobStore implements IntegrationSyncJobStore {
     const availableAt = validDate(input.availableAt ?? iso(now), 'available_at');
     const maxAttempts = Math.min(20, Math.max(1, Math.floor(input.maxAttempts ?? 8)));
 
-    const existing = await this.jobs.findOne({
-      workspaceId,
-      dedupeKey,
-      status: { $in: ['pending', 'processing', 'retry'] },
-    });
+    const existing = await this.jobs.findOne({ workspaceId, activeDedupeKey: dedupeKey });
     if (existing) return existing;
 
     const job: IntegrationSyncJob = {
@@ -124,6 +118,7 @@ export class MongoIntegrationSyncJobStore implements IntegrationSyncJobStore {
       kind,
       resourceId,
       dedupeKey,
+      activeDedupeKey: dedupeKey,
       status: 'pending',
       attempt: 0,
       maxAttempts,
@@ -136,11 +131,7 @@ export class MongoIntegrationSyncJobStore implements IntegrationSyncJobStore {
       await this.jobs.insertOne(job);
       return job;
     } catch (error) {
-      const raced = await this.jobs.findOne({
-        workspaceId,
-        dedupeKey,
-        status: { $in: ['pending', 'processing', 'retry'] },
-      });
+      const raced = await this.jobs.findOne({ workspaceId, activeDedupeKey: dedupeKey });
       if (raced) return raced;
       throw error;
     }
@@ -179,6 +170,7 @@ export class MongoIntegrationSyncJobStore implements IntegrationSyncJobStore {
       {
         $set: { status: 'completed', completedAt: iso(now), updatedAt: iso(now) },
         $unset: {
+          activeDedupeKey: '',
           claimToken: '',
           claimedAt: '',
           leaseExpiresAt: '',
@@ -215,6 +207,7 @@ export class MongoIntegrationSyncJobStore implements IntegrationSyncJobStore {
           updatedAt: iso(now),
         },
         $unset: {
+          ...(terminal ? { activeDedupeKey: '' } : {}),
           claimToken: '',
           claimedAt: '',
           leaseExpiresAt: '',
