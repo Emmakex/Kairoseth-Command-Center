@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import './management.css';
+import './integration-activity.css';
 
 export const metadata: Metadata = {
   title: 'Kairoseth Command Center',
