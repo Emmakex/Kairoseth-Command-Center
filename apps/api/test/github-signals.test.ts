@@ -66,7 +66,10 @@ const connection: IntegrationConnection = {
 
 function repositoryStore(): GitHubRepositoryStore {
   return {
-    async getRepositoryLink(requestScope, resourceId) {
+    async getRepositoryLink(
+      requestScope: WorkspaceScope,
+      resourceId: string,
+    ): Promise<ExternalResource | null> {
       return requestScope.workspaceId === scope.workspaceId && resourceId === resource.id
         ? resource
         : null;
@@ -76,17 +79,28 @@ function repositoryStore(): GitHubRepositoryStore {
 
 function connectionStore(onFailure?: (errorCode: string) => void): GitHubConnectionStore {
   return {
-    async getConnection(requestScope, connectionId) {
+    async getConnection(
+      requestScope: WorkspaceScope,
+      connectionId: string,
+    ): Promise<IntegrationConnection | null> {
       return requestScope.workspaceId === scope.workspaceId && connectionId === connection.id
         ? connection
         : null;
     },
-    async resolveCredential(requestScope, connectionId) {
+    async resolveCredential(
+      requestScope: WorkspaceScope,
+      connectionId: string,
+    ): Promise<string | null> {
       return requestScope.workspaceId === scope.workspaceId && connectionId === connection.id
         ? 'fixture-provider-token'
         : null;
     },
-    async markValidationFailure(_scope, _actorUserId, _connectionId, errorCode) {
+    async markValidationFailure(
+      _scope: WorkspaceScope,
+      _actorUserId: string,
+      _connectionId: string,
+      errorCode: string,
+    ): Promise<IntegrationConnection | null> {
       onFailure?.(errorCode);
       return { ...connection, status: 'error', lastErrorCode: errorCode };
     },
