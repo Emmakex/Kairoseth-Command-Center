@@ -26,6 +26,13 @@ export type EnsureIntegrationSyncScheduleInput = {
   nextRunAt?: string;
 };
 
+export type ClaimIntegrationSyncScheduleOptions = {
+  now?: Date;
+  leaseMs?: number;
+  provider?: string;
+  kind?: string;
+};
+
 function iso(date: Date): string {
   return date.toISOString();
 }
@@ -60,7 +67,7 @@ export class MongoIntegrationSyncScheduleStore {
         { workspaceId: 1, provider: 1, kind: 1, resourceId: 1 },
         { unique: true },
       ),
-      this.schedules.createIndex({ enabled: 1, nextRunAt: 1 }),
+      this.schedules.createIndex({ enabled: 1, provider: 1, kind: 1, nextRunAt: 1 }),
       this.schedules.createIndex({ leaseExpiresAt: 1 }, { sparse: true }),
     ]);
   }
@@ -113,45 +120,41 @@ export class MongoIntegrationSyncScheduleStore {
     }
   }
 
-  async disableMissingResources(
+  async disableResource(
+    workspaceId: string,
     provider: string,
     kind: string,
-    activeResourceKeys: string[],
-  ): Promise<number> {
-    const normalizedProvider = validText(provider, 'provider', 100);
-    const normalizedKind = validText(kind, 'kind', 100);
-    const filter: Filter<IntegrationSyncSchedule> = {
-      provider: normalizedProvider,
-      kind: normalizedKind,
-      enabled: true,
-    };
-    if (activeResourceKeys.length > 0) {
-      filter.$expr = {
-        $not: {
-          $in: [
-            { $concat: ['$workspaceId', '|', '$resourceId'] },
-            activeResourceKeys,
-          ],
-        },
-      };
-    }
-    const result = await this.schedules.updateMany(filter, {
-      $set: { enabled: false, updatedAt: iso(new Date()) },
-      $unset: { claimToken: '', claimedAt: '', leaseExpiresAt: '' },
-    });
-    return result.modifiedCount;
+    resourceId: string,
+  ): Promise<boolean> {
+    const result = await this.schedules.updateOne(
+      {
+        workspaceId: validText(workspaceId, 'workspace_id', 200),
+        provider: validText(provider, 'provider', 100),
+        kind: validText(kind, 'kind', 100),
+        resourceId: validText(resourceId, 'resource_id', 200),
+      },
+      {
+        $set: { enabled: false, updatedAt: iso(new Date()) },
+        $unset: { claimToken: '', claimedAt: '', leaseExpiresAt: '' },
+      },
+    );
+    return result.matchedCount === 1;
   }
 
-  async claimDue(options: { now?: Date; leaseMs?: number } = {}): Promise<IntegrationSyncSchedule | null> {
+  async claimDue(options: ClaimIntegrationSyncScheduleOptions = {}): Promise<IntegrationSyncSchedule | null> {
     const now = options.now ?? new Date();
     const leaseMs = Math.min(30 * 60_000, Math.max(10_000, Math.floor(options.leaseMs ?? 120_000)));
     const claimToken = randomUUID();
+    const filter: Filter<IntegrationSyncSchedule> = {
+      enabled: true,
+      nextRunAt: { $lte: iso(now) },
+      claimToken: { $exists: false },
+    };
+    if (options.provider) filter.provider = validText(options.provider, 'provider', 100);
+    if (options.kind) filter.kind = validText(options.kind, 'kind', 100);
+
     return this.schedules.findOneAndUpdate(
-      {
-        enabled: true,
-        nextRunAt: { $lte: iso(now) },
-        claimToken: { $exists: false },
-      },
+      filter,
       {
         $set: {
           claimToken,
