@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { IntegrationSignalSummary } from '../lib/api';
-import {
-  integrationActivityView,
-  safeIntegrationUrl,
-} from '../components/integration-activity-panel';
+import { integrationActivityView, safeIntegrationUrl } from '../lib/integration-activity';
 import { dictionary } from '../lib/i18n';
 
 function signal(
