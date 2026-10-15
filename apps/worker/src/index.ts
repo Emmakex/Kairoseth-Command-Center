@@ -2,7 +2,7 @@ import { MongoClient } from 'mongodb';
 import { loadWorkerConfig } from '@kcc/config';
 import { executeGitHubRepositorySignals } from '@kcc/integrations/github-signal-executor';
 import { GitHubProviderError, GitHubRestClient } from '@kcc/integrations/github';
-import { deriveAlertsFromIntegrationSignals } from '@kcc/integrations/signal-alert-rules';
+import { reconcileAlertsFromIntegrationSignals } from '@kcc/integrations/signal-alert-rules';
 import { MongoAuditOutboxStore } from '@kcc/persistence/audit-outbox';
 import { MongoGitHubScheduleDiscoveryStore } from '@kcc/persistence/github-schedule-discovery';
 import { MongoGitHubSignalRuntimeStore } from '@kcc/persistence/github-signal-runtime';
@@ -149,12 +149,21 @@ async function executeGitHubSignalJob(job: IntegrationSyncJob): Promise<void> {
     await githubExecution.signalStore.upsertSignals(runtime.workspaceId, signals);
 
     workerStage = 'alert_materialization';
-    const alertCandidates = deriveAlertsFromIntegrationSignals(signals);
+    const lifecycleSignals = await githubExecution.signalStore.listSignals({
+      workspaceId: runtime.workspaceId,
+      resourceId: runtime.resourceId,
+      types: ['repository.ci'],
+      limit: 500,
+    });
+    const reconciliation = reconcileAlertsFromIntegrationSignals(lifecycleSignals);
     let derivedAlertCount = 0;
-    for (const candidate of alertCandidates) {
+    let reopenedAlertCount = 0;
+    for (const candidate of reconciliation.active) {
       const result = await signalAlerts.materialize(runtime.workspaceId, candidate);
       if (result.status === 'created') derivedAlertCount += 1;
+      if (result.status === 'reopened') reopenedAlertCount += 1;
     }
+    const resolvedAlertCount = await signalAlerts.resolve(runtime.workspaceId, reconciliation.resolve);
 
     workerStage = 'job_completion';
     const completed = await syncJobs.complete(job.id, claimToken);
@@ -170,8 +179,12 @@ async function executeGitHubSignalJob(job: IntegrationSyncJob): Promise<void> {
       jobId: job.id,
       resourceId: job.resourceId,
       signalCount: signals.length,
-      alertCandidateCount: alertCandidates.length,
+      lifecycleSignalCount: lifecycleSignals.length,
+      alertCandidateCount: reconciliation.active.length,
+      alertResolutionCandidateCount: reconciliation.resolve.length,
       derivedAlertCount,
+      reopenedAlertCount,
+      resolvedAlertCount,
     });
   } catch (error) {
     if (error instanceof GitHubProviderError) {
