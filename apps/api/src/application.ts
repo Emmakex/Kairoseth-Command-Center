@@ -1,6 +1,7 @@
 import type { AuthProvider } from '@kcc/auth';
 import type { MilestoneStore, OperationalStore } from '@kcc/persistence';
 import type { IntegrationSignalStore } from '@kcc/persistence/integration-signals';
+import type { IntegrationSyncJobStore } from '@kcc/persistence/integration-sync-jobs';
 import { buildApp as buildBaseApp } from './app';
 import type { ReadinessCheck } from './app';
 import { registerDecisionCompatibilityGuard } from './decision-compatibility';
@@ -12,6 +13,7 @@ import type { GitHubProviderClient } from './github-provider-client';
 import { registerGitHubRepositoryRoutes } from './github-repositories';
 import type { GitHubRepositoryStore } from './github-repository-store';
 import { registerGitHubSignalRoutes } from './github-signals';
+import { registerGitHubSyncJobRoutes } from './github-sync-jobs';
 import { registerIntegrationSignalRoutes } from './integration-signals';
 import { registerStandaloneAuthRoutes } from './local-auth';
 import type { LocalLoginProvider } from './local-auth';
@@ -35,6 +37,7 @@ type ApplicationOptions = {
   githubConnectionStore?: GitHubConnectionStore;
   githubProviderClient?: GitHubProviderClient;
   integrationSignalStore?: IntegrationSignalStore;
+  integrationSyncJobStore?: IntegrationSyncJobStore;
 };
 
 export function buildApp(options: ApplicationOptions = {}) {
@@ -106,6 +109,19 @@ export function buildApp(options: ApplicationOptions = {}) {
       : {}),
     ...(options.integrationSignalStore
       ? { integrationSignalStore: options.integrationSignalStore }
+      : {}),
+  });
+
+  registerGitHubSyncJobRoutes(app, {
+    ...(options.authProvider ? { authProvider: options.authProvider } : {}),
+    ...(options.githubRepositoryStore
+      ? { githubRepositoryStore: options.githubRepositoryStore }
+      : {}),
+    ...(options.githubConnectionStore
+      ? { githubConnectionStore: options.githubConnectionStore }
+      : {}),
+    ...(options.integrationSyncJobStore
+      ? { integrationSyncJobStore: options.integrationSyncJobStore }
       : {}),
   });
 

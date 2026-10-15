@@ -5,7 +5,11 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    "./github": { "types": "./dist/github.d.ts", "import": "./dist/github.js" },
+    "./github-signals": { "types": "./dist/github-signals.d.ts", "import": "./dist/github-signals.js" }
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json"
