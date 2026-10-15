@@ -97,6 +97,8 @@ async function retryClaimedJob(
   });
 }
 
+type GitHubWorkerStage = 'signal_fetch' | 'signal_persistence' | 'alert_materialization' | 'job_completion';
+
 async function executeGitHubSignalJob(job: IntegrationSyncJob): Promise<void> {
   if (!githubExecution) return;
   const claimToken = job.claimToken;
@@ -130,6 +132,7 @@ async function executeGitHubSignalJob(job: IntegrationSyncJob): Promise<void> {
   }
 
   const runtime = resolution.runtime;
+  let workerStage: GitHubWorkerStage = 'signal_fetch';
   try {
     const signals = await executeGitHubRepositorySignals({
       providerClient: githubExecution.providerClient,
@@ -142,8 +145,10 @@ async function executeGitHubSignalJob(job: IntegrationSyncJob): Promise<void> {
       limit: 50,
     });
 
+    workerStage = 'signal_persistence';
     await githubExecution.signalStore.upsertSignals(runtime.workspaceId, signals);
 
+    workerStage = 'alert_materialization';
     const alertCandidates = deriveAlertsFromIntegrationSignals(signals);
     let derivedAlertCount = 0;
     for (const candidate of alertCandidates) {
@@ -151,6 +156,7 @@ async function executeGitHubSignalJob(job: IntegrationSyncJob): Promise<void> {
       if (result.status === 'created') derivedAlertCount += 1;
     }
 
+    workerStage = 'job_completion';
     const completed = await syncJobs.complete(job.id, claimToken);
     if (!completed) {
       workerLog('error', 'github_refresh.complete_claim_lost', {
@@ -205,10 +211,13 @@ async function executeGitHubSignalJob(job: IntegrationSyncJob): Promise<void> {
       return;
     }
 
-    await retryClaimedJob(job, 'github_worker_error');
+    const errorCode = `github_worker_${workerStage}_error`;
+    await retryClaimedJob(job, errorCode);
     workerLog('error', 'github_refresh.worker_error', {
       jobId: job.id,
       resourceId: job.resourceId,
+      errorCode,
+      stage: workerStage,
     });
   }
 }
