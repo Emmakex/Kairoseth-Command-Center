@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { Card } from '@kcc/ui';
 import { AccountPanel } from '../../components/account-panel';
 import { DecisionPanel } from '../../components/decision-panel';
+import { IntegrationActivityPanel } from '../../components/integration-activity-panel';
 import { MemberPanel } from '../../components/member-panel';
 import { MilestonePanel } from '../../components/milestone-panel';
 import { OperationalPanels } from '../../components/operational-panels';
@@ -10,6 +11,7 @@ import { QuickCapturePanel } from '../../components/quick-capture-panel';
 import { TimelinePanel } from '../../components/timeline-panel';
 import {
   getDecisions,
+  getIntegrationSignals,
   getMilestones,
   getProjects,
   getSession,
@@ -45,11 +47,12 @@ export default async function CommandCenterPage({
   const { scope: requestedScope, result } = await searchParams;
   const scope = requestedScope === 'private' ? 'private' : 'workspace';
   const canManageMembers = session.capabilities.includes('members.manage');
-  const [today, projects, milestones, decisions, timeline, members] = await Promise.all([
+  const [today, projects, milestones, decisions, integrationSignals, timeline, members] = await Promise.all([
     getToday(token, scope),
     getProjects(token, scope),
     getMilestones(token, scope),
     scope === 'workspace' ? getDecisions(token) : Promise.resolve(null),
+    scope === 'workspace' ? getIntegrationSignals(token, 12) : Promise.resolve(null),
     getTimeline(token, scope),
     scope === 'workspace' && canManageMembers ? getLocalMembers(token) : Promise.resolve(null),
   ]);
@@ -152,6 +155,14 @@ export default async function CommandCenterPage({
             <p className="empty-state">{copy.decisionWorkspaceOnly}</p>
           </article>
         )}
+        {scope === 'workspace' ? (
+          <IntegrationActivityPanel
+            locale={locale}
+            copy={copy}
+            timeZone={session.user.timezone}
+            signals={integrationSignals}
+          />
+        ) : null}
         <TimelinePanel
           locale={locale}
           copy={copy}
