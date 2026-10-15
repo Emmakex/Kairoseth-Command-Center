@@ -121,7 +121,10 @@ export class MongoIntegrationSyncScheduleStore implements IntegrationSyncSchedul
     const existing = await this.schedules.findOne(identity);
 
     if (!existing) {
-      const nextRunAt = validIso(input.nextRunAt ?? iso(now), 'next_run_at');
+      const nextRunAt = validIso(
+        input.nextRunAt ?? nextIntegrationScheduleAt(now, intervalSeconds),
+        'next_run_at',
+      );
       const schedule: IntegrationSyncSchedule = {
         id: randomUUID(),
         ...identity,
