@@ -1,7 +1,7 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { ClientSession, Collection, Db, MongoClient } from 'mongodb';
 import { MongoServerError } from 'mongodb';
-import type { ExternalResource, Scope } from '@kcc/domain';
+import type { ExternalResource, IntegrationConnection, Scope } from '@kcc/domain';
 import type { IntegrationSecretStore } from './integration-secrets.js';
 
 type WorkspaceScope = Extract<Scope, { kind: 'workspace' }>;
@@ -79,6 +79,7 @@ export class MongoGitHubWebhookStore implements GitHubWebhookStore {
   private readonly endpoints: Collection<GitHubWebhookEndpointDocument>;
   private readonly deliveries: Collection<GitHubWebhookDeliveryDocument>;
   private readonly resources: Collection<ExternalResource>;
+  private readonly connections: Collection<IntegrationConnection>;
 
   constructor(
     private readonly client: MongoClient,
@@ -88,6 +89,7 @@ export class MongoGitHubWebhookStore implements GitHubWebhookStore {
     this.endpoints = db.collection<GitHubWebhookEndpointDocument>('github_webhook_endpoints');
     this.deliveries = db.collection<GitHubWebhookDeliveryDocument>('github_webhook_deliveries');
     this.resources = db.collection<ExternalResource>('external_resources');
+    this.connections = db.collection<IntegrationConnection>('integration_connections');
   }
 
   async ensureIndexes(): Promise<void> {
@@ -97,6 +99,7 @@ export class MongoGitHubWebhookStore implements GitHubWebhookStore {
       this.deliveries.createIndex({ endpointId: 1, deliveryId: 1 }, { unique: true }),
       this.deliveries.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
       this.resources.createIndex({ 'scope.workspaceId': 1, connectionId: 1, provider: 1, kind: 1 }),
+      this.connections.createIndex({ 'scope.workspaceId': 1, id: 1, provider: 1 }),
       this.secrets.ensureIndexes(),
     ]);
   }
@@ -202,7 +205,17 @@ export class MongoGitHubWebhookStore implements GitHubWebhookStore {
       enabled: true,
     });
     if (!document) return null;
+
     const scope: WorkspaceScope = { kind: 'workspace', workspaceId: document.workspaceId };
+    const connection = await this.connections.findOne({
+      scope,
+      id: document.connectionId,
+      provider: 'github',
+      status: 'active',
+      lastValidatedAt: { $exists: true },
+    });
+    if (!connection) return null;
+
     const secret = await this.secrets.revealSecret(scope, document.secretRef);
     return secret ? { ...document, secret } : null;
   }
