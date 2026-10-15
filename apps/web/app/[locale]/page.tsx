@@ -14,6 +14,7 @@ import {
   getDecisions,
   getGitHubConnections,
   getGitHubRepositories,
+  getGitHubWebhookState,
   getIntegrationSignals,
   getMilestones,
   getProjects,
@@ -77,6 +78,18 @@ export default async function CommandCenterPage({
     scope === 'workspace' && canManageMembers ? getLocalMembers(token) : Promise.resolve(null),
   ]);
 
+  const githubWebhooks =
+    scope === 'workspace' && canManageIntegrations && githubConnections
+      ? Object.fromEntries(
+          await Promise.all(
+            githubConnections.map(async (connection) => [
+              connection.id,
+              await getGitHubWebhookState(token, connection.id),
+            ] as const),
+          ),
+        )
+      : null;
+
   const copy = dictionary[locale];
   const otherLocale = locale === 'es' ? 'en' : 'es';
   const summary = today?.summary;
@@ -86,6 +99,7 @@ export default async function CommandCenterPage({
     invalid: copy.actionInvalid,
     forbidden: copy.actionForbidden,
     'not-found': copy.actionNotFound,
+    conflict: copy.actionError,
     error: copy.actionError,
   };
   const resultMessage = result ? resultMessages[result] : undefined;
@@ -181,6 +195,7 @@ export default async function CommandCenterPage({
             projects={projectCatalog}
             connections={githubConnections}
             repositories={githubRepositories}
+            webhooks={githubWebhooks}
           />
         ) : null}
         {scope === 'workspace' ? (

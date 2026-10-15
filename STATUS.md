@@ -4,7 +4,7 @@
 **Technical/internal project:** Kairoseth Command Center  
 **Commercial names:** Gestor de Trabajo (ES) / Work Manager (EN)  
 **Category:** Kairoseth Software  
-**Status:** Phase 3 is closed. Phase 4 Slices 1–5h are merged and post-merge validated. Slice 5i — GitHub maintenance UI / Mantenimiento de GitHub — is active.
+**Status:** Phase 3 is closed. Phase 4 Slices 1–5i are merged and post-merge validated. Slice 5j — GitHub webhook administration UI / Administración de webhook GitHub — is active.
 
 ## Naming rule / Regla de naming
 
@@ -46,33 +46,38 @@
 - [x] **Slice 5f — derived alert lifecycle (PR #28):** merged `938c5440730ac9a989f02c4da4f944e71788df4b`, post-merge 9/9 green.
 - [x] **Slice 5g — Integration activity / Actividad de integraciones (PR #29):** merged `2183aeccc3ff17bc698e35f12d48708a2fbcb56b`, post-merge 9/9 green.
 - [x] **Slice 5h — GitHub setup UI / Configuración de GitHub (PR #30):** admin-only create/validate/link/bind/manual-sync UI, write-only provider token, ES/EN, private-scope isolation; final head `1464ad6c281bf6c6643e68ef8e7eb0b52001717c`, merged `b282b17e82ec6347ffd9b20f5a0c55d6f2578274`, post-merge 9/9 green.
+- [x] **Slice 5i — GitHub maintenance UI / Mantenimiento de GitHub (PR #31):** write-only token rotation, repository unlink and unused-connection removal with explicit destructive confirmation; final head `c7f9de7a7cfc5f17b640c1315338b32c1cfe4dac`, merged `9f3f256690e7ea4cad63e26406886bdcdcaacefa`, post-merge 9/9 green.
 
 ## Active / Activo
 
-### Slice 5i — GitHub maintenance UI / Mantenimiento de GitHub
+### Slice 5j — GitHub webhook administration UI / Administración de webhook GitHub
 
-Implemented on `feat/phase-4-github-maintenance-ui`:
+Implemented on `feat/phase-4-github-webhook-ui`:
 
-- [x] Provider-token rotation mutation through the existing server-side GitHub route.
-- [x] Rotated tokens remain write-only and never enter URLs.
-- [x] Repository unlink mutation reuses the existing workspace/capability-protected API.
-- [x] Unused-connection deletion mutation reuses backend `github_connection_in_use` protection.
-- [x] Destructive web mutations require explicit intended-action confirmation values.
-- [x] Connection/resource identifiers remain URL-encoded.
-- [x] UI disables connection removal while a loaded repository still references it.
-- [x] ES/EN maintenance controls for rotate token, unlink repository and remove connection.
-- [x] Unit coverage for rotation, destructive confirmation and malformed-input rejection.
-- [x] Existing GitHub connections Docker smoke remains the real encrypted-rotation/deletion acceptance path.
-- [x] Documentation in `docs/23-github-maintenance-ui.md`.
+- [x] Server-side safe webhook-state lookup per GitHub connection.
+- [x] Webhook administration is loaded only in workspace scope for users with `integrations.manage`.
+- [x] Provision existing verified-webhook endpoint from an active validated GitHub connection.
+- [x] Rotate existing webhook HMAC secret through the existing backend endpoint.
+- [x] Remove webhook through the existing backend endpoint with explicit destructive confirmation.
+- [x] Configured, not-configured and unavailable states render fail-closed controls.
+- [x] Existing webhook metadata remains manageable if the provider token is temporarily in error; provisioning still requires active validation.
+- [x] Provision/rotation HMAC secret is never placed in a URL or normal dashboard state.
+- [x] One-time secret reveal uses AES-256-GCM sealed state bound to the current session token.
+- [x] Sealed reveal state is stored only in a short-lived `HttpOnly`, `SameSite=Strict`, path-scoped cookie.
+- [x] Reveal state rejects tampering, wrong session, stale timestamps and invalid webhook paths.
+- [x] Reveal route is no-store, clears the cookie on first use, HTML-escapes dynamic values and uses a restrictive CSP without client JavaScript.
+- [x] UI shows only the opaque payload path and does not guess the public API host.
+- [x] ES/EN webhook controls and manual GitHub configuration guidance.
+- [x] Unit coverage for webhook mutations and one-time secret sealing/reveal safety.
+- [x] Documentation in `docs/24-github-webhook-ui.md`.
 - [ ] Final-head nine-gate validation.
 - [ ] Merge and post-merge `main` validation.
 
-**Slice 5i: VALIDATION PENDING / VALIDACIÓN PENDIENTE.**
+**Slice 5j: VALIDATION PENDING / VALIDACIÓN PENDIENTE.**
 
 ### Deferred / Diferido
 
-- [ ] Webhook endpoint provisioning/rotation/deletion UI.
-- [ ] GitHub App/OAuth authorization and automatic webhook registration.
+- [ ] GitHub App/OAuth authorization and automatic webhook registration/removal.
 - [ ] Customer-configurable rule editor.
 - [ ] Stale PR/issue policy rules.
 
@@ -81,32 +86,36 @@ Implemented on `feat/phase-4-github-maintenance-ui`:
 1. Workspace/private scope is server-derived from authenticated context.
 2. Product entitlement and capability checks are server-enforced.
 3. Integration administration requires `integrations.manage`.
-4. GitHub repository links and connections are workspace-only.
+4. GitHub repository links, connections and webhook management are workspace-only.
 5. Standalone passwords and provider credentials are never persisted in plaintext.
 6. Provider credentials never enter durable jobs, schedules, signals, alerts or audit events.
 7. Provider responses are normalized before persistence or client exposure.
 8. Webhook HMAC secrets are independent from provider credentials and encrypted at rest.
-9. Derived alert rules consume normalized durable signals and remain provider-neutral.
-10. Integration activity is workspace-only/read-only and never exposes credentials or internal provider/resource/workspace IDs.
-11. GitHub setup/maintenance is workspace-only and is not loaded in private scope.
-12. Provider tokens are write-only at the web boundary and are submitted only in request bodies.
-13. The API remains authoritative for tenancy, capabilities, provider validation and deletion safety.
-14. Connection/resource identifiers are URL-encoded before entering API paths.
-15. Repository unlink removes only the local Work Manager link; it does not delete the remote GitHub repository.
-16. Connection removal remains blocked while normalized resources reference that connection.
+9. Exact webhook raw bytes are verified with HMAC-SHA256 before JSON parsing and deliveries are replay-protected.
+10. Derived alert rules consume normalized durable signals and remain provider-neutral.
+11. Integration activity is workspace-only/read-only and never exposes credentials or internal provider/resource/workspace IDs.
+12. GitHub setup/maintenance/webhook administration is not loaded in private scope.
+13. Provider tokens are write-only at the web boundary and are submitted only in request bodies.
+14. The API remains authoritative for tenancy, capabilities, provider validation and deletion safety.
+15. Connection/resource identifiers are URL-encoded before entering API paths.
+16. Repository unlink removes only the local Work Manager link; it does not delete the remote GitHub repository.
+17. Connection removal remains blocked while normalized resources reference that connection.
+18. Webhook HMAC secrets never enter URL/query state or normal dashboard HTML.
+19. One-time webhook secret reveal is session-bound, authenticated, short-lived, tamper-evident and consumed by clearing its HttpOnly cookie.
+20. The web UI never derives a public webhook host from an internal API URL; deployment-specific public HTTPS host configuration remains explicit until automatic registration exists.
 
 ## Next / Siguiente
 
-1. Open the isolated Slice 5i PR and require all nine checks green on its final head.
-2. Correct any maintenance/security/regression failure directly on 5i.
+1. Open the isolated Slice 5j PR and require all nine checks green on its final head.
+2. Correct any webhook administration, secret-handling, isolation or regression failure directly on 5j.
 3. Merge with the exact validated head and revalidate resulting `main` 9/9.
-4. Reassess the remaining Phase 4 boundary before deciding between webhook administration UI and closing Phase 4 toward Phase 5.
-5. Keep GitHub App/OAuth, configurable rules and stale policies separate.
+4. Reassess whether the token-backed GitHub Phase 4 boundary is complete before opening GitHub App/OAuth or moving to Phase 5 automation/rules.
+5. Keep OAuth/automatic registration, configurable rules and stale policies separate.
 6. When commercial publication is scheduled, create the Kairoseth Software catalog entry as **Gestor de Trabajo / Work Manager**.
 
 ## Current blockers / Bloqueos actuales
 
-No known product blocker. Slice 5i is ready for PR validation.
+No known product blocker. Slice 5j is ready for PR validation; acceptance requires the final head and resulting `main` to pass all nine workflows.
 
 ## Operating rule
 

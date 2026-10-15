@@ -2,6 +2,7 @@ export type GitHubSetupMutation = {
   path: string;
   method: 'POST' | 'PATCH' | 'DELETE';
   body?: Record<string, unknown>;
+  revealWebhookSecret?: boolean;
 };
 
 function requiredText(form: FormData, name: string, maxLength: number): string | null {
@@ -73,6 +74,36 @@ export function parseGitHubSetupMutation(form: FormData): GitHubSetupMutation | 
     if (!connectionId || confirmation !== 'disconnect') return null;
     return {
       path: `/v1/integrations/github/connections/${encodeURIComponent(connectionId)}`,
+      method: 'DELETE',
+    };
+  }
+
+  if (operation === 'webhook-provision') {
+    const connectionId = requiredText(form, 'connectionId', 100);
+    if (!connectionId) return null;
+    return {
+      path: `/v1/integrations/github/connections/${encodeURIComponent(connectionId)}/webhook`,
+      method: 'POST',
+      revealWebhookSecret: true,
+    };
+  }
+
+  if (operation === 'webhook-rotate') {
+    const connectionId = requiredText(form, 'connectionId', 100);
+    if (!connectionId) return null;
+    return {
+      path: `/v1/integrations/github/connections/${encodeURIComponent(connectionId)}/webhook/rotate`,
+      method: 'POST',
+      revealWebhookSecret: true,
+    };
+  }
+
+  if (operation === 'webhook-delete') {
+    const connectionId = requiredText(form, 'connectionId', 100);
+    const confirmation = form.get('confirmation');
+    if (!connectionId || confirmation !== 'remove-webhook') return null;
+    return {
+      path: `/v1/integrations/github/connections/${encodeURIComponent(connectionId)}/webhook`,
       method: 'DELETE',
     };
   }

@@ -117,6 +117,49 @@ describe('parseGitHubSetupMutation', () => {
     });
   });
 
+  it('builds webhook provision and rotation as one-time secret reveals', () => {
+    expect(
+      parseGitHubSetupMutation(
+        form({ operation: 'webhook-provision', connectionId: 'connection/one' }),
+      ),
+    ).toEqual({
+      path: '/v1/integrations/github/connections/connection%2Fone/webhook',
+      method: 'POST',
+      revealWebhookSecret: true,
+    });
+
+    expect(
+      parseGitHubSetupMutation(
+        form({ operation: 'webhook-rotate', connectionId: 'connection/one' }),
+      ),
+    ).toEqual({
+      path: '/v1/integrations/github/connections/connection%2Fone/webhook/rotate',
+      method: 'POST',
+      revealWebhookSecret: true,
+    });
+  });
+
+  it('guards webhook deletion with an explicit confirmation value', () => {
+    expect(
+      parseGitHubSetupMutation(
+        form({
+          operation: 'webhook-delete',
+          connectionId: 'connection/one',
+          confirmation: 'remove-webhook',
+        }),
+      ),
+    ).toEqual({
+      path: '/v1/integrations/github/connections/connection%2Fone/webhook',
+      method: 'DELETE',
+    });
+
+    expect(
+      parseGitHubSetupMutation(
+        form({ operation: 'webhook-delete', connectionId: 'connection-1' }),
+      ),
+    ).toBeNull();
+  });
+
   it('rejects destructive mutations without explicit confirmation', () => {
     expect(
       parseGitHubSetupMutation(
