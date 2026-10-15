@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import type { ClientSession, Collection, Db, MongoClient } from 'mongodb';
 import { MongoServerError } from 'mongodb';
 import type { ExternalResource, IntegrationConnection, Scope } from '@kcc/domain';
+import { MongoAuditOutboxStore } from './audit-outbox.js';
 import type { IntegrationSecretStore } from './integration-secrets.js';
 
 type WorkspaceScope = Extract<Scope, { kind: 'workspace' }>;
@@ -40,10 +41,18 @@ export type ResolvedGitHubWebhookEndpoint = GitHubWebhookEndpointDocument & { se
 
 export interface GitHubWebhookStore {
   ensureIndexes(): Promise<void>;
-  provision(scope: WorkspaceScope, connectionId: string): Promise<ProvisionGitHubWebhookResult>;
+  provision(
+    scope: WorkspaceScope,
+    actorUserId: string,
+    connectionId: string,
+  ): Promise<ProvisionGitHubWebhookResult>;
   get(scope: WorkspaceScope, connectionId: string): Promise<GitHubWebhookEndpoint | null>;
-  rotateSecret(scope: WorkspaceScope, connectionId: string): Promise<RotateGitHubWebhookSecretResult>;
-  delete(scope: WorkspaceScope, connectionId: string): Promise<boolean>;
+  rotateSecret(
+    scope: WorkspaceScope,
+    actorUserId: string,
+    connectionId: string,
+  ): Promise<RotateGitHubWebhookSecretResult>;
+  delete(scope: WorkspaceScope, actorUserId: string, connectionId: string): Promise<boolean>;
   resolve(endpointId: string): Promise<ResolvedGitHubWebhookEndpoint | null>;
   resolveRepository(
     workspaceId: string,
@@ -86,6 +95,7 @@ export class MongoGitHubWebhookStore implements GitHubWebhookStore {
   private readonly deliveries: Collection<GitHubWebhookDeliveryDocument>;
   private readonly resources: Collection<ExternalResource>;
   private readonly connections: Collection<IntegrationConnection>;
+  private readonly outbox: MongoAuditOutboxStore;
 
   constructor(
     private readonly client: MongoClient,
@@ -96,6 +106,7 @@ export class MongoGitHubWebhookStore implements GitHubWebhookStore {
     this.deliveries = db.collection<GitHubWebhookDeliveryDocument>('github_webhook_deliveries');
     this.resources = db.collection<ExternalResource>('external_resources');
     this.connections = db.collection<IntegrationConnection>('integration_connections');
+    this.outbox = new MongoAuditOutboxStore(db);
   }
 
   async ensureIndexes(): Promise<void> {
@@ -107,6 +118,7 @@ export class MongoGitHubWebhookStore implements GitHubWebhookStore {
       this.resources.createIndex({ 'scope.workspaceId': 1, connectionId: 1, provider: 1, kind: 1 }),
       this.connections.createIndex({ 'scope.workspaceId': 1, id: 1, provider: 1 }),
       this.secrets.ensureIndexes(),
+      this.outbox.ensureIndexes(),
     ]);
   }
 
@@ -125,6 +137,7 @@ export class MongoGitHubWebhookStore implements GitHubWebhookStore {
 
   async provision(
     scope: WorkspaceScope,
+    actorUserId: string,
     connectionId: string,
   ): Promise<ProvisionGitHubWebhookResult> {
     const normalizedConnectionId = validId(connectionId, 'connection_id');
@@ -148,6 +161,19 @@ export class MongoGitHubWebhookStore implements GitHubWebhookStore {
         updatedAt: now,
       };
       await this.endpoints.insertOne(document, { session });
+      await this.outbox.enqueue(
+        {
+          scope,
+          type: 'integration.github.webhook_configured',
+          actorUserId,
+          entityType: 'integration_connection',
+          entityId: normalizedConnectionId,
+          summary: 'GitHub webhook configured',
+          source: 'manual-api',
+          metadata: { provider: 'github', endpointId: document.id },
+        },
+        session,
+      );
       return { status: 'created', endpoint: endpointView(document), secret };
     });
   }
@@ -162,6 +188,7 @@ export class MongoGitHubWebhookStore implements GitHubWebhookStore {
 
   async rotateSecret(
     scope: WorkspaceScope,
+    actorUserId: string,
     connectionId: string,
   ): Promise<RotateGitHubWebhookSecretResult> {
     const normalizedConnectionId = validId(connectionId, 'connection_id');
@@ -181,11 +208,24 @@ export class MongoGitHubWebhookStore implements GitHubWebhookStore {
         { session, returnDocument: 'after' },
       );
       if (!updated) throw new Error('github_webhook_endpoint_update_failed');
+      await this.outbox.enqueue(
+        {
+          scope,
+          type: 'integration.github.webhook_secret_rotated',
+          actorUserId,
+          entityType: 'integration_connection',
+          entityId: normalizedConnectionId,
+          summary: 'GitHub webhook secret rotated',
+          source: 'manual-api',
+          metadata: { provider: 'github', endpointId: updated.id },
+        },
+        session,
+      );
       return { status: 'rotated', endpoint: endpointView(updated), secret };
     });
   }
 
-  async delete(scope: WorkspaceScope, connectionId: string): Promise<boolean> {
+  async delete(scope: WorkspaceScope, actorUserId: string, connectionId: string): Promise<boolean> {
     const normalizedConnectionId = validId(connectionId, 'connection_id');
     return this.transaction(async (session) => {
       const document = await this.endpoints.findOne(
@@ -201,6 +241,19 @@ export class MongoGitHubWebhookStore implements GitHubWebhookStore {
       if (deleted.deletedCount !== 1) return false;
       await this.deliveries.deleteMany({ endpointId: document.id, workspaceId: scope.workspaceId }, { session });
       await this.secrets.deleteSecret(scope, document.secretRef, session);
+      await this.outbox.enqueue(
+        {
+          scope,
+          type: 'integration.github.webhook_deleted',
+          actorUserId,
+          entityType: 'integration_connection',
+          entityId: normalizedConnectionId,
+          summary: 'GitHub webhook deleted',
+          source: 'manual-api',
+          metadata: { provider: 'github', endpointId: document.id },
+        },
+        session,
+      );
       return true;
     });
   }
