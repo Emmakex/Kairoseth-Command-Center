@@ -15,6 +15,7 @@
     "@kcc/config": "workspace:*",
     "@kcc/contracts": "workspace:*",
     "@kcc/domain": "workspace:*",
+    "@kcc/integrations": "workspace:*",
     "@kcc/persistence": "workspace:*",
     "fastify": "^5.6.1",
     "mongodb": "^6.20.0"
