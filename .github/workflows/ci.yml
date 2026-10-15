@@ -83,6 +83,73 @@ jobs:
           curl --fail --silent http://localhost:3000/es >/dev/null
           curl --fail --silent http://localhost:3000/en >/dev/null
 
+      - name: Smoke test workspace integration activity surface
+        run: |
+          login_response="$(curl --fail --silent \
+            -X POST http://localhost:4000/v1/auth/local/login \
+            -H 'content-type: application/json' \
+            --data "{\"email\":\"$KCC_LOCAL_ADMIN_EMAIL\",\"password\":\"$KCC_LOCAL_ADMIN_PASSWORD\"}")"
+          access_token="$(printf '%s' "$login_response" | python3 -c 'import json,sys; print(json.load(sys.stdin)["accessToken"])')"
+          session_response="$(curl --fail --silent \
+            http://localhost:4000/v1/session \
+            -H "authorization: Bearer $access_token")"
+          workspace_id="$(printf '%s' "$session_response" | python3 -c 'import json,sys; print(json.load(sys.stdin)["activeWorkspaceId"])')"
+          test -n "$workspace_id"
+          test "$workspace_id" != "None"
+
+          docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval "
+          const now='2026-10-15T14:30:00.000Z';
+          db.integration_signals.updateOne(
+            {workspaceId:'$workspace_id',id:'ci:integration-activity:9001'},
+            {\$set:{
+              id:'ci:integration-activity:9001',
+              source:'github',
+              type:'repository.ci',
+              workspaceId:'$workspace_id',
+              occurredAt:now,
+              resourceId:'activity-resource',
+              projectId:null,
+              payload:{
+                repository:'acme/activity',
+                name:'Integration activity smoke',
+                status:'completed',
+                conclusion:'success',
+                url:'https://github.example/acme/activity/actions/runs/9001'
+              },
+              ingestedAt:now,
+              updatedAt:now
+            }},
+            {upsert:true}
+          );
+          " >/dev/null
+
+          es_page="$(curl --fail --silent \
+            'http://localhost:3000/es?scope=workspace' \
+            -H "Cookie: kcc_session=$access_token")"
+          printf '%s' "$es_page" | grep -F 'Actividad de integraciones' >/dev/null
+          printf '%s' "$es_page" | grep -F 'Integration activity smoke' >/dev/null
+          printf '%s' "$es_page" | grep -F 'acme/activity' >/dev/null
+          printf '%s' "$es_page" | grep -F 'Correcto' >/dev/null
+
+          en_page="$(curl --fail --silent \
+            'http://localhost:3000/en?scope=workspace' \
+            -H "Cookie: kcc_session=$access_token")"
+          printf '%s' "$en_page" | grep -F 'Integration activity' >/dev/null
+          printf '%s' "$en_page" | grep -F 'Integration activity smoke' >/dev/null
+          printf '%s' "$en_page" | grep -F 'Successful' >/dev/null
+
+          private_page="$(curl --fail --silent \
+            'http://localhost:3000/es?scope=private' \
+            -H "Cookie: kcc_session=$access_token")"
+          if printf '%s' "$private_page" | grep -F 'ci:integration-activity:9001' >/dev/null; then
+            echo 'Workspace integration activity leaked into private view' >&2
+            exit 1
+          fi
+          if printf '%s' "$private_page" | grep -F 'Integration activity smoke' >/dev/null; then
+            echo 'Workspace integration signal content leaked into private view' >&2
+            exit 1
+          fi
+
       - name: Smoke test transactional audit outbox mutations
         run: |
           test "$(docker compose exec -T mongo mongosh --quiet --eval 'print(rs.status().ok)')" = "1"
