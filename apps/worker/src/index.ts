@@ -1,7 +1,7 @@
 import { MongoClient } from 'mongodb';
 import { loadWorkerConfig } from '@kcc/config';
+import { executeGitHubRepositorySignals } from '@kcc/integrations/github-signal-executor';
 import { GitHubProviderError, GitHubRestClient } from '@kcc/integrations/github';
-import { normalizeGitHubRepositorySignals } from '@kcc/integrations/github-signals';
 import { MongoAuditOutboxStore } from '@kcc/persistence/audit-outbox';
 import { MongoGitHubSignalRuntimeStore } from '@kcc/persistence/github-signal-runtime';
 import { MongoEncryptedIntegrationSecretStore } from '@kcc/persistence/integration-secrets';
@@ -114,32 +114,15 @@ async function executeGitHubSignalJob(job: IntegrationSyncJob): Promise<void> {
 
   const runtime = resolution.runtime;
   try {
-    const [pullRequests, issues, workflowRuns, releases] = await Promise.all([
-      githubExecution.providerClient.listPullRequests(
-        runtime.token,
-        runtime.owner,
-        runtime.repository,
-        50,
-      ),
-      githubExecution.providerClient.listIssues(runtime.token, runtime.owner, runtime.repository, 50),
-      githubExecution.providerClient.listWorkflowRuns(
-        runtime.token,
-        runtime.owner,
-        runtime.repository,
-        50,
-      ),
-      githubExecution.providerClient.listReleases(runtime.token, runtime.owner, runtime.repository, 50),
-    ]);
-
-    const signals = normalizeGitHubRepositorySignals({
+    const signals = await executeGitHubRepositorySignals({
+      providerClient: githubExecution.providerClient,
+      token: runtime.token,
       workspaceId: runtime.workspaceId,
       resourceId: runtime.resourceId,
       ...(runtime.projectId ? { projectId: runtime.projectId } : {}),
-      repository: `${runtime.owner}/${runtime.repository}`,
-      pullRequests,
-      issues,
-      workflowRuns,
-      releases,
+      owner: runtime.owner,
+      repository: runtime.repository,
+      limit: 50,
     });
 
     await githubExecution.signalStore.upsertSignals(runtime.workspaceId, signals);
