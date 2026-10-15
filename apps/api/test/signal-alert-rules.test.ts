@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { IntegrationSignal } from '@kcc/integrations';
 import {
+  defaultSignalAlertRulePolicies,
   deriveAlertsFromIntegrationSignal,
   reconcileAlertsFromIntegrationSignals,
 } from '@kcc/integrations/signal-alert-rules';
@@ -27,6 +28,13 @@ function ciSignal(
 }
 
 describe('provider-neutral integration signal alert rules', () => {
+  it('keeps the historical built-in defaults unchanged', () => {
+    expect(defaultSignalAlertRulePolicies()).toEqual([
+      { ruleId: 'repository.ci.failed.v1', enabled: true, severity: 'urgent' },
+      { ruleId: 'repository.ci.action_required.v1', enabled: true, severity: 'warning' },
+    ]);
+  });
+
   it('derives an urgent idempotent alert from a failed CI signal without depending on provider name', () => {
     const [alert] = deriveAlertsFromIntegrationSignal(ciSignal({ conclusion: 'failure' }));
 
@@ -47,6 +55,37 @@ describe('provider-neutral integration signal alert rules', () => {
     expect(deriveAlertsFromIntegrationSignal(ciSignal({ conclusion: 'action_required' }))[0]?.severity).toBe('warning');
     expect(deriveAlertsFromIntegrationSignal(ciSignal({ conclusion: 'success' }))).toEqual([]);
     expect(deriveAlertsFromIntegrationSignal(ciSignal({ conclusion: 'cancelled' }))).toEqual([]);
+  });
+
+  it('applies a workspace severity override without changing the alert fingerprint', () => {
+    const [alert] = deriveAlertsFromIntegrationSignal(ciSignal({ conclusion: 'failure' }), {
+      'repository.ci.failed.v1': { enabled: true, severity: 'critical' },
+    });
+
+    expect(alert?.severity).toBe('critical');
+    expect(alert?.fingerprint).toBe(
+      'integration-rule:repository.ci.failed.v1:provider:workflow-run:701',
+    );
+  });
+
+  it('suppresses a disabled rule and emits its fingerprint as a resolution candidate', () => {
+    const signal = ciSignal({ conclusion: 'failure' });
+    const result = reconcileAlertsFromIntegrationSignals([signal], {
+      'repository.ci.failed.v1': { enabled: false, severity: 'urgent' },
+    });
+
+    expect(result.active).toEqual([]);
+    expect(result.resolve.map((item) => item.fingerprint)).toContain(
+      'integration-rule:repository.ci.failed.v1:provider:workflow-run:701',
+    );
+  });
+
+  it('keeps policies isolated by rule id', () => {
+    expect(
+      deriveAlertsFromIntegrationSignal(ciSignal({ conclusion: 'action_required' }), {
+        'repository.ci.failed.v1': { enabled: false, severity: 'critical' },
+      })[0]?.severity,
+    ).toBe('warning');
   });
 
   it('ignores non-CI signals even if their payload contains a failure-like field', () => {
