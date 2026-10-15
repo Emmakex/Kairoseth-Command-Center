@@ -67,11 +67,14 @@ services:
       NODE_ENV: production
       KCC_WORKER_POLL_MS: ${KCC_WORKER_POLL_MS:-5000}
       MONGODB_URI: mongodb://mongo:27017/kairoseth_command_center?replicaSet=rs0&directConnection=true
+      KCC_INTEGRATION_SECRET_KEY: ${KCC_INTEGRATION_SECRET_KEY:-}
+      KCC_GITHUB_API_BASE_URL: ${KCC_GITHUB_API_BASE_URL:-https://api.github.com}
     depends_on:
       mongo:
         condition: service_healthy
     networks:
       - backend
+      - frontend
 
   web:
     build:
