@@ -78,10 +78,67 @@ describe('parseGitHubSetupMutation', () => {
     });
   });
 
+  it('builds write-only credential rotation and guarded delete mutations', () => {
+    const token = 'github_pat_rotated_12345678901234567890';
+    expect(
+      parseGitHubSetupMutation(
+        form({ operation: 'connection-rotate', connectionId: 'connection/one', token }),
+      ),
+    ).toEqual({
+      path: '/v1/integrations/github/connections/connection%2Fone/credential',
+      method: 'PATCH',
+      body: { token },
+    });
+
+    expect(
+      parseGitHubSetupMutation(
+        form({
+          operation: 'repository-delete',
+          resourceId: 'resource/one',
+          confirmation: 'unlink',
+        }),
+      ),
+    ).toEqual({
+      path: '/v1/integrations/github/repositories/resource%2Fone',
+      method: 'DELETE',
+    });
+
+    expect(
+      parseGitHubSetupMutation(
+        form({
+          operation: 'connection-delete',
+          connectionId: 'connection/one',
+          confirmation: 'disconnect',
+        }),
+      ),
+    ).toEqual({
+      path: '/v1/integrations/github/connections/connection%2Fone',
+      method: 'DELETE',
+    });
+  });
+
+  it('rejects destructive mutations without explicit confirmation', () => {
+    expect(
+      parseGitHubSetupMutation(
+        form({ operation: 'repository-delete', resourceId: 'resource-1' }),
+      ),
+    ).toBeNull();
+    expect(
+      parseGitHubSetupMutation(
+        form({ operation: 'connection-delete', connectionId: 'connection-1' }),
+      ),
+    ).toBeNull();
+  });
+
   it('rejects malformed tokens and GitHub coordinates', () => {
     expect(
       parseGitHubSetupMutation(
         form({ operation: 'connection-create', displayName: 'GitHub', token: 'short token' }),
+      ),
+    ).toBeNull();
+    expect(
+      parseGitHubSetupMutation(
+        form({ operation: 'connection-rotate', connectionId: 'connection-1', token: 'short token' }),
       ),
     ).toBeNull();
 
