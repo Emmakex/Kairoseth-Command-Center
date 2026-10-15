@@ -27,10 +27,15 @@ The endpoint:
 | Pull request | `repository.pull_request` | number, title, state, draft, merged, URL |
 | Issue | `repository.issue` | number, title, state, URL |
 | Actions workflow run | `repository.ci` | name, status, conclusion, event, branch, SHA, URL |
+| Release | `repository.release` | tag, name, draft, prerelease, target commitish, URL |
 
 GitHub's issues endpoint also returns pull requests. Those rows are explicitly excluded from `repository.issue` so one remote PR cannot become two dashboard signals.
 
 El endpoint de issues de GitHub también devuelve pull requests. Esas filas se excluyen explícitamente de `repository.issue` para evitar duplicados en el dashboard.
+
+Published releases use `published_at` as their signal time. Drafts or provider records without `published_at` fall back to `created_at`, so release activity remains orderable without inventing timestamps.
+
+Las releases publicadas usan `published_at` como fecha de señal. Los borradores o registros sin `published_at` usan `created_at`, evitando inventar fechas para ordenar la actividad.
 
 ## Security boundary / Límite de seguridad
 
@@ -40,4 +45,4 @@ A provider 401 marks the connection as invalid using the existing validation-fai
 
 ## Deliberately deferred / Aplazado expresamente
 
-This slice does not persist signals yet and does not create alerts automatically. It establishes the stable read/normalization boundary first. Persistence, scheduled refresh, verified webhooks and signal-derived automation remain later Phase 4 slices.
+Signals are not persisted yet and do not create alerts automatically. The stable read/normalization boundary comes first. Persistence, scheduled refresh, verified webhooks and signal-derived automation remain later Phase 4 slices.
