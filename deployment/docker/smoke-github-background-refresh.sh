@@ -71,6 +71,47 @@ print(doc ? doc.status : 'missing');
   return 1
 }
 
+set_ci_state() {
+  local conclusion="$1"
+  local updated_at="$2"
+  ${COMPOSE[@]} exec -T github-background-mock node -e "
+const response = await fetch('http://127.0.0.1:8081/__test__/workflow', {
+  method: 'POST',
+  headers: {
+    authorization: 'Bearer ' + process.env.KCC_GITHUB_MOCK_TOKEN,
+    'content-type': 'application/json'
+  },
+  body: JSON.stringify({ conclusion: '$conclusion', updatedAt: '$updated_at' })
+});
+if (!response.ok) {
+  console.error(await response.text());
+  process.exit(1);
+}
+" >/dev/null
+}
+
+wait_for_timeline_count() {
+  local event_type="$1"
+  local alert_id="$2"
+  local expected="$3"
+  for attempt in {1..30}; do
+    local count
+    count="$(${COMPOSE[@]} exec -T mongo mongosh --quiet kairoseth_command_center --eval "
+print(db.timeline_events.countDocuments({type:'$event_type',entityId:'$alert_id','scope.workspaceId':'$WORKSPACE_ID'}));
+")"
+    count="$(printf '%s' "$count" | tr -d '\r\n')"
+    if [[ "$count" == "$expected" ]]; then
+      return 0
+    fi
+    if [[ "$count" != "0" ]]; then
+      echo "Expected $expected $event_type event(s), found $count" >&2
+      return 1
+    fi
+    sleep 1
+  done
+  return 1
+}
+
 insert_job "$JOB_ID" "$DEDUPE_KEY"
 wait_for_job "$JOB_ID"
 
@@ -107,29 +148,43 @@ IFS='|' read -r ALERT_COUNT ALERT_ID ALERT_SEVERITY ALERT_STATUS <<< "$ALERT_DAT
 [[ "$ALERT_STATUS" == "open" ]]
 [[ -n "$ALERT_ID" ]]
 
-# `alert.derived` is delivered through the transactional audit outbox. The refresh job
-# may complete in the same worker tick that enqueues the outbox record, so wait for the
-# next drain instead of assuming Timeline is synchronous. Uniqueness is still strict.
-DERIVED_AUDIT_COUNT=0
-for attempt in {1..30}; do
-  DERIVED_AUDIT_COUNT="$(${COMPOSE[@]} exec -T mongo mongosh --quiet kairoseth_command_center --eval "
-print(db.timeline_events.countDocuments({type:'alert.derived',entityId:'$ALERT_ID','scope.workspaceId':'$WORKSPACE_ID'}));
-")"
-  DERIVED_AUDIT_COUNT="$(printf '%s' "$DERIVED_AUDIT_COUNT" | tr -d '\r\n')"
-  if [[ "$DERIVED_AUDIT_COUNT" == "1" ]]; then
-    break
-  fi
-  if [[ "$DERIVED_AUDIT_COUNT" != "0" ]]; then
-    echo "Expected exactly one alert.derived event, found $DERIVED_AUDIT_COUNT" >&2
-    exit 1
-  fi
-  sleep 1
-done
-[[ "$DERIVED_AUDIT_COUNT" == "1" ]]
+wait_for_timeline_count 'alert.derived' "$ALERT_ID" 1
+
+# The same stable provider signal becomes healthy. Its durable signal record is updated,
+# and lifecycle reconciliation must resolve the already-materialized alert without
+# creating a second alert or a second alert.derived audit event.
+set_ci_state 'success' '2026-10-15T06:40:00Z'
+RESOLVE_JOB_ID="${JOB_ID}-resolve"
+insert_job "$RESOLVE_JOB_ID" "${DEDUPE_KEY}:resolve"
+wait_for_job "$RESOLVE_JOB_ID"
+
+${COMPOSE[@]} exec -T mongo mongosh --quiet kairoseth_command_center --eval "
+const alert=db.alerts.findOne({id:'$ALERT_ID',fingerprint:'$ALERT_FINGERPRINT'});
+if (!alert || alert.status !== 'resolved' || !alert.resolvedAt) quit(2);
+if (new Date(alert.resolvedAt).toISOString() !== '2026-10-15T06:40:00.000Z') quit(3);
+if (db.alerts.countDocuments({'scope.workspaceId':'$WORKSPACE_ID',fingerprint:'$ALERT_FINGERPRINT'}) !== 1) quit(4);
+" >/dev/null
+wait_for_timeline_count 'alert.auto_resolved' "$ALERT_ID" 1
+
+# A genuinely later failure for the same workflow-run identity must reopen that exact
+# durable alert. The fingerprint and alert ID stay stable, resolvedAt is cleared, and
+# the original derivation audit event remains unique.
+set_ci_state 'failure' '2026-10-15T06:50:00Z'
+REOPEN_JOB_ID="${JOB_ID}-reopen"
+insert_job "$REOPEN_JOB_ID" "${DEDUPE_KEY}:reopen"
+wait_for_job "$REOPEN_JOB_ID"
+
+${COMPOSE[@]} exec -T mongo mongosh --quiet kairoseth_command_center --eval "
+const alert=db.alerts.findOne({id:'$ALERT_ID',fingerprint:'$ALERT_FINGERPRINT'});
+if (!alert || alert.status !== 'open' || alert.resolvedAt) quit(2);
+if (db.alerts.countDocuments({'scope.workspaceId':'$WORKSPACE_ID',fingerprint:'$ALERT_FINGERPRINT'}) !== 1) quit(3);
+if (db.timeline_events.countDocuments({type:'alert.derived',entityId:'$ALERT_ID','scope.workspaceId':'$WORKSPACE_ID'}) !== 1) quit(4);
+" >/dev/null
+wait_for_timeline_count 'alert.reopened' "$ALERT_ID" 1
 
 # Durable alert + audit state above are the canonical behavior assertions. Keep logs
 # only for the security invariant that provider credentials must never be emitted.
 WORKER_LOGS="$(${COMPOSE[@]} logs --no-color worker)"
 [[ "$WORKER_LOGS" != *"${KCC_GITHUB_MOCK_TOKEN}"* ]]
 
-echo "GitHub background refresh + derived alert smoke passed"
+echo "GitHub background refresh + derived alert lifecycle smoke passed"
