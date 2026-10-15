@@ -1,5 +1,6 @@
 import type { AuthProvider } from '@kcc/auth';
 import type { MilestoneStore, OperationalStore } from '@kcc/persistence';
+import type { IntegrationSignalStore } from '@kcc/persistence/integration-signals';
 import { buildApp as buildBaseApp } from './app';
 import type { ReadinessCheck } from './app';
 import { registerDecisionCompatibilityGuard } from './decision-compatibility';
@@ -11,6 +12,7 @@ import type { GitHubProviderClient } from './github-provider-client';
 import { registerGitHubRepositoryRoutes } from './github-repositories';
 import type { GitHubRepositoryStore } from './github-repository-store';
 import { registerGitHubSignalRoutes } from './github-signals';
+import { registerIntegrationSignalRoutes } from './integration-signals';
 import { registerStandaloneAuthRoutes } from './local-auth';
 import type { LocalLoginProvider } from './local-auth';
 import { registerLocalIdentityRoutes } from './local-identity-routes';
@@ -32,6 +34,7 @@ type ApplicationOptions = {
   githubRepositoryStore?: GitHubRepositoryStore;
   githubConnectionStore?: GitHubConnectionStore;
   githubProviderClient?: GitHubProviderClient;
+  integrationSignalStore?: IntegrationSignalStore;
 };
 
 export function buildApp(options: ApplicationOptions = {}) {
@@ -70,6 +73,13 @@ export function buildApp(options: ApplicationOptions = {}) {
       : {}),
   });
 
+  registerIntegrationSignalRoutes(app, {
+    ...(options.authProvider ? { authProvider: options.authProvider } : {}),
+    ...(options.integrationSignalStore
+      ? { integrationSignalStore: options.integrationSignalStore }
+      : {}),
+  });
+
   registerGitHubRepositoryRoutes(app, {
     ...(options.authProvider ? { authProvider: options.authProvider } : {}),
     ...(options.githubRepositoryStore
@@ -93,6 +103,9 @@ export function buildApp(options: ApplicationOptions = {}) {
       : {}),
     ...(options.githubProviderClient
       ? { githubProviderClient: options.githubProviderClient }
+      : {}),
+    ...(options.integrationSignalStore
+      ? { integrationSignalStore: options.integrationSignalStore }
       : {}),
   });
 
