@@ -23,6 +23,7 @@ const apiSchema = z.object({
   KCC_INTEGRATION_SECRET_KEY: optionalSecret(
     z.string().regex(/^[0-9a-fA-F]{64}$/, 'KCC_INTEGRATION_SECRET_KEY must be 64 hexadecimal characters'),
   ),
+  KCC_GITHUB_API_BASE_URL: z.string().url().default('https://api.github.com'),
 });
 
 const workerSchema = z.object({
