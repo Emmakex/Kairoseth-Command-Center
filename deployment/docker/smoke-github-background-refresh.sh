@@ -12,7 +12,7 @@ COMPOSE=(
 # repository binding and manual repository sync.
 bash deployment/docker/smoke-github-live-sync.sh
 
-RESOURCE_DATA="$(${COMPOSE[@]} exec -T mongodb mongosh --quiet kairoseth_command_center --eval '
+RESOURCE_DATA="$(${COMPOSE[@]} exec -T mongo mongosh --quiet kairoseth_command_center --eval '
 const doc = db.external_resources.find({provider:"github",kind:"repository"}).sort({createdAt:-1}).limit(1).next();
 if (!doc) quit(2);
 print(doc.scope.workspaceId + "|" + doc.id);
@@ -26,7 +26,7 @@ RUN_ID="${KCC_SMOKE_RUN_ID:-local}"
 JOB_ID="background-smoke-${RUN_ID}"
 DEDUPE_KEY="github:repository_signals:${RESOURCE_ID}:background-smoke:${RUN_ID}"
 
-${COMPOSE[@]} exec -T mongodb mongosh --quiet kairoseth_command_center --eval "
+${COMPOSE[@]} exec -T mongo mongosh --quiet kairoseth_command_center --eval "
 const now = new Date().toISOString();
 db.integration_sync_jobs.deleteOne({id:'$JOB_ID'});
 db.integration_sync_jobs.insertOne({
@@ -48,7 +48,7 @@ db.integration_sync_jobs.insertOne({
 
 completed=0
 for attempt in {1..60}; do
-  STATUS="$(${COMPOSE[@]} exec -T mongodb mongosh --quiet kairoseth_command_center --eval "
+  STATUS="$(${COMPOSE[@]} exec -T mongo mongosh --quiet kairoseth_command_center --eval "
 const doc = db.integration_sync_jobs.findOne({id:'$JOB_ID'});
 print(doc ? doc.status : 'missing');
 ")"
@@ -65,7 +65,7 @@ print(doc ? doc.status : 'missing');
 done
 [[ "$completed" == "1" ]]
 
-SIGNAL_IDS="$(${COMPOSE[@]} exec -T mongodb mongosh --quiet kairoseth_command_center --eval "
+SIGNAL_IDS="$(${COMPOSE[@]} exec -T mongo mongosh --quiet kairoseth_command_center --eval "
 const docs = db.integration_signals.find({workspaceId:'$WORKSPACE_ID',resourceId:'$RESOURCE_ID'}).toArray();
 print(docs.map((doc) => doc.id).sort().join(','));
 ")"
