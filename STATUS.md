@@ -1,10 +1,10 @@
 # Project status / Estado del proyecto
 
-**Current phase:** Phase 4 — GitHub integration closure  
+**Current phase:** Phase 5 — Automation and intelligence  
 **Technical/internal project:** Kairoseth Command Center  
 **Commercial names:** Gestor de Trabajo (ES) / Work Manager (EN)  
 **Category:** Kairoseth Software  
-**Status:** Phase 3 is closed. Phase 4 Slices 1–5j are merged. Slice 5j passed all nine gates on its final PR head and is merged; post-merge `main` validation is the only remaining closure step for the token-backed GitHub boundary.
+**Status:** Phase 4 token-backed GitHub boundary is closed and post-merge validated 9/9 on `d1bfa929b6b2aa409991949513218826f10c2bb0`. Phase 5 Slice 1 — Automation rule policies / Políticas de reglas de automatización — is active.
 
 ## Naming rule / Regla de naming
 
@@ -16,107 +16,102 @@
 
 ## Completed / Completado
 
-### Phases 0–3
+### Phase 3 — Operational product
 
-- [x] Product, architecture, portability, tenancy, security and commercial model documented.
-- [x] Portable monorepo with web/API/worker, ES/EN, Docker and CI baseline.
-- [x] Server-side identity, workspaces, memberships, RBAC/capabilities and product entitlements.
-- [x] Strict workspace/private isolation.
+- [x] Portable monorepo, standalone authentication and strict workspace/private isolation.
 - [x] Projects, Tasks, Alerts, Decisions, Timeline, Quick Capture and Milestones.
-- [x] Standalone persistent multi-user authentication and password lifecycle.
 - [x] Transactional audit outbox, production-oriented standalone profile, backup and guarded restore.
 
 **Phase 3 technical release boundary: CLOSED / CERRADA.**
 
-## Phase 4 — GitHub integration
+### Phase 4 — GitHub integration
 
-### Closed slices / Slices cerradas
+- [x] Normalized repository links and encrypted GitHub connections.
+- [x] Live validation + manual repository sync.
+- [x] Durable provider-neutral PR/issue/CI/release signal history.
+- [x] Durable integration queue, worker retries and recurring reconciliation.
+- [x] Verified GitHub webhooks with raw-body HMAC verification and replay protection.
+- [x] Provider-neutral derived alerts with deterministic fingerprints.
+- [x] Automatic derived-alert resolve/reopen lifecycle.
+- [x] Workspace integration activity UI.
+- [x] Admin GitHub setup and maintenance UI.
+- [x] Manual webhook provision/rotate/remove UI with session-bound one-time secret reveal.
+- [x] Final Phase 4 closure commit `d1bfa929b6b2aa409991949513218826f10c2bb0` validated with all nine workflows green.
 
-- [x] **Slice 1 — normalized repository links (PR #15):** `2c1219f4e0f6b7d568a1c0edb56026c1915ec121`.
-- [x] **Slice 2 — encrypted GitHub connections (PR #16):** `79053390c192c3b906847e2dab735ecf91d51531`.
-- [x] **Slice 3 — live validation + manual repository sync (PR #17):** `2e9062b373bcef4ffea407eecfe7863c1b5336f4`.
-- [x] **Slice 4a — normalized PR/issue/CI signals (PR #18):** `570bc0154fa167a9f3ee84d3dba93bb406757d9b`.
-- [x] **Slice 4b — normalized release signals (PR #19):** `4a6619f84c55b67aa211014a46b85062d739fbae`.
-- [x] **Slice 4c — durable provider-neutral signal history (PR #20):** `7b38bcf105a766ad39e697e181a634a0321c60ad`.
-- [x] **Slice 5a — durable integration sync queue (PR #21):** `5a0b15e31257b42777e7da4d32a79fc33dab0f27`.
-- [x] **Slice 5b — credential-backed worker execution (PRs #22–#24):** shared executor `ed1542f1e3402a0d5b3b6a09b740c83df94226ce`.
-- [x] **Slice 5c — recurring GitHub refresh (PR #25):** `715f441b8c4a69de3e1b9fd442c241798ec56302`.
-- [x] **Slice 5d — verified GitHub webhooks (PR #26):** `e51474854276d6ec73306be8c80f1b7450d583fa`.
-- [x] **Slice 5e — provider-neutral derived alerts (PR #27):** `e0b2e8d3454ddbfa1865ddc2031a0ae405220f66`.
-- [x] **Slice 5f — derived alert lifecycle (PR #28):** merged `938c5440730ac9a989f02c4da4f944e71788df4b`, post-merge 9/9 green.
-- [x] **Slice 5g — Integration activity / Actividad de integraciones (PR #29):** merged `2183aeccc3ff17bc698e35f12d48708a2fbcb56b`, post-merge 9/9 green.
-- [x] **Slice 5h — GitHub setup UI / Configuración de GitHub (PR #30):** admin-only create/validate/link/bind/manual-sync UI; merged `b282b17e82ec6347ffd9b20f5a0c55d6f2578274`, post-merge 9/9 green.
-- [x] **Slice 5i — GitHub maintenance UI / Mantenimiento de GitHub (PR #31):** token rotation, repository unlink and unused-connection removal; final head `c7f9de7a7cfc5f17b640c1315338b32c1cfe4dac`, merged `9f3f256690e7ea4cad63e26406886bdcdcaacefa`, post-merge 9/9 green.
-- [x] **Slice 5j — GitHub webhook administration UI / Administración de webhook GitHub (PR #32):** safe state lookup, provision/rotate/delete controls, ES/EN manual setup guidance and session-bound one-time HMAC secret reveal; final head `71d80ce89d0f654b83c90d1f7827f0af4e0b7431` validated 9/9, merged `1aeee36a7049afc03f02069297dfac01fa954f4a`.
+**Phase 4 token-backed GitHub boundary: CLOSED / CERRADA.**
 
-### Phase 4 boundary / Frontera de Fase 4
-
-The token-backed GitHub integration is functionally complete for the current product boundary:
-
-- [x] encrypted connection lifecycle;
-- [x] repository linking and manual sync;
-- [x] durable normalized PR/issue/CI/release signals;
-- [x] durable queue, worker, retries and recurring reconciliation;
-- [x] verified webhooks with HMAC/replay protection;
-- [x] provider-neutral derived alerts with resolve/reopen lifecycle;
-- [x] workspace integration activity UI;
-- [x] admin connection/repository maintenance UI;
-- [x] manual webhook provisioning/rotation/removal UI with one-time secret handling;
-- [ ] final post-merge `main` 9/9 validation for the closure commit.
-
-**Phase 4 token-backed boundary: CLOSURE VALIDATION / VALIDACIÓN DE CIERRE.**
-
-### Deferred enhancements / Mejoras diferidas
+Deferred GitHub enhancements are not Phase 4 blockers:
 
 - [ ] GitHub App/OAuth authorization and automatic webhook registration/removal.
 - [ ] Additional integration providers.
 
-These are enhancements/new adapter fronts, not blockers for the current token-backed GitHub product boundary.
+## Active / Activo
 
-## Phase 5 candidates / Candidatos de Fase 5
+### Phase 5 Slice 1 — Automation rule policies / Políticas de reglas de automatización
 
-- [ ] Customer-configurable rules/automation.
-- [ ] Stale PR/issue policy rules built on normalized durable signals.
-- [ ] Cross-source operational signals when a second provider is intentionally opened.
-- [ ] Explainable prioritization and AI assistance only where core correctness remains deterministic.
+Implemented on `feat/phase-5-rule-policies`:
 
-No Phase 5 implementation front opens until the Phase 4 closure `main` commit is 9/9 green.
+- [x] Existing built-in CI alert rules exported as explicit versioned definitions with unchanged defaults.
+- [x] Workspace-scoped `signal_alert_rule_policies` persistence with unique workspace + rule identity.
+- [x] Effective policy merge keeps Phase 4 behavior unchanged when no overrides exist.
+- [x] Dedicated `automation.manage` capability granted to owner/admin presets, not members.
+- [x] `GET /v1/automation/rules` returns effective policies for the authenticated workspace.
+- [x] `PATCH /v1/automation/rules/:ruleId` changes `enabled` and/or `severity` for known built-in rules only.
+- [x] API requires authenticated workspace, `automation.manage` and `command-center` entitlement.
+- [x] Policy changes emit transactional `automation.rule_policy_changed` audit work.
+- [x] Worker loads effective workspace policies before durable CI alert reconciliation.
+- [x] Severity override changes the existing open/acknowledged derived alert in place without changing ID/fingerprint.
+- [x] Severity update emits transactional `alert.policy_updated` audit work.
+- [x] Disabling a rule suppresses its active candidate and lifecycle reconciliation resolves the existing derived alert rather than deleting history.
+- [x] Pure rule tests cover historical defaults, severity override, disabled-rule resolution and rule isolation.
+- [x] API tests cover defaults, partial update, workspace isolation, capability enforcement and invalid input.
+- [x] Existing background-refresh Docker smoke strengthened to prove `urgent → critical → disabled/resolved` on the same durable alert/fingerprint.
+- [x] Architecture/operations documentation in `docs/25-automation-rule-policies.md`.
+- [ ] Final-head regression validation.
+- [ ] Merge and post-merge `main` validation.
+
+**Phase 5 Slice 1: VALIDATION PENDING / VALIDACIÓN PENDIENTE.**
+
+## Deliberately deferred / Diferido expresamente
+
+- [ ] Customer-facing ES/EN rule policy UI — next isolated slice after runtime/API foundation is green.
+- [ ] Arbitrary user-authored conditions or rule DSL.
+- [ ] Stale PR/issue built-in rules.
+- [ ] Automation actions beyond current derived-alert behavior.
+- [ ] AI-generated automation rules.
+- [ ] GitHub App/OAuth and additional providers.
 
 ## Security and correctness invariants
 
 1. Workspace/private scope is server-derived from authenticated context.
 2. Product entitlement and capability checks are server-enforced.
-3. Integration administration requires `integrations.manage`.
+3. Integration administration requires `integrations.manage`; automation policy administration requires `automation.manage`.
 4. GitHub repository links, connections and webhook management are workspace-only.
 5. Standalone passwords and provider credentials are never persisted in plaintext.
-6. Provider credentials never enter durable jobs, schedules, signals, alerts or audit events.
+6. Provider credentials never enter durable jobs, schedules, signals, alerts, automation policies or audit events.
 7. Provider responses are normalized before persistence or client exposure.
-8. Webhook HMAC secrets are independent from provider credentials and encrypted at rest.
-9. Exact webhook raw bytes are verified with HMAC-SHA256 before JSON parsing and deliveries are replay-protected.
-10. Derived alert rules consume normalized durable signals and remain provider-neutral.
-11. Integration activity is workspace-only/read-only and never exposes credentials or internal provider/resource/workspace IDs.
-12. GitHub setup/maintenance/webhook administration is not loaded in private scope.
-13. Provider tokens are write-only at the web boundary and are submitted only in request bodies.
-14. The API remains authoritative for tenancy, capabilities, provider validation and deletion safety.
-15. Connection/resource identifiers are URL-encoded before entering API paths.
-16. Repository unlink removes only the local Work Manager link; it does not delete the remote GitHub repository.
-17. Connection removal remains blocked while normalized resources reference that connection.
-18. Webhook HMAC secrets never enter URL/query state or normal dashboard HTML.
-19. One-time webhook secret reveal is session-bound, authenticated, short-lived, tamper-evident and consumed by clearing its HttpOnly cookie.
-20. The web UI never derives a public webhook host from an internal API URL; deployment-specific public HTTPS host configuration remains explicit until automatic registration exists.
+8. Webhook HMAC secrets remain independent from provider credentials and encrypted at rest.
+9. Derived alert rules consume normalized durable signals and remain provider-neutral.
+10. Built-in rule IDs and deterministic alert fingerprints remain versioned and stable across workspace policy changes.
+11. Missing workspace policy overrides preserve the Phase 4 default behavior exactly.
+12. Workspace policy storage is unique by workspace + built-in rule ID; arbitrary rule IDs are rejected.
+13. Disabling a built-in rule resolves active derived conditions instead of deleting alerts or audit history.
+14. Severity policy changes update only eligible open/acknowledged derived alerts and do not override dismissed human decisions.
+15. Every stored policy change and derived-alert policy mutation is delivered through the transactional audit outbox.
 
 ## Next / Siguiente
 
-1. Require all nine workflows green on the current `main` closure commit.
-2. If any gate fails, correct that regression before opening Phase 5.
-3. Once 9/9 green, mark the Phase 4 token-backed GitHub boundary closed and start the first isolated Phase 5 automation/rules slice from that exact green commit.
-4. Keep GitHub App/OAuth and additional providers separate from Phase 5 rule logic.
-5. When commercial publication is scheduled, create the Kairoseth Software catalog entry as **Gestor de Trabajo / Work Manager**.
+1. Require all existing regression workflows green on the final Slice 1 head, including the strengthened background-refresh smoke.
+2. Correct any policy/runtime/API regression directly on this slice; do not open the UI slice while a gate is red.
+3. Merge with the exact validated head and revalidate resulting `main`.
+4. Start Phase 5 Slice 2 from that green commit: ES/EN workspace rule-policy administration UI for the two proven built-in rules.
+5. Keep custom DSL, stale PR/issue rules, AI rules, OAuth and additional providers as separate fronts.
+6. When commercial publication is scheduled, create the Kairoseth Software catalog entry as **Gestor de Trabajo / Work Manager**.
 
 ## Current blockers / Bloqueos actuales
 
-No known product blocker. Only final post-merge regression validation remains for the Phase 4 closure boundary.
+No known product blocker. Slice 1 is ready for CI validation.
 
 ## Operating rule
 
-Update this file at meaningful milestones. Keep slices small and independently releasable; never mix unrelated provider/auth/rule fronts into a red validation boundary.
+Update this file at meaningful milestones. Keep Phase 5 slices deterministic, auditable, workspace-isolated and independently releasable; never introduce arbitrary executable user logic into a red validation boundary.
