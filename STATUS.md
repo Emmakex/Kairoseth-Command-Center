@@ -4,7 +4,7 @@
 **Technical/internal project:** Kairoseth Command Center  
 **Commercial names:** Gestor de Trabajo (ES) / Work Manager (EN)  
 **Category:** Kairoseth Software  
-**Status:** Phase 3 is closed. Phase 4 Slices 1–5e are merged. Slice 5f — derived alert lifecycle — is active in PR #28.
+**Status:** Phase 3 is closed. Phase 4 Slices 1–5f are merged and post-merge validated. Slice 5g — Integration activity / Actividad de integraciones — is active in PR #29.
 
 ## Naming rule / Regla de naming
 
@@ -136,17 +136,10 @@
 
 **Slice 5e: CLOSED / CERRADA.**
 
-## Active / Activo
-
 ### Slice 5f — derived alert lifecycle (PR #28)
-
-Implemented on the active draft PR:
-
 - [x] Existing v1 fingerprints remain unchanged; no fingerprint migration.
 - [x] CI lifecycle reconciliation groups durable signals by resource/workflow/branch.
-- [x] Latest decisive `failure`/`timed_out`/`startup_failure` keeps one `urgent` condition active.
-- [x] `action_required` keeps one `warning` condition active.
-- [x] `success` marks the CI series healthy and resolves older derived alerts.
+- [x] Latest decisive failure/action-required state remains active; `success` resolves superseded derived conditions.
 - [x] `cancelled` and unknown/non-conclusive states remain lifecycle-neutral.
 - [x] Worker reconciles against durable CI history after signal persistence.
 - [x] Auto-resolution only mutates `open`/`acknowledged`; `dismissed` remains a human decision.
@@ -155,18 +148,43 @@ Implemented on the active draft PR:
 - [x] Reopen preserves the same alert ID and fingerprint.
 - [x] Transactional `alert.auto_resolved` and `alert.reopened` audit events.
 - [x] Unit coverage for recovery, newest unhealthy state and lifecycle-neutral cancellation.
-- [x] Background smoke expanded to `failure → repeated failure → success → later failure` on workflow `701`.
+- [x] Background smoke proves `failure → repeated failure → success → later failure` on workflow `701`.
 - [x] ES/EN lifecycle architecture/operations documentation.
-- [ ] Final-head nine-gate validation.
-- [ ] Merge PR #28 and validate resulting `main`.
+- [x] Final PR head `7a7074df80f88663707bce8986d31a22110b53e5` validated with all nine gates green.
+- [x] PR #28 squash-merged as `938c5440730ac9a989f02c4da4f944e71788df4b`.
+- [x] Resulting `main` commit validated post-merge with all nine push workflows green.
 
-**Slice 5f: VALIDATION IN PROGRESS / VALIDACIÓN EN CURSO.**
+**Slice 5f: CLOSED / CERRADA.**
+
+## Active / Activo
+
+### Slice 5g — Integration activity / Actividad de integraciones (PR #29)
+
+Implemented on the active draft PR:
+
+- [x] Workspace-only, read-only integration activity surface on the Today dashboard.
+- [x] Server-side consumption of existing normalized `/v1/integrations/signals` history.
+- [x] Provider-neutral presentation for commit, pull request, issue, CI, release, calendar and generic webhook signal types.
+- [x] ES/EN labels and user-timezone timestamps.
+- [x] Alerts remain the actionable derived-condition layer; Timeline remains audit/change history.
+- [x] Safe sparse-payload fallbacks.
+- [x] External links restricted to valid `http`/`https` normalized URLs.
+- [x] Internal IDs such as `resourceId`, `providerId` and `workspaceId` are not rendered.
+- [x] Private view does not request or render workspace integration activity.
+- [x] Dashboard phase badge updated from Phase 3 to Phase 4.
+- [x] Unit coverage for normalized presentation, localization, fallbacks and unsafe-link rejection.
+- [x] General Docker smoke strengthened to seed one durable normalized CI signal and verify ES/EN workspace rendering plus private-scope non-leakage.
+- [x] ES/EN architecture/operations documentation.
+- [ ] Final-head nine-gate validation.
+- [ ] Merge PR #29 and validate resulting `main`.
+
+**Slice 5g: VALIDATION IN PROGRESS / VALIDACIÓN EN CURSO.**
 
 ### Deferred / Diferido
 
 - [ ] Customer-configurable rule editor.
 - [ ] Stale PR/issue policy rules.
-- [ ] Localized/configurable rule presentation in UI.
+- [ ] Integration administration/credential UI.
 - [ ] GitHub App/OAuth authorization and automatic webhook registration after the token-backed adapter boundary is fully proven.
 
 ## Security and correctness invariants
@@ -193,19 +211,22 @@ Implemented on the active draft PR:
 20. Lifecycle auto-resolution never overrides `dismissed`.
 21. A manually resolved alert reopens only for a provider event whose `occurredAt` is later than `resolvedAt`.
 22. Resolve/reopen lifecycle changes are transactional with their audit outbox events.
+23. Integration activity is workspace-only and read-only; private views do not consume workspace signals.
+24. Integration activity renders descriptive normalized fields only and never exposes provider/resource/workspace internal IDs or credentials.
+25. Integration activity external links are limited to validated `http`/`https` normalized URLs.
 
 ## Next / Siguiente
 
-1. Require all nine checks green on PR #28 final head.
-2. Correct any lifecycle or regression failure directly on this slice; do not open another front while a gate is red.
-3. Merge PR #28 and validate the resulting `main` commit again.
-4. Reassess the remaining Phase 4 boundary from the repository after 5f closes before starting the next isolated slice.
-5. Keep customer rule editing, stale PR/issue policies and GitHub App/OAuth separate from this lifecycle slice.
+1. Require all nine checks green on PR #29 final head, including the strengthened general Docker smoke.
+2. Correct any presentation, isolation or regression failure directly on this slice; do not open another front while a gate is red.
+3. Merge PR #29 and validate the resulting `main` commit again.
+4. Reassess the remaining Phase 4 product boundary from the repository before choosing the next isolated slice.
+5. Keep connection administration, customer rule editing, stale PR/issue policies and GitHub App/OAuth separate from this read-only activity surface.
 6. When commercial publication is scheduled, create the Kairoseth Software catalog entry as **Gestor de Trabajo / Work Manager**.
 
 ## Current blockers / Bloqueos actuales
 
-No known product blocker. PR #28 is in CI validation; the acceptance target is nine green gates including the strengthened background lifecycle smoke.
+No known product blocker. PR #29 is in CI validation; acceptance requires nine green gates and explicit workspace/private integration-activity isolation in Docker.
 
 ## Operating rule
 
