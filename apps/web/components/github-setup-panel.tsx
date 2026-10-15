@@ -1,6 +1,7 @@
 import type {
   GitHubConnectionSummary,
   GitHubRepositorySummary,
+  GitHubWebhookState,
   ProjectSummary,
 } from '../lib/api';
 import type { Locale } from '../lib/i18n';
@@ -46,6 +47,18 @@ const copy = {
     statusUnverified: 'Sin validar',
     statusDisabled: 'Deshabilitada',
     configured: 'Credencial configurada',
+    webhook: 'Webhook',
+    webhookHelp: 'Reduce la latencia de cambios; el polling periódico sigue siendo el respaldo.',
+    webhookConfigured: 'Configurado',
+    webhookNotConfigured: 'Sin configurar',
+    webhookUnavailable: 'No se pudo cargar el estado del webhook.',
+    webhookPath: 'Ruta del payload',
+    webhookProvision: 'Crear webhook',
+    webhookRotate: 'Rotar secreto',
+    webhookDelete: 'Eliminar webhook',
+    webhookNeedsValidation: 'Valida primero la conexión para crear el webhook.',
+    webhookSecretOnce: 'El secreto se mostrará una sola vez después de crear o rotar.',
+    webhookManualHost: 'Usa esta ruta con el host HTTPS público de la API al configurarlo en GitHub.',
   },
   en: {
     title: 'GitHub setup',
@@ -87,6 +100,18 @@ const copy = {
     statusUnverified: 'Unverified',
     statusDisabled: 'Disabled',
     configured: 'Credential configured',
+    webhook: 'Webhook',
+    webhookHelp: 'Reduces update latency; recurring polling remains the fallback.',
+    webhookConfigured: 'Configured',
+    webhookNotConfigured: 'Not configured',
+    webhookUnavailable: 'Webhook state could not be loaded.',
+    webhookPath: 'Payload path',
+    webhookProvision: 'Create webhook',
+    webhookRotate: 'Rotate secret',
+    webhookDelete: 'Remove webhook',
+    webhookNeedsValidation: 'Validate the connection before creating the webhook.',
+    webhookSecretOnce: 'The secret will be shown once after creating or rotating.',
+    webhookManualHost: 'Use this path with the public HTTPS API host when configuring GitHub.',
   },
 } as const;
 
@@ -113,11 +138,13 @@ export function GitHubSetupPanel({
   projects,
   connections,
   repositories,
+  webhooks,
 }: {
   locale: Locale;
   projects: ProjectSummary[];
   connections: GitHubConnectionSummary[] | null;
   repositories: GitHubRepositorySummary[] | null;
+  webhooks: Record<string, GitHubWebhookState> | null;
 }) {
   const t = copy[locale];
   const unavailable = connections === null || repositories === null;
@@ -180,6 +207,9 @@ export function GitHubSetupPanel({
           <div className="github-setup-list">
             {connections.map((connection) => {
               const inUse = usedConnectionIds.has(connection.id);
+              const webhookState = webhooks?.[connection.id] ?? { state: 'unavailable' as const };
+              const canProvisionWebhook =
+                connection.status === 'active' && Boolean(connection.lastValidatedAt);
               return (
                 <div className="github-setup-card github-connection-card" key={connection.id}>
                   <div className="github-setup-card-copy">
@@ -195,6 +225,72 @@ export function GitHubSetupPanel({
                         : t.configured}
                     </span>
                     {connection.lastErrorCode ? <code>{connection.lastErrorCode}</code> : null}
+
+                    <div className="github-webhook-box">
+                      <div className="github-webhook-heading">
+                        <div>
+                          <strong>{t.webhook}</strong>
+                          <span>{t.webhookHelp}</span>
+                        </div>
+                        <span className={`github-webhook-state github-webhook-state-${webhookState.state}`}>
+                          {webhookState.state === 'configured'
+                            ? t.webhookConfigured
+                            : webhookState.state === 'not-configured'
+                              ? t.webhookNotConfigured
+                              : t.webhookUnavailable}
+                        </span>
+                      </div>
+
+                      {webhookState.state === 'configured' ? (
+                        <>
+                          <div className="github-webhook-path">
+                            <span>{t.webhookPath}</span>
+                            <code>{webhookState.webhook.path}</code>
+                            <small>{t.webhookManualHost}</small>
+                          </div>
+                          <div className="github-webhook-actions">
+                            <form action="/api/integrations/github" method="post">
+                              <input type="hidden" name="locale" value={locale} />
+                              <input type="hidden" name="operation" value="webhook-rotate" />
+                              <input type="hidden" name="connectionId" value={connection.id} />
+                              <button className="secondary-button" type="submit">
+                                {t.webhookRotate}
+                              </button>
+                            </form>
+                            <form action="/api/integrations/github" method="post">
+                              <input type="hidden" name="locale" value={locale} />
+                              <input type="hidden" name="operation" value="webhook-delete" />
+                              <input type="hidden" name="connectionId" value={connection.id} />
+                              <button
+                                className="danger-button"
+                                type="submit"
+                                name="confirmation"
+                                value="remove-webhook"
+                              >
+                                {t.webhookDelete}
+                              </button>
+                            </form>
+                          </div>
+                          <span className="github-setup-hint">{t.webhookSecretOnce}</span>
+                        </>
+                      ) : webhookState.state === 'not-configured' ? (
+                        <div className="github-webhook-actions github-webhook-provision-row">
+                          <form action="/api/integrations/github" method="post">
+                            <input type="hidden" name="locale" value={locale} />
+                            <input type="hidden" name="operation" value="webhook-provision" />
+                            <input type="hidden" name="connectionId" value={connection.id} />
+                            <button className="secondary-button" type="submit" disabled={!canProvisionWebhook}>
+                              {t.webhookProvision}
+                            </button>
+                          </form>
+                          <span className="github-setup-hint">
+                            {canProvisionWebhook ? t.webhookSecretOnce : t.webhookNeedsValidation}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="github-setup-hint">{t.webhookUnavailable}</span>
+                      )}
+                    </div>
                   </div>
                   <div className="github-connection-actions">
                     <form action="/api/integrations/github" method="post">
