@@ -4,12 +4,12 @@ import { buildApp as buildBaseApp } from './app';
 import type { ReadinessCheck } from './app';
 import { registerDecisionCompatibilityGuard } from './decision-compatibility';
 import { registerDecisionLifecycleRoutes } from './decisions';
-import type { DecisionLifecycleStore } from './decision-lifecycle-store';
 import { registerGitHubConnectionRoutes } from './github-connections';
 import type { GitHubConnectionStore } from './github-connection-store';
 import type { GitHubProviderClient } from './github-provider-client';
 import { registerGitHubRepositoryRoutes } from './github-repositories';
 import type { GitHubRepositoryStore } from './github-repository-store';
+import { registerGitHubSignalRoutes } from './github-signals';
 import { registerStandaloneAuthRoutes } from './local-auth';
 import type { LocalLoginProvider } from './local-auth';
 import { registerLocalIdentityRoutes } from './local-identity-routes';
@@ -70,6 +70,19 @@ export function buildApp(options: ApplicationOptions = {}) {
   });
 
   registerGitHubRepositoryRoutes(app, {
+    ...(options.authProvider ? { authProvider: options.authProvider } : {}),
+    ...(options.githubRepositoryStore
+      ? { githubRepositoryStore: options.githubRepositoryStore }
+      : {}),
+    ...(options.githubConnectionStore
+      ? { githubConnectionStore: options.githubConnectionStore }
+      : {}),
+    ...(options.githubProviderClient
+      ? { githubProviderClient: options.githubProviderClient }
+      : {}),
+  });
+
+  registerGitHubSignalRoutes(app, {
     ...(options.authProvider ? { authProvider: options.authProvider } : {}),
     ...(options.githubRepositoryStore
       ? { githubRepositoryStore: options.githubRepositoryStore }
