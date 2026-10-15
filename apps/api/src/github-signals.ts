@@ -126,7 +126,7 @@ export function registerGitHubSignalRoutes(
     if (!coordinates) return reply.code(409).send({ error: 'github_repository_metadata_invalid' });
 
     try {
-      const [pullRequests, issues, workflowRuns] = await Promise.all([
+      const [pullRequests, issues, workflowRuns, releases] = await Promise.all([
         options.githubProviderClient.listPullRequests(
           token,
           coordinates.owner,
@@ -140,6 +140,12 @@ export function registerGitHubSignalRoutes(
           limit,
         ),
         options.githubProviderClient.listWorkflowRuns(
+          token,
+          coordinates.owner,
+          coordinates.repository,
+          limit,
+        ),
+        options.githubProviderClient.listReleases(
           token,
           coordinates.owner,
           coordinates.repository,
@@ -200,9 +206,26 @@ export function registerGitHubSignalRoutes(
             status: workflowRun.status,
             ...(workflowRun.conclusion ? { conclusion: workflowRun.conclusion } : {}),
             event: workflowRun.event,
-            headBranch: workflowRun.headBranch,
+            ...(workflowRun.headBranch ? { headBranch: workflowRun.headBranch } : {}),
             headSha: workflowRun.headSha,
             url: workflowRun.htmlUrl,
+          },
+        })),
+        ...releases.map((release): IntegrationSignal => ({
+          id: `github:release:${release.id}`,
+          source: 'github',
+          type: 'repository.release',
+          workspaceId: scope.workspaceId,
+          occurredAt: release.publishedAt ?? release.createdAt,
+          payload: {
+            ...commonPayload,
+            providerId: release.id,
+            tagName: release.tagName,
+            ...(release.name ? { name: release.name } : {}),
+            draft: release.draft,
+            prerelease: release.prerelease,
+            targetCommitish: release.targetCommitish,
+            url: release.htmlUrl,
           },
         })),
       ];

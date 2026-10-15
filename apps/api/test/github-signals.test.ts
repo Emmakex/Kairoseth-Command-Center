@@ -42,10 +42,7 @@ const resource: ExternalResource = {
   url: 'https://github.com/Emmakex/Kairoseth-Command-Center',
   projectId: 'project-a',
   connectionId: 'connection-1',
-  metadata: {
-    owner: 'Emmakex',
-    repository: 'Kairoseth-Command-Center',
-  },
+  metadata: { owner: 'Emmakex', repository: 'Kairoseth-Command-Center' },
   createdAt: '2026-10-15T05:00:00.000Z',
   updatedAt: '2026-10-15T05:00:00.000Z',
 };
@@ -109,61 +106,62 @@ function connectionStore(onFailure?: (errorCode: string) => void): GitHubConnect
 
 function signalProvider(): GitHubProviderClient {
   return {
-    async validateCredential() {
-      throw new Error('not_used');
-    },
-    async getRepository() {
-      throw new Error('not_used');
-    },
-    async getLatestCommit() {
-      throw new Error('not_used');
-    },
+    async validateCredential() { throw new Error('not_used'); },
+    async getRepository() { throw new Error('not_used'); },
+    async getLatestCommit() { throw new Error('not_used'); },
     async listPullRequests(token, owner, repository, limit) {
       expect(token).toBe('fixture-provider-token');
       expect({ owner, repository, limit }).toEqual({
         owner: 'Emmakex',
         repository: 'Kairoseth-Command-Center',
-        limit: 3,
+        limit: 4,
       });
-      return [
-        {
-          id: '501',
-          number: 17,
-          title: 'Ship GitHub signals',
-          state: 'closed',
-          draft: false,
-          htmlUrl: 'https://github.com/Emmakex/Kairoseth-Command-Center/pull/17',
-          updatedAt: '2026-10-15T06:00:00Z',
-          mergedAt: '2026-10-15T05:59:00Z',
-        },
-      ];
+      return [{
+        id: '501',
+        number: 17,
+        title: 'Ship GitHub signals',
+        state: 'closed',
+        draft: false,
+        htmlUrl: 'https://github.com/Emmakex/Kairoseth-Command-Center/pull/17',
+        updatedAt: '2026-10-15T06:00:00Z',
+        mergedAt: '2026-10-15T05:59:00Z',
+      }];
     },
     async listIssues() {
-      return [
-        {
-          id: '601',
-          number: 20,
-          title: 'Real issue',
-          state: 'open',
-          htmlUrl: 'https://github.com/Emmakex/Kairoseth-Command-Center/issues/20',
-          updatedAt: '2026-10-15T05:00:00Z',
-        },
-      ];
+      return [{
+        id: '601',
+        number: 20,
+        title: 'Real issue',
+        state: 'open',
+        htmlUrl: 'https://github.com/Emmakex/Kairoseth-Command-Center/issues/20',
+        updatedAt: '2026-10-15T05:00:00Z',
+      }];
     },
     async listWorkflowRuns() {
-      return [
-        {
-          id: '701',
-          name: 'CI',
-          status: 'completed',
-          conclusion: 'success',
-          event: 'push',
-          headBranch: 'main',
-          headSha: 'abc123',
-          htmlUrl: 'https://github.com/Emmakex/Kairoseth-Command-Center/actions/runs/701',
-          updatedAt: '2026-10-15T06:30:00Z',
-        },
-      ];
+      return [{
+        id: '701',
+        name: 'CI',
+        status: 'completed',
+        conclusion: 'success',
+        event: 'push',
+        headBranch: 'main',
+        headSha: 'abc123',
+        htmlUrl: 'https://github.com/Emmakex/Kairoseth-Command-Center/actions/runs/701',
+        updatedAt: '2026-10-15T06:30:00Z',
+      }];
+    },
+    async listReleases() {
+      return [{
+        id: '801',
+        tagName: 'v0.4.0',
+        name: 'Signals v0.4.0',
+        draft: false,
+        prerelease: false,
+        targetCommitish: 'main',
+        htmlUrl: 'https://github.com/Emmakex/Kairoseth-Command-Center/releases/tag/v0.4.0',
+        createdAt: '2026-10-15T06:10:00Z',
+        publishedAt: '2026-10-15T06:20:00Z',
+      }];
     },
   };
 }
@@ -181,7 +179,7 @@ describe('GitHub repository signals API', () => {
 
     const response = await app.inject({
       method: 'GET',
-      url: '/v1/integrations/github/repositories/resource-1/signals?limit=3',
+      url: '/v1/integrations/github/repositories/resource-1/signals?limit=4',
       headers,
     });
 
@@ -200,6 +198,11 @@ describe('GitHub repository signals API', () => {
           repository: 'Emmakex/Kairoseth-Command-Center',
           conclusion: 'success',
         },
+      },
+      {
+        id: 'github:release:801',
+        type: 'repository.release',
+        payload: { tagName: 'v0.4.0', prerelease: false, draft: false },
       },
       {
         id: 'github:pull-request:501',
@@ -224,9 +227,7 @@ describe('GitHub repository signals API', () => {
     const app = buildApp({
       authProvider,
       githubRepositoryStore: repositoryStore(),
-      githubConnectionStore: connectionStore((code) => {
-        failureCode = code;
-      }),
+      githubConnectionStore: connectionStore((code) => { failureCode = code; }),
       githubProviderClient: remote,
     });
 

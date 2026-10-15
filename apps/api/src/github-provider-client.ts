@@ -69,6 +69,18 @@ export type GitHubRemoteWorkflowRun = {
   updatedAt: string;
 };
 
+export type GitHubRemoteRelease = {
+  id: string;
+  tagName: string;
+  name?: string;
+  draft: boolean;
+  prerelease: boolean;
+  targetCommitish: string;
+  htmlUrl: string;
+  createdAt: string;
+  publishedAt?: string;
+};
+
 export interface GitHubProviderClient {
   validateCredential(token: string): Promise<GitHubRemoteAccount>;
   getRepository(token: string, owner: string, repository: string): Promise<GitHubRemoteRepository>;
@@ -96,6 +108,12 @@ export interface GitHubProviderClient {
     repository: string,
     limit: number,
   ): Promise<GitHubRemoteWorkflowRun[]>;
+  listReleases(
+    token: string,
+    owner: string,
+    repository: string,
+    limit: number,
+  ): Promise<GitHubRemoteRelease[]>;
 }
 
 type RequestOptions = {
@@ -224,10 +242,7 @@ export class GitHubRestClient implements GitHubProviderClient {
     owner: string,
     repository: string,
   ): Promise<GitHubRemoteRepository> {
-    const body = await this.requestObject({
-      token,
-      path: repositoryPath(owner, repository),
-    });
+    const body = await this.requestObject({ token, path: repositoryPath(owner, repository) });
     const id = idValue(body.id);
     const fullName = stringValue(body.full_name, 300);
     const defaultBranch = stringValue(body.default_branch, 255);
@@ -372,6 +387,43 @@ export class GitHubRestClient implements GitHubProviderClient {
         headSha,
         htmlUrl,
         updatedAt,
+      };
+    });
+  }
+
+  async listReleases(
+    token: string,
+    owner: string,
+    repository: string,
+    limit: number,
+  ): Promise<GitHubRemoteRelease[]> {
+    const body = await this.requestArray({
+      token,
+      path: `${repositoryPath(owner, repository)}/releases?per_page=${boundedLimit(limit)}`,
+    });
+
+    return body.map((value) => {
+      const item = objectValue(value);
+      const id = idValue(item?.id);
+      const tagName = stringValue(item?.tag_name, 255);
+      const targetCommitish = stringValue(item?.target_commitish, 255);
+      const htmlUrl = stringValue(item?.html_url, 2000);
+      const createdAt = stringValue(item?.created_at, 100);
+      if (!id || !tagName || !targetCommitish || !htmlUrl || !createdAt) {
+        throw new GitHubProviderError('upstream_error', 'github_invalid_release_response');
+      }
+      const name = stringValue(item?.name, 500);
+      const publishedAt = stringValue(item?.published_at, 100);
+      return {
+        id,
+        tagName,
+        ...(name ? { name } : {}),
+        draft: item?.draft === true,
+        prerelease: item?.prerelease === true,
+        targetCommitish,
+        htmlUrl,
+        createdAt,
+        ...(publishedAt ? { publishedAt } : {}),
       };
     });
   }

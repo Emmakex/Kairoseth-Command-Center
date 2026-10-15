@@ -13,6 +13,7 @@ import type {
   GitHubRemoteCommit,
   GitHubRemoteIssue,
   GitHubRemotePullRequest,
+  GitHubRemoteRelease,
   GitHubRemoteRepository,
   GitHubRemoteWorkflowRun,
 } from '../src/github-provider-client';
@@ -185,6 +186,10 @@ class MemoryGitHubProviderClient implements GitHubProviderClient {
   }
 
   async listWorkflowRuns(): Promise<GitHubRemoteWorkflowRun[]> {
+    throw new Error('not_used');
+  }
+
+  async listReleases(): Promise<GitHubRemoteRelease[]> {
     throw new Error('not_used');
   }
 }

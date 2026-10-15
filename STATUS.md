@@ -4,7 +4,7 @@
 **Technical/internal project:** Kairoseth Command Center  
 **Commercial names:** Gestor de Trabajo (ES) / Work Manager (EN)  
 **Category:** Kairoseth Software  
-**Status:** Phase 3 is closed. Phase 4 Slices 1–3 are merged and post-merge validated. PR #18 is the active Slice 4a front: normalized GitHub pull request, issue and CI signals for the dashboard.
+**Status:** Phase 3 is closed. Phase 4 Slices 1–4a are merged and post-merge validated. PR #19 is the active Slice 4b front: normalized GitHub release signals for the dashboard.
 
 ## Naming rule / Regla de naming
 
@@ -113,8 +113,6 @@
 
 ### Slice 4a — normalized dashboard signals (PR #18)
 
-Implemented in the active branch:
-
 - [x] Extend `GitHubProviderClient` with normalized pull request, issue and Actions workflow-run reads.
 - [x] Reuse provider-neutral `IntegrationSignal` rather than introduce GitHub-specific dashboard contracts.
 - [x] Exclude pull requests returned by GitHub's issues endpoint to prevent duplicate signals.
@@ -126,12 +124,31 @@ Implemented in the active branch:
 - [x] Normalize provider 401 and invalidate the affected connection without credential leakage.
 - [x] Tolerate historical workflow runs without `head_branch`.
 - [x] Provider/API tests cover PR/issue/CI normalization, issue deduplication, authorization, ordering and credential redaction.
-- [ ] Final PR #18 CI/type/test/build/security/Docker gates.
+- [x] API Docker image includes the `@kcc/integrations` workspace dependency.
+- [x] PR #18 final head `a06246f1d4844d5baf50b9b5bd210ec2299ae1cb` passed all six CI/release/smoke gates.
+- [x] PR #18 merged as `570bc0154fa167a9f3ee84d3dba93bb406757d9b`.
+- [x] Post-merge `main` started six workflows; all completed with no failure or cancellation.
+
+**Slice 4a: CLOSED / CERRADA.**
+
+### Slice 4b — normalized release signals (PR #19)
+
+Implemented in the active branch:
+
+- [x] Extend `GitHubProviderClient` with normalized release reads.
+- [x] Support published releases, prereleases and drafts.
+- [x] Tolerate nullable release `name` and `published_at` fields.
+- [x] Map GitHub releases to the existing `repository.release` `IntegrationSignal`.
+- [x] Use `published_at` as signal time when available and fall back to `created_at` otherwise.
+- [x] Include release signals in the existing repository signal endpoint and global recent-first ordering.
+- [x] Preserve the same workspace, entitlement, validated-connection and credential-redaction boundaries as Slice 4a.
+- [x] Provider/API tests cover release normalization and draft/null-field behavior.
+- [x] ES/EN integration documentation updated.
+- [ ] Final PR #19 CI/type/test/build/security/Docker gates.
 - [ ] Merge and post-merge validation.
 
 ### Deferred Phase 4 slices
 
-- [ ] Release signals.
 - [ ] Persist normalized signals for dashboard history and offline reads.
 - [ ] Scheduled/retryable sync jobs and rate-limit-aware backoff.
 - [ ] Verified GitHub webhooks.
@@ -161,19 +178,21 @@ Implemented in the active branch:
 19. Credential rotation returns a connection to `unverified` and clears prior validation metadata.
 20. A provider 401 during sync or signal retrieval marks the connection invalid; repo-specific access errors do not silently invalidate it.
 21. Signal consumption is read-only and requires `projects.read`; integration configuration remains restricted to `integrations.manage`.
+22. Release timestamps are provider-derived; `created_at` is used only when `published_at` is absent.
 
 ## Next / Siguiente
 
-1. Finish PR #18 validation and merge only when all final-head gates are green.
+1. Finish PR #19 validation and merge only when all final-head gates are green.
 2. Verify the same gates on `main` after merge.
-3. Add release normalization as a small follow-up slice.
-4. Persist provider-neutral signals before adding background scheduling or verified webhooks.
-5. Add verified webhooks only after polling/manual normalization is stable.
-6. When commercial publication is scheduled, create the Kairoseth Software catalog entry as **Gestor de Trabajo / Work Manager**.
+3. Start the next small slice to persist provider-neutral signals idempotently for dashboard history and offline reads.
+4. Add scheduled refresh/backoff only after persistence is stable.
+5. Add verified webhooks only after polling/manual normalization and persistence are stable.
+6. Add signal-derived alerts and rule automation only after event ingestion is durable.
+7. When commercial publication is scheduled, create the Kairoseth Software catalog entry as **Gestor de Trabajo / Work Manager**.
 
 ## Current blockers / Bloqueos actuales
 
-No known product blocker. PR #18 is the active development front; final CI validation is in progress.
+No known product blocker. PR #19 is the active development front; final CI validation is in progress.
 
 ## Operating rule
 
