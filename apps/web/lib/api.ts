@@ -90,6 +90,34 @@ export type IntegrationSignalSummary = {
   payload: Record<string, unknown>;
 };
 
+export type GitHubConnectionSummary = {
+  id: string;
+  provider: 'github';
+  displayName: string;
+  status: string;
+  credentialConfigured: boolean;
+  lastValidatedAt?: string;
+  remoteAccountId?: string;
+  remoteAccountLabel?: string;
+  lastErrorCode?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type GitHubRepositorySummary = {
+  id: string;
+  provider: 'github';
+  kind: string;
+  externalId: string;
+  displayName: string;
+  url: string;
+  projectId?: string;
+  connectionId?: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type TodayResponse = {
   scope: 'workspace' | 'private';
   range: { start: string; end: string };
@@ -111,6 +139,8 @@ export type MilestonesResponse = { milestones: MilestoneSummary[] };
 export type DecisionsResponse = { decisions: DecisionSummary[] };
 export type TimelineResponse = { events: TimelineEventSummary[] };
 export type IntegrationSignalsResponse = { signals: IntegrationSignalSummary[] };
+export type GitHubConnectionsResponse = { connections: GitHubConnectionSummary[] };
+export type GitHubRepositoriesResponse = { repositories: GitHubRepositorySummary[] };
 
 export function apiBaseUrl(): string {
   return (
@@ -189,4 +219,20 @@ export async function getIntegrationSignals(
     token,
   );
   return response?.signals ?? null;
+}
+
+export async function getGitHubConnections(token: string): Promise<GitHubConnectionSummary[] | null> {
+  const response = await authenticatedGet<GitHubConnectionsResponse>(
+    '/v1/integrations/github/connections',
+    token,
+  );
+  return response?.connections ?? null;
+}
+
+export async function getGitHubRepositories(token: string): Promise<GitHubRepositorySummary[] | null> {
+  const response = await authenticatedGet<GitHubRepositoriesResponse>(
+    '/v1/integrations/github/repositories',
+    token,
+  );
+  return response?.repositories ?? null;
 }

@@ -31,6 +31,7 @@ Esta carpeta es la fuente de verdad para las decisiones de producto, arquitectur
 24. [`19-integration-signal-alert-derivation.md`](19-integration-signal-alert-derivation.md) — provider-neutral operational alert derivation.
 25. [`20-integration-signal-alert-lifecycle.md`](20-integration-signal-alert-lifecycle.md) — automatic resolve/reopen lifecycle for derived alerts.
 26. [`21-integration-activity-surface.md`](21-integration-activity-surface.md) — workspace dashboard surface for normalized integration activity.
+27. [`22-github-setup-ui.md`](22-github-setup-ui.md) — admin-only GitHub connection and repository setup surface.
 
 ## Living documents / Documentos vivos
 
