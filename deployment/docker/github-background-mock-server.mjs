@@ -1,9 +1,15 @@
+import { Buffer } from 'node:buffer';
 import http from 'node:http';
 import process from 'node:process';
 import { URL } from 'node:url';
 
 const port = Number(process.env.PORT ?? '8081');
 const expectedToken = process.env.KCC_GITHUB_MOCK_TOKEN ?? '';
+
+let workflowState = {
+  conclusion: 'failure',
+  updatedAt: '2026-10-15T06:30:00Z',
+};
 
 function send(response, status, payload, headers = {}) {
   response.writeHead(status, {
@@ -13,14 +19,43 @@ function send(response, status, payload, headers = {}) {
   response.end(JSON.stringify(payload));
 }
 
-const server = http.createServer((request, response) => {
+async function readJson(request) {
+  const chunks = [];
+  for await (const chunk of request) chunks.push(chunk);
+  if (chunks.length === 0) return {};
+  return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+}
+
+const server = http.createServer(async (request, response) => {
   const url = new URL(request.url ?? '/', `http://${request.headers.host ?? 'localhost'}`);
-  if (request.method !== 'GET') {
-    send(response, 405, { message: 'method not allowed' });
-    return;
-  }
   if (request.headers.authorization !== `Bearer ${expectedToken}`) {
     send(response, 401, { message: 'bad credentials' });
+    return;
+  }
+
+  if (url.pathname === '/__test__/workflow') {
+    if (request.method !== 'POST') {
+      send(response, 405, { message: 'method not allowed' });
+      return;
+    }
+    try {
+      const body = await readJson(request);
+      const conclusion = typeof body.conclusion === 'string' ? body.conclusion.trim() : '';
+      const updatedAt = typeof body.updatedAt === 'string' ? body.updatedAt.trim() : '';
+      if (!conclusion || !Number.isFinite(Date.parse(updatedAt))) {
+        send(response, 400, { message: 'invalid workflow state' });
+        return;
+      }
+      workflowState = { conclusion, updatedAt };
+      send(response, 200, workflowState);
+    } catch {
+      send(response, 400, { message: 'invalid json' });
+    }
+    return;
+  }
+
+  if (request.method !== 'GET') {
+    send(response, 405, { message: 'method not allowed' });
     return;
   }
 
@@ -43,12 +78,12 @@ const server = http.createServer((request, response) => {
           id: 701,
           name: 'CI',
           status: 'completed',
-          conclusion: 'failure',
+          conclusion: workflowState.conclusion,
           event: 'push',
           head_branch: 'main',
           head_sha: 'abc123',
           html_url: `${base}/actions/runs/701`,
-          updated_at: '2026-10-15T06:30:00Z',
+          updated_at: workflowState.updatedAt,
         },
       ],
     });

@@ -31,7 +31,7 @@ type IntegrationSignalDocument = IntegrationSignal & {
 
 function boundedLimit(value: number | undefined): number {
   if (value === undefined || !Number.isFinite(value)) return 50;
-  return Math.max(1, Math.min(100, Math.floor(value)));
+  return Math.max(1, Math.min(500, Math.floor(value)));
 }
 
 function payloadText(payload: Record<string, unknown>, key: string): string | undefined {

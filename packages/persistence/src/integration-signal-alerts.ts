@@ -1,15 +1,25 @@
 import { randomUUID } from 'node:crypto';
 import { MongoServerError, type ClientSession, type Collection, type Db, type MongoClient } from 'mongodb';
 import type { Alert, Scope } from '@kcc/domain';
-import type { DerivedSignalAlert } from '@kcc/integrations/signal-alert-rules';
+import type {
+  DerivedSignalAlert,
+  DerivedSignalAlertResolution,
+} from '@kcc/integrations/signal-alert-rules';
 import { MongoAuditOutboxStore } from './audit-outbox.js';
 
 type WorkspaceScope = Extract<Scope, { kind: 'workspace' }>;
 
 export type MaterializeSignalAlertResult = {
-  status: 'created' | 'existing';
+  status: 'created' | 'existing' | 'reopened';
   alert: Alert;
 };
+
+function canReopen(existing: Alert, candidate: DerivedSignalAlert): boolean {
+  if (existing.status !== 'resolved' || !existing.resolvedAt) return false;
+  const resolvedAt = Date.parse(existing.resolvedAt);
+  const occurredAt = Date.parse(candidate.occurredAt);
+  return Number.isFinite(resolvedAt) && Number.isFinite(occurredAt) && occurredAt > resolvedAt;
+}
 
 export class MongoIntegrationSignalAlertStore {
   private readonly alerts: Collection<Alert>;
@@ -60,12 +70,54 @@ export class MongoIntegrationSignalAlertStore {
       fingerprint: candidate.fingerprint,
     };
 
-    // Reprocessing an already materialized signal is the common idempotent path.
-    // Avoid opening a creation transaction when the durable alert is already present.
-    // The unique index plus the duplicate-key fallback below still protects concurrent
-    // first materializations that race after this read.
     const existing = await this.alerts.findOne(filter);
-    if (existing) return { status: 'existing', alert: existing };
+    if (existing) {
+      if (!canReopen(existing, candidate)) return { status: 'existing', alert: existing };
+
+      return this.transaction(async (session) => {
+        const now = new Date().toISOString();
+        const update = await this.alerts.updateOne(
+          { ...filter, status: 'resolved', updatedAt: existing.updatedAt },
+          {
+            $set: {
+              status: 'open',
+              title: candidate.title,
+              severity: candidate.severity,
+              updatedAt: now,
+            },
+            $unset: { acknowledgedAt: '', resolvedAt: '' },
+          },
+          { session },
+        );
+        if (update.matchedCount === 0) {
+          const current = await this.alerts.findOne(filter, { session });
+          if (!current) throw new Error('integration_signal_alert_reopen_lost');
+          return { status: 'existing', alert: current };
+        }
+
+        const reopened = await this.alerts.findOne(filter, { session });
+        if (!reopened) throw new Error('integration_signal_alert_reopen_failed');
+        await this.outbox.enqueue(
+          {
+            scope,
+            type: 'alert.reopened',
+            entityType: 'alert',
+            entityId: reopened.id,
+            summary: reopened.title,
+            source: 'integration-rules',
+            metadata: {
+              ruleId: candidate.ruleId,
+              signalId: candidate.signalId,
+              signalType: candidate.signalType,
+              severity: candidate.severity,
+              occurredAt: candidate.occurredAt,
+            },
+          },
+          session,
+        );
+        return { status: 'reopened', alert: reopened };
+      });
+    }
 
     const now = new Date().toISOString();
     const alert: Alert = {
@@ -119,5 +171,75 @@ export class MongoIntegrationSignalAlertStore {
       }
       throw error;
     }
+  }
+
+  async resolve(
+    workspaceId: string,
+    resolutions: DerivedSignalAlertResolution[],
+  ): Promise<number> {
+    if (resolutions.length === 0) return 0;
+    const scope: WorkspaceScope = { kind: 'workspace', workspaceId };
+    const byFingerprint = new Map(resolutions.map((resolution) => [resolution.fingerprint, resolution]));
+
+    return this.transaction(async (session) => {
+      const candidates = await this.alerts
+        .find(
+          {
+            'scope.kind': 'workspace',
+            'scope.workspaceId': workspaceId,
+            fingerprint: { $in: [...byFingerprint.keys()] },
+            status: { $in: ['open', 'acknowledged'] },
+          },
+          { session },
+        )
+        .toArray();
+      if (candidates.length === 0) return 0;
+
+      let resolved = 0;
+      for (const alert of candidates) {
+        if (!alert.fingerprint) continue;
+        const resolution = byFingerprint.get(alert.fingerprint);
+        if (!resolution) continue;
+        const now = new Date().toISOString();
+        const update = await this.alerts.updateOne(
+          {
+            id: alert.id,
+            'scope.kind': 'workspace',
+            'scope.workspaceId': workspaceId,
+            status: alert.status,
+            updatedAt: alert.updatedAt,
+          },
+          {
+            $set: {
+              status: 'resolved',
+              resolvedAt: resolution.occurredAt,
+              updatedAt: now,
+            },
+          },
+          { session },
+        );
+        if (update.matchedCount === 0) continue;
+
+        await this.outbox.enqueue(
+          {
+            scope,
+            type: 'alert.auto_resolved',
+            entityType: 'alert',
+            entityId: alert.id,
+            summary: `${alert.title}: resolved`,
+            source: 'integration-rules',
+            metadata: {
+              ruleId: resolution.ruleId,
+              causeSignalId: resolution.causeSignalId,
+              signalType: resolution.signalType,
+              occurredAt: resolution.occurredAt,
+            },
+          },
+          session,
+        );
+        resolved += 1;
+      }
+      return resolved;
+    });
   }
 }

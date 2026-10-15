@@ -1,14 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import type { IntegrationSignal } from '@kcc/integrations';
-import { deriveAlertsFromIntegrationSignal } from '@kcc/integrations/signal-alert-rules';
+import {
+  deriveAlertsFromIntegrationSignal,
+  reconcileAlertsFromIntegrationSignals,
+} from '@kcc/integrations/signal-alert-rules';
 
-function ciSignal(payload: Record<string, unknown>): IntegrationSignal {
+function ciSignal(
+  payload: Record<string, unknown>,
+  options: { id?: string; occurredAt?: string } = {},
+): IntegrationSignal {
   return {
-    id: 'provider:workflow-run:701',
+    id: options.id ?? 'provider:workflow-run:701',
     source: 'provider-x',
     type: 'repository.ci',
     workspaceId: 'workspace-a',
-    occurredAt: '2026-10-15T10:00:00.000Z',
+    occurredAt: options.occurredAt ?? '2026-10-15T10:00:00.000Z',
     payload: {
       resourceId: 'resource-1',
       projectId: 'project-a',
@@ -49,5 +55,73 @@ describe('provider-neutral integration signal alert rules', () => {
       type: 'repository.issue',
     };
     expect(deriveAlertsFromIntegrationSignal(signal)).toEqual([]);
+  });
+
+  it('resolves both possible alert fingerprints when the current CI signal becomes healthy', () => {
+    const signal = ciSignal(
+      { conclusion: 'success' },
+      { occurredAt: '2026-10-15T10:10:00.000Z' },
+    );
+    const result = reconcileAlertsFromIntegrationSignals([signal]);
+
+    expect(result.active).toEqual([]);
+    expect(result.resolve).toEqual([
+      {
+        ruleId: 'repository.ci.failed.v1',
+        fingerprint: 'integration-rule:repository.ci.failed.v1:provider:workflow-run:701',
+        causeSignalId: 'provider:workflow-run:701',
+        signalType: 'repository.ci',
+        occurredAt: '2026-10-15T10:10:00.000Z',
+      },
+      {
+        ruleId: 'repository.ci.action_required.v1',
+        fingerprint: 'integration-rule:repository.ci.action_required.v1:provider:workflow-run:701',
+        causeSignalId: 'provider:workflow-run:701',
+        signalType: 'repository.ci',
+        occurredAt: '2026-10-15T10:10:00.000Z',
+      },
+    ]);
+  });
+
+  it('keeps only the newest unhealthy run active and resolves older alerts in the same CI series', () => {
+    const olderFailure = ciSignal(
+      { conclusion: 'failure' },
+      { id: 'provider:workflow-run:700', occurredAt: '2026-10-15T09:50:00.000Z' },
+    );
+    const newerFailure = ciSignal(
+      { conclusion: 'timed_out' },
+      { id: 'provider:workflow-run:701', occurredAt: '2026-10-15T10:00:00.000Z' },
+    );
+    const result = reconcileAlertsFromIntegrationSignals([olderFailure, newerFailure]);
+
+    expect(result.active).toHaveLength(1);
+    expect(result.active[0]?.fingerprint).toBe(
+      'integration-rule:repository.ci.failed.v1:provider:workflow-run:701',
+    );
+    expect(result.resolve.map((item) => item.fingerprint)).toContain(
+      'integration-rule:repository.ci.failed.v1:provider:workflow-run:700',
+    );
+    expect(result.resolve.map((item) => item.fingerprint)).not.toContain(
+      'integration-rule:repository.ci.failed.v1:provider:workflow-run:701',
+    );
+  });
+
+  it('treats cancelled as lifecycle-neutral so it does not hide the previous decisive failure', () => {
+    const failure = ciSignal(
+      { conclusion: 'failure' },
+      { id: 'provider:workflow-run:700', occurredAt: '2026-10-15T09:50:00.000Z' },
+    );
+    const cancelled = ciSignal(
+      { conclusion: 'cancelled' },
+      { id: 'provider:workflow-run:701', occurredAt: '2026-10-15T10:00:00.000Z' },
+    );
+    const result = reconcileAlertsFromIntegrationSignals([failure, cancelled]);
+
+    expect(result.active.map((item) => item.fingerprint)).toEqual([
+      'integration-rule:repository.ci.failed.v1:provider:workflow-run:700',
+    ]);
+    expect(result.resolve.map((item) => item.fingerprint)).not.toContain(
+      'integration-rule:repository.ci.failed.v1:provider:workflow-run:700',
+    );
   });
 });

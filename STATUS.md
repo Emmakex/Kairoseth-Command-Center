@@ -4,7 +4,7 @@
 **Technical/internal project:** Kairoseth Command Center  
 **Commercial names:** Gestor de Trabajo (ES) / Work Manager (EN)  
 **Category:** Kairoseth Software  
-**Status:** Phase 3 is closed. Phase 4 Slices 1–5c are merged and post-merge validated. Slice 5d — verified GitHub webhooks — is active in PR #26.
+**Status:** Phase 3 is closed. Phase 4 Slices 1–5e are merged. Slice 5f — derived alert lifecycle — is active in PR #28.
 
 ## Naming rule / Regla de naming
 
@@ -32,17 +32,11 @@
 ### Phase 3 — Operational product
 - [x] Projects, Tasks, Alerts, Decisions and Timeline foundations.
 - [x] Scoped MongoDB persistence and server-derived workspace/private boundaries.
-- [x] Quick Capture and operational mutations.
-- [x] Weighted Milestones with project progress recalculation.
-- [x] Standalone login/bootstrap and authenticated Today dashboard.
-- [x] ES/EN operational UI.
-- [x] Milestone management and Decision Log UI.
-- [x] Scoped Timeline/audit UI.
-- [x] Validated Decision create/supersede/reverse lifecycle.
-- [x] Transactional audit outbox, idempotent Timeline delivery and worker processing.
+- [x] Quick Capture, Milestones, project progress and Decision lifecycle.
+- [x] Standalone login/bootstrap, ES/EN Today dashboard and operational UI.
+- [x] Scoped Timeline/audit UI and transactional audit outbox.
 - [x] Persistent standalone multi-user identities and password lifecycle.
-- [x] Production-oriented standalone Docker profile.
-- [x] Backup + SHA-256 + guarded restore tooling.
+- [x] Production-oriented standalone Docker profile, backup and guarded restore tooling.
 - [x] PR #13 merged and post-merge validated.
 - [x] PR #14 merged as `c3d95397559ae0a6987601a5529bd502059fb270` and post-merge validated.
 
@@ -51,209 +45,168 @@
 ## Phase 4 — GitHub integration
 
 ### Slice 1 — normalized repository links (PR #15)
-
-- [x] Normalized `IntegrationConnection` / `ExternalResource` domain contracts.
-- [x] Workspace-scoped GitHub repository links stored as `ExternalResource`.
-- [x] Canonical case-insensitive `owner/repository` external identity.
-- [x] Server-built GitHub deep link; arbitrary client URLs are not persisted.
-- [x] Same-workspace project validation.
-- [x] `integrations.manage` + `command-center` entitlement enforcement.
-- [x] Transactional link/unlink + audit outbox.
-- [x] Dedicated GitHub repository-links Docker smoke.
-- [x] PR #15 merged as `2c1219f4e0f6b7d568a1c0edb56026c1915ec121` and validated.
+- [x] Workspace-scoped GitHub repository links as normalized `ExternalResource`.
+- [x] Canonical repository identity, server-built deep links and project validation.
+- [x] Capability/entitlement enforcement and transactional audit.
+- [x] Dedicated repository-links Docker smoke.
+- [x] Merged as `2c1219f4e0f6b7d568a1c0edb56026c1915ec121` and validated.
 
 **Slice 1: CLOSED / CERRADA.**
 
 ### Slice 2 — encrypted GitHub connections (PR #16)
-
-- [x] AES-256-GCM encrypted provider credential vault with workspace/ref AAD.
-- [x] Create/list/rotate/delete GitHub connection API with redacted responses.
-- [x] Missing vault key fails closed for credential-backed actions.
-- [x] Transactional credential lifecycle and audit delivery.
-- [x] PR #16 merged as `79053390c192c3b906847e2dab735ecf91d51531` and post-merge validated.
+- [x] AES-256-GCM provider credential vault with workspace/ref AAD.
+- [x] Create/list/rotate/delete API with redacted responses and fail-closed runtime configuration.
+- [x] Merged as `79053390c192c3b906847e2dab735ecf91d51531` and validated.
 
 **Slice 2: CLOSED / CERRADA.**
 
 ### Slice 3 — live validation + manual repository sync (PR #17)
-
-- [x] Trusted GitHub provider base URL and normalized provider client/errors.
-- [x] Provider credential validation with `unverified → active` lifecycle.
-- [x] Validated repository binding and manual repository sync.
-- [x] Normalized repository/default-branch/latest-commit snapshot.
-- [x] Strict GitHub HTTP mock and dedicated live validation/sync Docker smoke.
-- [x] PR #17 merged as `2e9062b373bcef4ffea407eecfe7863c1b5336f4` and post-merge validated.
+- [x] Trusted provider client/error normalization and credential validation lifecycle.
+- [x] Validated repository binding and manual sync.
+- [x] Strict GitHub HTTP mock + live validation/sync Docker smoke.
+- [x] Merged as `2e9062b373bcef4ffea407eecfe7863c1b5336f4` and validated.
 
 **Slice 3: CLOSED / CERRADA.**
 
 ### Slice 4a — normalized dashboard signals (PR #18)
-
-- [x] Normalize pull requests, issues and Actions workflow runs into provider-neutral `IntegrationSignal`.
-- [x] Exclude PRs returned by GitHub's issues endpoint to prevent duplicate signals.
-- [x] `GET /v1/integrations/github/repositories/:resourceId/signals?limit=20`.
-- [x] Require `projects.read` + `command-center` entitlement.
-- [x] Derive workspace, repository coordinates and encrypted credential server-side.
-- [x] Sort signals by provider activity and tolerate historical workflow runs without a branch.
-- [x] PR #18 merged as `570bc0154fa167a9f3ee84d3dba93bb406757d9b` and post-merge validated.
+- [x] Provider-neutral PR/issue/CI signals with authenticated workspace isolation.
+- [x] Merged as `570bc0154fa167a9f3ee84d3dba93bb406757d9b` and validated.
 
 **Slice 4a: CLOSED / CERRADA.**
 
 ### Slice 4b — normalized release signals (PR #19)
-
-- [x] Normalize published releases, prereleases and drafts.
-- [x] Tolerate nullable release `name` and `published_at`.
-- [x] Map releases to `repository.release` with provider-derived timestamps.
-- [x] PR #19 merged as `4a6619f84c55b67aa211014a46b85062d739fbae` and post-merge validated.
+- [x] Published/draft/prerelease normalization with provider-derived timestamps.
+- [x] Merged as `4a6619f84c55b67aa211014a46b85062d739fbae` and validated.
 
 **Slice 4b: CLOSED / CERRADA.**
 
 ### Slice 4c — durable provider-neutral signal history (PR #20)
-
-- [x] Mongo `integration_signals` store using provider-neutral `IntegrationSignal`.
-- [x] Idempotent `{ workspaceId, id }` upserts with batch de-duplication.
-- [x] Indexed internal `resourceId` / `projectId` fields and durable ingestion timestamps.
-- [x] Reject cross-workspace writes and invalid signal IDs/timestamps.
-- [x] Persist the complete normalized GitHub signal set after successful live refresh.
-- [x] Provider-neutral `GET /v1/integrations/signals` history endpoint.
-- [x] Resource/project/type filters with authenticated workspace isolation.
-- [x] Runtime index bootstrap and worker Docker dependency graph updated.
-- [x] API coverage for durable refresh, filters, isolation and authorization.
-- [x] PR #20 merged as `7b38bcf105a766ad39e697e181a634a0321c60ad` and post-merge validated.
+- [x] Mongo `integration_signals` store with workspace-scoped idempotent upserts.
+- [x] Durable resource/project/type history endpoint and isolation tests.
+- [x] Merged as `7b38bcf105a766ad39e697e181a634a0321c60ad` and validated.
 
 **Slice 4c: CLOSED / CERRADA.**
 
 ### Slice 5a — durable integration sync job queue (PR #21)
-
-- [x] Provider-neutral Mongo `integration_sync_jobs` queue.
-- [x] Durable `pending → processing → completed/retry/dead` lifecycle.
-- [x] Workspace-scoped active-job dedupe boundary.
-- [x] Atomic due-job claim with claim token and bounded lease.
-- [x] Claim-token ownership for complete/retry transitions.
-- [x] Bounded exponential retry/backoff and hard attempt ceiling.
-- [x] Expired processing lease recovery.
-- [x] Unit coverage and ES/EN queue architecture documentation.
-- [x] PR #21 merged as `5a0b15e31257b42777e7da4d32a79fc33dab0f27`.
+- [x] Provider-neutral durable queue with dedupe, leases, retries and dead-letter ceiling.
+- [x] Merged as `5a0b15e31257b42777e7da4d32a79fc33dab0f27`.
 
 **Slice 5a: CLOSED / CERRADA.**
 
 ### Slice 5b — credential-backed worker execution (PRs #22–#24)
-
-- [x] GitHub repository-signal jobs are claimed and executed by the worker.
-- [x] Repository → validated connection → encrypted credential is resolved server-side.
-- [x] Provider credentials never enter durable jobs.
-- [x] Normalized PR/issue/workflow/release signals are persisted idempotently.
-- [x] Unauthorized credentials invalidate the connection; terminal/retryable provider failures are separated.
-- [x] Dedicated worker/background Docker smoke validates the real queue → worker → provider → signal path.
-- [x] Worker runtime/configuration and Docker networking gaps exposed after PR #22 were repaired in PR #23.
-- [x] API and worker share the same GitHub provider fetch + normalization executor after PR #24.
-- [x] PR #23 merged as `156b0e86931b70cab090abe7e8b9b9090e4658e7` with all seven gates green.
-- [x] PR #24 merged as `ed1542f1e3402a0d5b3b6a09b740c83df94226ce` with all seven gates green.
+- [x] Worker resolves provider credentials server-side and persists normalized signals.
+- [x] Retryable/terminal provider failures separated; invalid credentials invalidate connections.
+- [x] Queue → worker → provider → signal Docker acceptance path.
+- [x] PR #23 merged as `156b0e86931b70cab090abe7e8b9b9090e4658e7`.
+- [x] PR #24 merged as `ed1542f1e3402a0d5b3b6a09b740c83df94226ce`.
 
 **Slice 5b: CLOSED / CERRADA.**
 
-### Slice 5c — durable recurring GitHub refresh schedules (PR #25)
-
-- [x] Provider-neutral `integration_sync_schedules` persistence with bounded cadence and leases.
-- [x] Tenant-safe discovery requiring a same-workspace active validated GitHub connection.
-- [x] One recurring `repository_signals` schedule per eligible GitHub repository.
-- [x] Default GitHub cadence of 15 minutes.
-- [x] Newly discovered schedules start after the first cadence instead of racing the initial/manual refresh.
-- [x] Existing schedule discovery preserves `nextRunAt` and active claims.
-- [x] Due schedule claim → deduplicated durable job enqueue → next-run advancement.
-- [x] Expired schedule lease recovery and bounded enqueue retry.
-- [x] GitHub rate-limit timing from provider retry headers is persisted into durable job retry availability.
-- [x] Dedicated recurring-refresh Docker smoke covers schedule → job → worker → signals → next run.
-- [x] Existing background-refresh smoke remains compatible with recurring scheduling.
-- [x] No provider token is persisted in schedule/job operational records.
-- [x] ES/EN recurring scheduling and recovery documentation.
-- [x] PR #25 final head validated with all eight gates green.
-- [x] PR #25 squash-merged as `715f441b8c4a69de3e1b9fd442c241798ec56302`.
-- [x] Resulting `main` commit post-merge validated with all eight workflows green.
+### Slice 5c — recurring GitHub refresh schedules (PR #25)
+- [x] Durable schedules, cadence, leases, due-job enqueue and retry recovery.
+- [x] Default 15-minute reconciliation cadence with no immediate duplicate refresh on discovery.
+- [x] Dedicated recurring-refresh smoke.
+- [x] Squash-merged as `715f441b8c4a69de3e1b9fd442c241798ec56302`; resulting `main` validated with eight workflows green.
 
 **Slice 5c: CLOSED / CERRADA.**
 
+### Slice 5d — verified GitHub webhooks (PR #26)
+- [x] Opaque connection-scoped webhook endpoints and independent encrypted HMAC secret.
+- [x] Raw-body HMAC-SHA256 verification, constant-time comparison and strict headers.
+- [x] Durable delivery replay protection and tenant/connection-scoped repository resolution.
+- [x] Webhook events enqueue authoritative provider refresh; payloads never become signal truth directly.
+- [x] Recurring polling remains reconciliation/fallback.
+- [x] Provision/read/rotate/delete management lifecycle and transactional audit.
+- [x] Dedicated webhook Docker smoke and ninth CI gate.
+- [x] PR #26 merged as `e51474854276d6ec73306be8c80f1b7450d583fa`.
+
+**Slice 5d: CLOSED / CERRADA.**
+
+### Slice 5e — provider-neutral derived alerts (PR #27)
+- [x] Provider-neutral rules consume normalized `IntegrationSignal`, not raw GitHub payloads.
+- [x] `repository.ci.failed.v1` derives `urgent` alerts for failure/timed_out/startup_failure.
+- [x] `repository.ci.action_required.v1` derives `warning` alerts for action_required.
+- [x] Deterministic versioned fingerprints and Mongo uniqueness guarantee idempotency.
+- [x] First materialization emits transactional `alert.derived` audit work.
+- [x] Repeated polling/webhook convergence does not duplicate alerts or Timeline events.
+- [x] Background smoke processes the same failed CI signal set twice and proves one alert + one audit event.
+- [x] Queue completion bug exposed by repeat processing fixed by migrating active-job dedupe from compound sparse to unique partial index.
+- [x] Final PR head validated with all nine gates green.
+- [x] PR #27 squash-merged as `e0b2e8d3454ddbfa1865ddc2031a0ae405220f66`.
+
+**Slice 5e: CLOSED / CERRADA.**
+
 ## Active / Activo
 
-### Slice 5d — verified GitHub webhooks (PR #26)
+### Slice 5f — derived alert lifecycle (PR #28)
 
-Implemented on the active PR:
+Implemented on the active draft PR:
 
-- [x] Opaque connection-scoped webhook endpoints.
-- [x] HMAC secret independent from the GitHub provider token and encrypted in the existing AES-256-GCM integration vault.
-- [x] Exact raw-body HMAC-SHA256 verification with constant-time comparison.
-- [x] Strict signature, delivery ID and event header validation.
-- [x] Durable `endpointId + deliveryId` replay claims with TTL retention.
-- [x] Active/validated backing connection required at receive time.
-- [x] Tenant + connection scoped repository resolution after signature verification.
-- [x] Relevant webhook events enqueue the existing durable `repository_signals` job instead of trusting payload state.
-- [x] Recurring 15-minute polling remains reconciliation/fallback.
-- [x] Provision/read/rotate/delete management API; plaintext webhook secret returned only on provision/rotation.
-- [x] Existing webhook can still be read/rotated/deleted while the provider credential is temporarily invalid.
-- [x] Enqueue failure releases the replay claim so a genuine GitHub retry can be processed.
-- [x] Transactional audit outbox events for webhook configure/secret rotation/delete without secret material.
-- [x] API coverage for provisioning, signature verification, replay, event filtering, tenant binding and enqueue failure recovery.
-- [x] Dedicated Docker smoke and ninth CI gate for `delivery → HMAC → replay → queue → worker → normalized signals`.
-- [x] ES/EN security and operations documentation.
+- [x] Existing v1 fingerprints remain unchanged; no fingerprint migration.
+- [x] CI lifecycle reconciliation groups durable signals by resource/workflow/branch.
+- [x] Latest decisive `failure`/`timed_out`/`startup_failure` keeps one `urgent` condition active.
+- [x] `action_required` keeps one `warning` condition active.
+- [x] `success` marks the CI series healthy and resolves older derived alerts.
+- [x] `cancelled` and unknown/non-conclusive states remain lifecycle-neutral.
+- [x] Worker reconciles against durable CI history after signal persistence.
+- [x] Auto-resolution only mutates `open`/`acknowledged`; `dismissed` remains a human decision.
+- [x] `resolvedAt` uses provider signal `occurredAt` for deterministic event ordering.
+- [x] Resolved alerts reopen only when the provider signal is genuinely later than `resolvedAt`.
+- [x] Reopen preserves the same alert ID and fingerprint.
+- [x] Transactional `alert.auto_resolved` and `alert.reopened` audit events.
+- [x] Unit coverage for recovery, newest unhealthy state and lifecycle-neutral cancellation.
+- [x] Background smoke expanded to `failure → repeated failure → success → later failure` on workflow `701`.
+- [x] ES/EN lifecycle architecture/operations documentation.
 - [ ] Final-head nine-gate validation.
-- [ ] Merge PR #26 and validate `main` post-merge.
+- [ ] Merge PR #28 and validate resulting `main`.
 
-**Slice 5d: VALIDATION IN PROGRESS / VALIDACIÓN EN CURSO.**
+**Slice 5f: VALIDATION IN PROGRESS / VALIDACIÓN EN CURSO.**
 
-### Deferred Phase 4 slices
+### Deferred / Diferido
 
-- [ ] GitHub-derived alerts and rule automation.
-- [ ] OAuth/GitHub App authorization and automatic webhook registration after the token-backed adapter boundary is proven.
+- [ ] Customer-configurable rule editor.
+- [ ] Stale PR/issue policy rules.
+- [ ] Localized/configurable rule presentation in UI.
+- [ ] GitHub App/OAuth authorization and automatic webhook registration after the token-backed adapter boundary is fully proven.
 
-## Security invariants
+## Security and correctness invariants
 
-1. Workspace/private scope is derived from authenticated/server-controlled context, never authorized by raw client tenant/user IDs.
+1. Workspace/private scope is derived from authenticated/server-controlled context, never raw client tenant/user IDs.
 2. Product entitlement and capability checks are server-enforced.
 3. MongoDB queries include the applicable scope boundary.
 4. Timeline/audit events are server-authored and delivered idempotently through the transactional outbox.
 5. Standalone passwords and provider credentials are never persisted in plaintext.
-6. Runtime `.env` files are excluded from Docker build contexts.
-7. Integration administration requires `integrations.manage`.
-8. GitHub repository links and connections are workspace-only.
-9. Raw external IDs, repository names or client-supplied URLs never grant cross-workspace access.
-10. Integration ciphertext is AES-256-GCM authenticated against workspace + secret reference.
-11. The integration master key is runtime-only and stored separately from database backups.
-12. Missing vault configuration disables credential-backed actions rather than weakening encryption.
-13. Public API responses never expose provider token, `secretRef`, ciphertext, IV or auth tag.
-14. GitHub provider base URL is deployment configuration, never HTTP request input.
-15. Validation, sync and signal reads derive credentials and repository coordinates server-side.
-16. Provider responses are normalized before persistence or client exposure.
-17. Provider errors are reduced to stable error categories; raw provider bodies are not returned.
-18. Durable signal identity is workspace-scoped; repeated provider refreshes upsert rather than duplicate.
-19. Persisted history queries always include the authenticated workspace boundary.
-20. Sync jobs never contain provider credentials or raw provider response bodies.
-21. Active jobs are workspace-scoped and deduplicated by a server-generated semantic key.
-22. Processing ownership is enforced with claim tokens and bounded leases.
-23. Expired worker claims are recovered before future execution.
-24. The worker claims only the GitHub job kind it can execute and resolves credentials server-side at execution time.
-25. Recurring discovery requires the repository and active validated connection to belong to the same workspace.
-26. Recurring schedules contain operational identifiers and cadence only, never provider credentials.
-27. Schedule ownership is protected by bounded claim leases; recurring enqueue is deduplicated by schedule + due timestamp.
-28. Initial discovery does not immediately enqueue a second refresh; recurrence starts after its configured cadence.
-29. GitHub webhook HMAC secrets are distinct from provider credentials and use the encrypted integration vault.
-30. HMAC verification operates on the exact raw request bytes before JSON parsing.
-31. Webhook delivery IDs are durably replay-protected before any provider refresh is enqueued.
-32. Webhook repository lookup is constrained by endpoint workspace + connection; payload repository names never grant access.
-33. Webhook payloads do not become persisted signal truth; accepted events enqueue an authoritative provider refresh.
-34. External webhook ingestion fails closed when the backing GitHub connection is not active and validated.
-35. Webhook configuration audit records never contain HMAC secrets, secret references or provider tokens.
+6. Integration administration requires `integrations.manage`.
+7. GitHub repository links and connections are workspace-only.
+8. Provider credentials never enter durable sync jobs, schedules, signals, alerts or audit events.
+9. External IDs, repository names and URLs never grant cross-workspace access.
+10. Provider responses are normalized before persistence or client exposure.
+11. Durable signal identity is workspace-scoped and idempotent.
+12. Sync jobs use server-generated semantic dedupe, claim tokens and bounded leases.
+13. Recurring discovery requires same-workspace active validated connection and repository binding.
+14. Webhook HMAC secrets are independent from provider credentials and encrypted at rest.
+15. Webhook verification uses exact raw bytes before JSON parsing and durable delivery replay protection.
+16. Webhook payloads enqueue authoritative provider refresh; they do not become persisted signal truth directly.
+17. Derived alert rules consume normalized durable signals and are provider-neutral.
+18. Derived alerts are unique by workspace + deterministic fingerprint.
+19. `alert.derived` is first-materialization-only.
+20. Lifecycle auto-resolution never overrides `dismissed`.
+21. A manually resolved alert reopens only for a provider event whose `occurredAt` is later than `resolvedAt`.
+22. Resolve/reopen lifecycle changes are transactional with their audit outbox events.
 
 ## Next / Siguiente
 
-1. Require all nine checks green on PR #26 final head, then merge and validate `main`.
-2. Keep recurring polling active after webhooks merge as reconciliation/fallback.
-3. Start the next isolated slice for GitHub-derived alerts and rule automation.
-4. Define provider-neutral rule inputs from durable `IntegrationSignal` history rather than GitHub-specific payloads.
-5. Keep GitHub App/OAuth and automatic webhook registration separate from the current token-backed adapter proof.
+1. Require all nine checks green on PR #28 final head.
+2. Correct any lifecycle or regression failure directly on this slice; do not open another front while a gate is red.
+3. Merge PR #28 and validate the resulting `main` commit again.
+4. Reassess the remaining Phase 4 boundary from the repository after 5f closes before starting the next isolated slice.
+5. Keep customer rule editing, stale PR/issue policies and GitHub App/OAuth separate from this lifecycle slice.
 6. When commercial publication is scheduled, create the Kairoseth Software catalog entry as **Gestor de Trabajo / Work Manager**.
 
 ## Current blockers / Bloqueos actuales
 
-No known product blocker. PR #26 is in CI validation; the active goal is nine green gates including the new verified-webhook Docker smoke.
+No known product blocker. PR #28 is in CI validation; the acceptance target is nine green gates including the strengthened background lifecycle smoke.
 
 ## Operating rule
 
-Update this file at meaningful milestones. Keep Phase 4 slices small; do not mix recurring scheduling, webhooks and automation rules in one PR.
+Update this file at meaningful milestones. Keep Phase 4 slices small and independently releasable; never mix unrelated provider/auth/rule fronts into a red validation boundary.
