@@ -93,13 +93,39 @@ export class MongoIntegrationSyncJobStore implements IntegrationSyncJobStore {
     this.jobs = db.collection<IntegrationSyncJob>('integration_sync_jobs');
   }
 
+  private async ensureActiveDedupeIndex(): Promise<void> {
+    const indexes = await this.jobs.listIndexes().toArray();
+    const existing = indexes.find(
+      (index) => index.key?.workspaceId === 1 && index.key?.activeDedupeKey === 1,
+    );
+    const partial = existing?.partialFilterExpression as
+      | { activeDedupeKey?: { $type?: string } }
+      | undefined;
+
+    if (
+      existing?.unique === true &&
+      existing.sparse !== true &&
+      partial?.activeDedupeKey?.$type === 'string'
+    ) {
+      return;
+    }
+
+    if (existing?.name) await this.jobs.dropIndex(existing.name);
+
+    await this.jobs.createIndex(
+      { workspaceId: 1, activeDedupeKey: 1 },
+      {
+        unique: true,
+        partialFilterExpression: { activeDedupeKey: { $type: 'string' } },
+      },
+    );
+  }
+
   async ensureIndexes(): Promise<void> {
+    // Create the collection before inspecting/migrating the legacy sparse dedupe index.
+    await this.jobs.createIndex({ id: 1 }, { unique: true });
+    await this.ensureActiveDedupeIndex();
     await Promise.all([
-      this.jobs.createIndex({ id: 1 }, { unique: true }),
-      this.jobs.createIndex(
-        { workspaceId: 1, activeDedupeKey: 1 },
-        { unique: true, sparse: true },
-      ),
       this.jobs.createIndex({ status: 1, provider: 1, kind: 1, availableAt: 1, createdAt: 1 }),
       this.jobs.createIndex({ status: 1, leaseExpiresAt: 1 }),
       this.jobs.createIndex({ workspaceId: 1, resourceId: 1, updatedAt: -1 }),
