@@ -255,7 +255,7 @@ export function GitHubSetupPanel({
                       </a>
                       <span className="github-project-label">
                         {repository.projectId
-                          ? (projectNames.get(repository.projectId) ?? repository.projectId)
+                          ? (projectNames.get(repository.projectId) ?? t.project)
                           : t.project}
                       </span>
                     </div>
