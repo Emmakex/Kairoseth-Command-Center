@@ -26,6 +26,11 @@ export type GitHubSignalRuntimeResolution =
         | 'repository_metadata_invalid';
     };
 
+export type GitHubLinkedRepositoryRef = {
+  workspaceId: string;
+  resourceId: string;
+};
+
 function text(value: unknown, maxLength: number): string | null {
   if (typeof value !== 'string') return null;
   const normalized = value.trim();
@@ -42,6 +47,48 @@ export class MongoGitHubSignalRuntimeStore {
   ) {
     this.resources = db.collection<ExternalResource>('external_resources');
     this.connections = db.collection<IntegrationConnection>('integration_connections');
+  }
+
+  async listLinkedRepositories(limit = 500): Promise<GitHubLinkedRepositoryRef[]> {
+    const safeLimit = Math.min(2_000, Math.max(1, Math.floor(limit)));
+    const [resources, activeConnections] = await Promise.all([
+      this.resources
+        .find({
+          'scope.kind': 'workspace',
+          provider: 'github',
+          kind: 'repository',
+          connectionId: { $exists: true },
+        })
+        .sort({ updatedAt: -1 })
+        .limit(safeLimit)
+        .project<Pick<ExternalResource, 'id' | 'scope' | 'connectionId'>>({ id: 1, scope: 1, connectionId: 1 })
+        .toArray(),
+      this.connections
+        .find({
+          'scope.kind': 'workspace',
+          provider: 'github',
+          status: 'active',
+          lastValidatedAt: { $exists: true },
+        })
+        .project<Pick<IntegrationConnection, 'id' | 'scope'>>({ id: 1, scope: 1 })
+        .toArray(),
+    ]);
+
+    const activeConnectionKeys = new Set(
+      activeConnections.flatMap((connection) =>
+        connection.scope.kind === 'workspace'
+          ? [`${connection.scope.workspaceId}|${connection.id}`]
+          : [],
+      ),
+    );
+
+    return resources.flatMap((resource) => {
+      if (resource.scope.kind !== 'workspace' || !resource.connectionId) return [];
+      const key = `${resource.scope.workspaceId}|${resource.connectionId}`;
+      return activeConnectionKeys.has(key)
+        ? [{ workspaceId: resource.scope.workspaceId, resourceId: resource.id }]
+        : [];
+    });
   }
 
   async resolve(workspaceId: string, resourceId: string): Promise<GitHubSignalRuntimeResolution> {
