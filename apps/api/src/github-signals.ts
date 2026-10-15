@@ -160,7 +160,7 @@ export function registerGitHubSignalRoutes(
           source: 'github',
           type: 'repository.pull_request',
           workspaceId: scope.workspaceId,
-          occurredAt: pullRequest.mergedAt ?? pullRequest.updatedAt,
+          occurredAt: pullRequest.updatedAt,
           payload: {
             ...commonPayload,
             providerId: pullRequest.id,
@@ -177,7 +177,7 @@ export function registerGitHubSignalRoutes(
           source: 'github',
           type: 'repository.issue',
           workspaceId: scope.workspaceId,
-          occurredAt: issue.closedAt ?? issue.updatedAt,
+          occurredAt: issue.updatedAt,
           payload: {
             ...commonPayload,
             providerId: issue.id,
