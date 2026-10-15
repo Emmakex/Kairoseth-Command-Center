@@ -127,8 +127,9 @@ print(db.timeline_events.countDocuments({type:'alert.derived',entityId:'$ALERT_I
 done
 [[ "$DERIVED_AUDIT_COUNT" == "1" ]]
 
+# Durable alert + audit state above are the canonical behavior assertions. Keep logs
+# only for the security invariant that provider credentials must never be emitted.
 WORKER_LOGS="$(${COMPOSE[@]} logs --no-color worker)"
 [[ "$WORKER_LOGS" != *"${KCC_GITHUB_MOCK_TOKEN}"* ]]
-[[ "$WORKER_LOGS" == *'"derivedAlertCount":1'* ]]
 
 echo "GitHub background refresh + derived alert smoke passed"
