@@ -26,17 +26,20 @@ RUN_ID="${KCC_SMOKE_RUN_ID:-local}"
 JOB_ID="background-smoke-${RUN_ID}"
 DEDUPE_KEY="github:repository_signals:${RESOURCE_ID}:background-smoke:${RUN_ID}"
 
-${COMPOSE[@]} exec -T mongo mongosh --quiet kairoseth_command_center --eval "
+insert_job() {
+  local job_id="$1"
+  local dedupe_key="$2"
+  ${COMPOSE[@]} exec -T mongo mongosh --quiet kairoseth_command_center --eval "
 const now = new Date().toISOString();
-db.integration_sync_jobs.deleteOne({id:'$JOB_ID'});
+db.integration_sync_jobs.deleteOne({id:'$job_id'});
 db.integration_sync_jobs.insertOne({
-  id:'$JOB_ID',
+  id:'$job_id',
   workspaceId:'$WORKSPACE_ID',
   provider:'github',
   kind:'repository_signals',
   resourceId:'$RESOURCE_ID',
-  dedupeKey:'$DEDUPE_KEY',
-  activeDedupeKey:'$DEDUPE_KEY',
+  dedupeKey:'$dedupe_key',
+  activeDedupeKey:'$dedupe_key',
   status:'pending',
   attempt:0,
   maxAttempts:8,
@@ -45,25 +48,31 @@ db.integration_sync_jobs.insertOne({
   updatedAt:now
 });
 " >/dev/null
+}
 
-completed=0
-for attempt in {1..60}; do
-  STATUS="$(${COMPOSE[@]} exec -T mongo mongosh --quiet kairoseth_command_center --eval "
-const doc = db.integration_sync_jobs.findOne({id:'$JOB_ID'});
+wait_for_job() {
+  local job_id="$1"
+  for attempt in {1..60}; do
+    local status
+    status="$(${COMPOSE[@]} exec -T mongo mongosh --quiet kairoseth_command_center --eval "
+const doc = db.integration_sync_jobs.findOne({id:'$job_id'});
 print(doc ? doc.status : 'missing');
 ")"
-  STATUS="$(printf '%s' "$STATUS" | tr -d '\r\n')"
-  if [[ "$STATUS" == "completed" ]]; then
-    completed=1
-    break
-  fi
-  if [[ "$STATUS" == "dead" ]]; then
-    ${COMPOSE[@]} logs --no-color worker github-background-mock >&2
-    exit 1
-  fi
-  sleep 1
-done
-[[ "$completed" == "1" ]]
+    status="$(printf '%s' "$status" | tr -d '\r\n')"
+    if [[ "$status" == "completed" ]]; then
+      return 0
+    fi
+    if [[ "$status" == "dead" ]]; then
+      ${COMPOSE[@]} logs --no-color worker github-background-mock >&2
+      return 1
+    fi
+    sleep 1
+  done
+  return 1
+}
+
+insert_job "$JOB_ID" "$DEDUPE_KEY"
+wait_for_job "$JOB_ID"
 
 SIGNAL_IDS="$(${COMPOSE[@]} exec -T mongo mongosh --quiet kairoseth_command_center --eval "
 const docs = db.integration_signals.find({workspaceId:'$WORKSPACE_ID',resourceId:'$RESOURCE_ID'}).toArray();
@@ -78,7 +87,34 @@ for expected in \
   [[ ",$SIGNAL_IDS," == *",$expected,"* ]]
 done
 
+# Process the same provider signal set again under a different queue job. The derived
+# alert must remain one durable record because its fingerprint is rule + signal based.
+REPEAT_JOB_ID="${JOB_ID}-repeat"
+insert_job "$REPEAT_JOB_ID" "${DEDUPE_KEY}:repeat"
+wait_for_job "$REPEAT_JOB_ID"
+
+ALERT_FINGERPRINT="integration-rule:repository.ci.failed.v1:github:workflow-run:701"
+ALERT_DATA="$(${COMPOSE[@]} exec -T mongo mongosh --quiet kairoseth_command_center --eval "
+const docs = db.alerts.find({'scope.kind':'workspace','scope.workspaceId':'$WORKSPACE_ID',fingerprint:'$ALERT_FINGERPRINT'}).toArray();
+if (docs.length !== 1) quit(2);
+const alert = docs[0];
+print([docs.length,alert.id,alert.severity,alert.status].join('|'));
+")"
+ALERT_DATA="$(printf '%s' "$ALERT_DATA" | tr -d '\r\n')"
+IFS='|' read -r ALERT_COUNT ALERT_ID ALERT_SEVERITY ALERT_STATUS <<< "$ALERT_DATA"
+[[ "$ALERT_COUNT" == "1" ]]
+[[ "$ALERT_SEVERITY" == "urgent" ]]
+[[ "$ALERT_STATUS" == "open" ]]
+[[ -n "$ALERT_ID" ]]
+
+DERIVED_AUDIT_COUNT="$(${COMPOSE[@]} exec -T mongo mongosh --quiet kairoseth_command_center --eval "
+print(db.timeline_events.countDocuments({type:'alert.derived',entityId:'$ALERT_ID','scope.workspaceId':'$WORKSPACE_ID'}));
+")"
+DERIVED_AUDIT_COUNT="$(printf '%s' "$DERIVED_AUDIT_COUNT" | tr -d '\r\n')"
+[[ "$DERIVED_AUDIT_COUNT" == "1" ]]
+
 WORKER_LOGS="$(${COMPOSE[@]} logs --no-color worker)"
 [[ "$WORKER_LOGS" != *"${KCC_GITHUB_MOCK_TOKEN}"* ]]
+[[ "$WORKER_LOGS" == *'"derivedAlertCount":1'* ]]
 
-echo "GitHub background refresh smoke passed"
+echo "GitHub background refresh + derived alert smoke passed"
