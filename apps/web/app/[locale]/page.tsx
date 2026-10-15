@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { Card } from '@kcc/ui';
 import { AccountPanel } from '../../components/account-panel';
 import { DecisionPanel } from '../../components/decision-panel';
+import { GitHubSetupPanel } from '../../components/github-setup-panel';
 import { IntegrationActivityPanel } from '../../components/integration-activity-panel';
 import { MemberPanel } from '../../components/member-panel';
 import { MilestonePanel } from '../../components/milestone-panel';
@@ -11,6 +12,8 @@ import { QuickCapturePanel } from '../../components/quick-capture-panel';
 import { TimelinePanel } from '../../components/timeline-panel';
 import {
   getDecisions,
+  getGitHubConnections,
+  getGitHubRepositories,
   getIntegrationSignals,
   getMilestones,
   getProjects,
@@ -47,11 +50,28 @@ export default async function CommandCenterPage({
   const { scope: requestedScope, result } = await searchParams;
   const scope = requestedScope === 'private' ? 'private' : 'workspace';
   const canManageMembers = session.capabilities.includes('members.manage');
-  const [today, projects, milestones, decisions, integrationSignals, timeline, members] = await Promise.all([
+  const canManageIntegrations = session.capabilities.includes('integrations.manage');
+  const [
+    today,
+    projects,
+    milestones,
+    decisions,
+    githubConnections,
+    githubRepositories,
+    integrationSignals,
+    timeline,
+    members,
+  ] = await Promise.all([
     getToday(token, scope),
     getProjects(token, scope),
     getMilestones(token, scope),
     scope === 'workspace' ? getDecisions(token) : Promise.resolve(null),
+    scope === 'workspace' && canManageIntegrations
+      ? getGitHubConnections(token)
+      : Promise.resolve(null),
+    scope === 'workspace' && canManageIntegrations
+      ? getGitHubRepositories(token)
+      : Promise.resolve(null),
     scope === 'workspace' ? getIntegrationSignals(token, 12) : Promise.resolve(null),
     getTimeline(token, scope),
     scope === 'workspace' && canManageMembers ? getLocalMembers(token) : Promise.resolve(null),
@@ -155,6 +175,14 @@ export default async function CommandCenterPage({
             <p className="empty-state">{copy.decisionWorkspaceOnly}</p>
           </article>
         )}
+        {scope === 'workspace' && canManageIntegrations ? (
+          <GitHubSetupPanel
+            locale={locale}
+            projects={projectCatalog}
+            connections={githubConnections}
+            repositories={githubRepositories}
+          />
+        ) : null}
         {scope === 'workspace' ? (
           <IntegrationActivityPanel
             locale={locale}
