@@ -118,6 +118,20 @@ export type GitHubRepositorySummary = {
   updatedAt: string;
 };
 
+export type GitHubWebhookSummary = {
+  id: string;
+  connectionId: string;
+  enabled: boolean;
+  path: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type GitHubWebhookState =
+  | { state: 'configured'; webhook: GitHubWebhookSummary }
+  | { state: 'not-configured' }
+  | { state: 'unavailable' };
+
 export type TodayResponse = {
   scope: 'workspace' | 'private';
   range: { start: string; end: string };
@@ -235,4 +249,36 @@ export async function getGitHubRepositories(token: string): Promise<GitHubReposi
     token,
   );
   return response?.repositories ?? null;
+}
+
+export async function getGitHubWebhookState(
+  token: string,
+  connectionId: string,
+): Promise<GitHubWebhookState> {
+  try {
+    const response = await fetch(
+      `${apiBaseUrl()}/v1/integrations/github/connections/${encodeURIComponent(connectionId)}/webhook`,
+      {
+        headers: { authorization: `Bearer ${token}` },
+        cache: 'no-store',
+        signal: AbortSignal.timeout(6000),
+      },
+    );
+    if (response.status === 404) return { state: 'not-configured' };
+    if (!response.ok) return { state: 'unavailable' };
+    const body = (await response.json()) as { webhook?: GitHubWebhookSummary };
+    const webhook = body.webhook;
+    if (
+      !webhook ||
+      typeof webhook.id !== 'string' ||
+      webhook.connectionId !== connectionId ||
+      typeof webhook.path !== 'string' ||
+      !webhook.path.startsWith('/v1/integrations/github/webhooks/')
+    ) {
+      return { state: 'unavailable' };
+    }
+    return { state: 'configured', webhook };
+  } catch {
+    return { state: 'unavailable' };
+  }
 }
