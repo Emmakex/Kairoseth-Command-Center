@@ -48,6 +48,7 @@ export interface IntegrationSyncJobStore {
   enqueue(input: EnqueueIntegrationSyncJobInput): Promise<IntegrationSyncJob>;
   claimDue(options?: { now?: Date; leaseMs?: number }): Promise<IntegrationSyncJob | null>;
   complete(jobId: string, claimToken: string, now?: Date): Promise<boolean>;
+  fail(jobId: string, claimToken: string, errorCode: string, now?: Date): Promise<boolean>;
   retry(input: RetryIntegrationSyncJobInput): Promise<IntegrationSyncJob | null>;
   requeueExpired(options?: { now?: Date; limit?: number }): Promise<number>;
 }
@@ -142,10 +143,7 @@ export class MongoIntegrationSyncJobStore implements IntegrationSyncJobStore {
     const leaseMs = Math.min(30 * 60_000, Math.max(10_000, Math.floor(options.leaseMs ?? 120_000)));
     const claimToken = randomUUID();
     return this.jobs.findOneAndUpdate(
-      {
-        status: { $in: ['pending', 'retry'] },
-        availableAt: { $lte: iso(now) },
-      },
+      { status: { $in: ['pending', 'retry'] }, availableAt: { $lte: iso(now) } },
       {
         $set: {
           status: 'processing',
@@ -157,10 +155,7 @@ export class MongoIntegrationSyncJobStore implements IntegrationSyncJobStore {
         $inc: { attempt: 1 },
         $unset: { completedAt: '' },
       },
-      {
-        sort: { availableAt: 1, createdAt: 1 },
-        returnDocument: 'after',
-      },
+      { sort: { availableAt: 1, createdAt: 1 }, returnDocument: 'after' },
     );
   }
 
@@ -181,6 +176,32 @@ export class MongoIntegrationSyncJobStore implements IntegrationSyncJobStore {
     return result.modifiedCount === 1;
   }
 
+  async fail(
+    jobId: string,
+    claimToken: string,
+    errorCode: string,
+    now = new Date(),
+  ): Promise<boolean> {
+    const normalizedErrorCode = validText(errorCode, 'error_code', 200);
+    const result = await this.jobs.updateOne(
+      { id: jobId, status: 'processing', claimToken },
+      {
+        $set: {
+          status: 'dead',
+          lastErrorCode: normalizedErrorCode,
+          updatedAt: iso(now),
+        },
+        $unset: {
+          activeDedupeKey: '',
+          claimToken: '',
+          claimedAt: '',
+          leaseExpiresAt: '',
+        },
+      },
+    );
+    return result.modifiedCount === 1;
+  }
+
   async retry(input: RetryIntegrationSyncJobInput): Promise<IntegrationSyncJob | null> {
     const now = input.now ?? new Date();
     const current = await this.jobs.findOne({
@@ -192,11 +213,7 @@ export class MongoIntegrationSyncJobStore implements IntegrationSyncJobStore {
 
     const errorCode = validText(input.errorCode, 'error_code', 200);
     const terminal = current.attempt >= current.maxAttempts;
-    const delay = integrationSyncRetryDelayMs(
-      current.attempt,
-      input.baseDelayMs,
-      input.maxDelayMs,
-    );
+    const delay = integrationSyncRetryDelayMs(current.attempt, input.baseDelayMs, input.maxDelayMs);
     return this.jobs.findOneAndUpdate(
       { id: current.id, status: 'processing', claimToken: input.claimToken },
       {
@@ -231,7 +248,12 @@ export class MongoIntegrationSyncJobStore implements IntegrationSyncJobStore {
     const result = await this.jobs.updateMany(
       { id: { $in: expired.map((job) => job.id) }, status: 'processing' },
       {
-        $set: { status: 'retry', availableAt: iso(now), updatedAt: iso(now), lastErrorCode: 'lease_expired' },
+        $set: {
+          status: 'retry',
+          availableAt: iso(now),
+          updatedAt: iso(now),
+          lastErrorCode: 'lease_expired',
+        },
         $unset: { claimToken: '', claimedAt: '', leaseExpiresAt: '' },
       },
     );
