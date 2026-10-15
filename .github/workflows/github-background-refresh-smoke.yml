@@ -81,7 +81,7 @@ jobs:
       - name: Diagnose repeat background job
         if: failure()
         run: |
-          docker compose \
+          STATE="$(docker compose \
             -f docker-compose.yml \
             -f deployment/docker/docker-compose.github-mock.yml \
             -f deployment/docker/docker-compose.github-background-mock.yml \
@@ -89,8 +89,11 @@ jobs:
           const id='background-smoke-${GITHUB_RUN_ID}-repeat';
           const doc=db.integration_sync_jobs.findOne({id});
           print(JSON.stringify(doc ? {id:doc.id,status:doc.status,attempt:doc.attempt,lastError:doc.lastError,availableAt:doc.availableAt,claimToken:doc.claimToken,leaseExpiresAt:doc.leaseExpiresAt} : null));
-          if (!doc || doc.status !== 'completed') quit(2);
-          "
+          ")"
+          STATE="$(printf '%s' "$STATE" | tr -d '\r\n')"
+          echo "::error title=Repeat background job state::$STATE"
+          STATUS="$(printf '%s' "$STATE" | sed -n 's/.*\"status\":\"\([^\"]*\)\".*/\1/p')"
+          [[ "$STATUS" == "completed" ]]
 
       - name: Diagnose normalized signal set
         if: failure()
