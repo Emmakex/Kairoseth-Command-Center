@@ -10,6 +10,7 @@ export class GitHubProviderError extends Error {
   constructor(
     readonly code: GitHubProviderErrorCode,
     message: string,
+    readonly retryAt?: string,
   ) {
     super(message);
     this.name = 'GitHubProviderError';
@@ -99,6 +100,27 @@ function providerCode(response: Response): GitHubProviderErrorCode {
   return 'upstream_error';
 }
 
+export function githubRateLimitRetryAt(headers: Headers, nowMs = Date.now()): string | undefined {
+  const candidates: number[] = [];
+  const retryAfter = headers.get('retry-after')?.trim();
+  if (retryAfter) {
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds) && seconds >= 0) {
+      candidates.push(nowMs + Math.ceil(seconds * 1000));
+    } else {
+      const parsed = Date.parse(retryAfter);
+      if (Number.isFinite(parsed)) candidates.push(parsed);
+    }
+  }
+
+  const reset = Number(headers.get('x-ratelimit-reset'));
+  if (Number.isFinite(reset) && reset > 0) candidates.push(Math.ceil(reset * 1000));
+
+  const future = candidates.filter((value) => value > nowMs);
+  if (future.length === 0) return undefined;
+  return new Date(Math.max(...future)).toISOString();
+}
+
 function stringValue(value: unknown, max = 1000): string | undefined {
   if (typeof value !== 'string') return undefined;
   const normalized = value.trim();
@@ -152,7 +174,12 @@ export class GitHubRestClient implements GitHubProviderClient {
         },
       });
       if (!response.ok) {
-        throw new GitHubProviderError(providerCode(response), `github_http_${response.status}`);
+        const code = providerCode(response);
+        throw new GitHubProviderError(
+          code,
+          `github_http_${response.status}`,
+          code === 'rate_limited' ? githubRateLimitRetryAt(response.headers) : undefined,
+        );
       }
       return (await response.json()) as unknown;
     } catch (error) {
