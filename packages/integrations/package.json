@@ -8,7 +8,8 @@
   "exports": {
     ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
     "./github": { "types": "./dist/github.d.ts", "import": "./dist/github.js" },
-    "./github-signals": { "types": "./dist/github-signals.d.ts", "import": "./dist/github-signals.js" }
+    "./github-signals": { "types": "./dist/github-signals.d.ts", "import": "./dist/github-signals.js" },
+    "./github-signal-executor": { "types": "./dist/github-signal-executor.d.ts", "import": "./dist/github-signal-executor.js" }
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
