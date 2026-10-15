@@ -23,8 +23,8 @@ export interface IntegrationSignalStore {
 }
 
 type IntegrationSignalDocument = IntegrationSignal & {
-  resourceId?: string;
-  projectId?: string;
+  resourceId?: string | null;
+  projectId?: string | null;
   ingestedAt: string;
   updatedAt: string;
 };
@@ -81,17 +81,22 @@ export class MongoIntegrationSignalStore implements IntegrationSignalStore {
       if (signal.workspaceId !== workspaceId) {
         throw new Error('integration_signal_workspace_mismatch');
       }
+      if (!signal.id.trim()) throw new Error('integration_signal_id_required');
+      if (!Number.isFinite(Date.parse(signal.occurredAt))) {
+        throw new Error('integration_signal_occurred_at_invalid');
+      }
     }
 
+    const uniqueSignals = [...new Map(signals.map((signal) => [signal.id, signal])).values()];
     const now = new Date().toISOString();
     const result = await this.signals.bulkWrite(
-      signals.map((signal) => {
+      uniqueSignals.map((signal) => {
         const resourceId = payloadText(signal.payload, 'resourceId');
         const projectId = payloadText(signal.payload, 'projectId');
         const stored: Omit<IntegrationSignalDocument, 'ingestedAt'> = {
           ...signal,
-          ...(resourceId ? { resourceId } : {}),
-          ...(projectId ? { projectId } : {}),
+          resourceId: resourceId ?? null,
+          projectId: projectId ?? null,
           updatedAt: now,
         };
         return {
