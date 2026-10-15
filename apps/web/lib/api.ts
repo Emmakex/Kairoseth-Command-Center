@@ -74,6 +74,22 @@ export type TimelineEventSummary = {
   metadata: Record<string, unknown>;
 };
 
+export type IntegrationSignalSummary = {
+  id: string;
+  source: string;
+  type:
+    | 'repository.commit'
+    | 'repository.pull_request'
+    | 'repository.issue'
+    | 'repository.ci'
+    | 'repository.release'
+    | 'calendar.event'
+    | 'generic.webhook';
+  workspaceId: string;
+  occurredAt: string;
+  payload: Record<string, unknown>;
+};
+
 export type TodayResponse = {
   scope: 'workspace' | 'private';
   range: { start: string; end: string };
@@ -94,6 +110,7 @@ export type ProjectsResponse = { projects: ProjectSummary[] };
 export type MilestonesResponse = { milestones: MilestoneSummary[] };
 export type DecisionsResponse = { decisions: DecisionSummary[] };
 export type TimelineResponse = { events: TimelineEventSummary[] };
+export type IntegrationSignalsResponse = { signals: IntegrationSignalSummary[] };
 
 export function apiBaseUrl(): string {
   return (
@@ -160,4 +177,16 @@ export async function getTimeline(
 ): Promise<TimelineEventSummary[] | null> {
   const response = await authenticatedGet<TimelineResponse>(`/v1/timeline?scope=${scope}`, token);
   return response?.events ?? null;
+}
+
+export async function getIntegrationSignals(
+  token: string,
+  limit = 12,
+): Promise<IntegrationSignalSummary[] | null> {
+  const safeLimit = Math.max(1, Math.min(30, Math.floor(limit)));
+  const response = await authenticatedGet<IntegrationSignalsResponse>(
+    `/v1/integrations/signals?limit=${safeLimit}`,
+    token,
+  );
+  return response?.signals ?? null;
 }
