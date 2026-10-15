@@ -12,6 +12,7 @@
     "./github-signal-runtime": { "types": "./dist/github-signal-runtime.d.ts", "import": "./dist/github-signal-runtime.js" },
     "./github-webhooks": { "types": "./dist/github-webhooks.d.ts", "import": "./dist/github-webhooks.js" },
     "./integration-secrets": { "types": "./dist/integration-secrets.d.ts", "import": "./dist/integration-secrets.js" },
+    "./integration-signal-alerts": { "types": "./dist/integration-signal-alerts.d.ts", "import": "./dist/integration-signal-alerts.js" },
     "./integration-signals": { "types": "./dist/integration-signals.d.ts", "import": "./dist/integration-signals.js" },
     "./integration-sync-jobs": { "types": "./dist/integration-sync-jobs.d.ts", "import": "./dist/integration-sync-jobs.js" },
     "./integration-sync-schedules": { "types": "./dist/integration-sync-schedules.d.ts", "import": "./dist/integration-sync-schedules.js" }

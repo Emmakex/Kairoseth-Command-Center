@@ -43,7 +43,7 @@ const server = http.createServer((request, response) => {
           id: 701,
           name: 'CI',
           status: 'completed',
-          conclusion: 'success',
+          conclusion: 'failure',
           event: 'push',
           head_branch: 'main',
           head_sha: 'abc123',

@@ -10,7 +10,8 @@
     "./github": { "types": "./dist/github.d.ts", "import": "./dist/github.js" },
     "./github-signals": { "types": "./dist/github-signals.d.ts", "import": "./dist/github-signals.js" },
     "./github-signal-executor": { "types": "./dist/github-signal-executor.d.ts", "import": "./dist/github-signal-executor.js" },
-    "./github-webhook": { "types": "./dist/github-webhook.d.ts", "import": "./dist/github-webhook.js" }
+    "./github-webhook": { "types": "./dist/github-webhook.d.ts", "import": "./dist/github-webhook.js" },
+    "./signal-alert-rules": { "types": "./dist/signal-alert-rules.d.ts", "import": "./dist/signal-alert-rules.js" }
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
