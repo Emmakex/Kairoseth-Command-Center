@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { authorize } from '@kcc/auth';
 import type { AuthProvider, SessionContext } from '@kcc/auth';
 import type { Scope } from '@kcc/domain';
-import { normalizeGitHubRepositorySignals } from '@kcc/integrations/github-signals';
+import { executeGitHubRepositorySignals } from '@kcc/integrations/github-signal-executor';
 import type { IntegrationSignalStore } from '@kcc/persistence/integration-signals';
 import type { GitHubConnectionStore } from './github-connection-store';
 import { GitHubProviderError } from './github-provider-client';
@@ -124,22 +124,15 @@ export function registerGitHubSignalRoutes(
     if (!coordinates) return reply.code(409).send({ error: 'github_repository_metadata_invalid' });
 
     try {
-      const [pullRequests, issues, workflowRuns, releases] = await Promise.all([
-        options.githubProviderClient.listPullRequests(token, coordinates.owner, coordinates.repository, limit),
-        options.githubProviderClient.listIssues(token, coordinates.owner, coordinates.repository, limit),
-        options.githubProviderClient.listWorkflowRuns(token, coordinates.owner, coordinates.repository, limit),
-        options.githubProviderClient.listReleases(token, coordinates.owner, coordinates.repository, limit),
-      ]);
-
-      const signals = normalizeGitHubRepositorySignals({
+      const signals = await executeGitHubRepositorySignals({
+        providerClient: options.githubProviderClient,
+        token,
         workspaceId: scope.workspaceId,
         resourceId: resource.id,
         ...(resource.projectId ? { projectId: resource.projectId } : {}),
-        repository: `${coordinates.owner}/${coordinates.repository}`,
-        pullRequests,
-        issues,
-        workflowRuns,
-        releases,
+        owner: coordinates.owner,
+        repository: coordinates.repository,
+        limit,
       });
 
       if (options.integrationSignalStore) {
