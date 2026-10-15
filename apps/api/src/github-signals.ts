@@ -3,6 +3,7 @@ import { authorize } from '@kcc/auth';
 import type { AuthProvider, SessionContext } from '@kcc/auth';
 import type { Scope } from '@kcc/domain';
 import type { IntegrationSignal } from '@kcc/integrations';
+import type { IntegrationSignalStore } from '@kcc/persistence/integration-signals';
 import type { GitHubConnectionStore } from './github-connection-store';
 import { GitHubProviderError } from './github-provider-client';
 import type { GitHubProviderClient } from './github-provider-client';
@@ -85,6 +86,7 @@ export function registerGitHubSignalRoutes(
     githubRepositoryStore?: GitHubRepositoryStore;
     githubConnectionStore?: GitHubConnectionStore;
     githubProviderClient?: GitHubProviderClient;
+    integrationSignalStore?: IntegrationSignalStore;
   },
 ): void {
   app.get('/v1/integrations/github/repositories/:resourceId/signals', async (request, reply) => {
@@ -231,6 +233,9 @@ export function registerGitHubSignalRoutes(
       ];
 
       signals.sort(compareSignals);
+      if (options.integrationSignalStore) {
+        await options.integrationSignalStore.upsertSignals(scope.workspaceId, signals);
+      }
       return { signals: signals.slice(0, limit) };
     } catch (error) {
       if (!(error instanceof GitHubProviderError)) throw error;
