@@ -4,7 +4,7 @@
 **Technical/internal project:** Kairoseth Command Center  
 **Commercial names:** Gestor de Trabajo (ES) / Work Manager (EN)  
 **Category:** Kairoseth Software  
-**Status:** Phase 3 is closed. Phase 4 Slices 1–4a are merged and post-merge validated. PR #19 is the active Slice 4b front: normalized GitHub release signals for the dashboard.
+**Status:** Phase 3 is closed. Phase 4 Slices 1–4b are merged and post-merge validated. Slice 4c is the active front: durable provider-neutral signal history for the dashboard.
 
 ## Naming rule / Regla de naming
 
@@ -80,11 +80,7 @@
 - [x] Dedicated encrypted-connection Docker smoke.
 - [x] Gitleaks false-positive fixture removed from PR history without adding scanner exceptions.
 - [x] PR #16 merged as `79053390c192c3b906847e2dab735ecf91d51531`.
-- [x] Post-merge CI #111 green.
-- [x] Post-merge Local identities #37 green.
-- [x] Post-merge Standalone #24 green.
-- [x] Post-merge Repository links #9 green.
-- [x] Post-merge GitHub connections #7 green.
+- [x] Post-merge CI #111, Local identities #37, Standalone #24, Repository links #9 and GitHub connections #7 green.
 
 **Slice 2: CLOSED / CERRADA.**
 
@@ -92,64 +88,68 @@
 
 - [x] Trusted deployment-level `KCC_GITHUB_API_BASE_URL`, defaulting to `https://api.github.com`.
 - [x] Isolated `GitHubRestClient` with bearer auth, provider timeout and normalized error categories.
-- [x] `IntegrationConnectionStatus` includes `unverified`.
 - [x] New/rotated credentials become `unverified`; only provider validation promotes to `active`.
-- [x] Generic validation fields: `lastValidatedAt`, remote account ID/label and normalized last error code.
-- [x] `POST /v1/integrations/github/connections/:id/validate`.
-- [x] Legacy `active` connections without `lastValidatedAt` cannot be bound until revalidated once.
-- [x] Explicit repository → validated connection binding.
-- [x] `PATCH /v1/integrations/github/repositories/:resourceId/connection`.
-- [x] Manual repository sync by `resourceId`; token/owner/repository are resolved server-side.
-- [x] `POST /v1/integrations/github/repositories/:resourceId/sync`.
-- [x] Normalized repository snapshot includes GitHub repository ID, remote full name, default branch, latest commit SHA/URL/date, private/archived flags, remote update time and local sync time.
-- [x] Validation success/failure, binding, sync success/failure audited without raw provider bodies or credentials.
-- [x] Provider 401 discovered during sync invalidates the connection; repository-specific 403/404 does not automatically invalidate the credential.
+- [x] Validated repository binding and manual repository sync.
+- [x] Normalized repository/default-branch/latest-commit snapshot.
+- [x] Provider errors and validation/sync audit paths normalized without credential leakage.
 - [x] Strict GitHub HTTP mock and dedicated live validation/sync Docker smoke.
-- [x] PR #17 final head passed CI, Local identities, Standalone, Repository links, GitHub connections and GitHub live sync gates.
-- [x] PR #17 merged as `2e9062b373bcef4ffea407eecfe7863c1b5336f4`.
+- [x] PR #17 final head passed all six gates and merged as `2e9062b373bcef4ffea407eecfe7863c1b5336f4`.
 - [x] Post-merge `main` validation completed without a failed gate.
 
 **Slice 3: CLOSED / CERRADA.**
 
 ### Slice 4a — normalized dashboard signals (PR #18)
 
-- [x] Extend `GitHubProviderClient` with normalized pull request, issue and Actions workflow-run reads.
-- [x] Reuse provider-neutral `IntegrationSignal` rather than introduce GitHub-specific dashboard contracts.
-- [x] Exclude pull requests returned by GitHub's issues endpoint to prevent duplicate signals.
+- [x] Normalize pull requests, issues and Actions workflow runs into provider-neutral `IntegrationSignal`.
+- [x] Exclude PRs returned by GitHub's issues endpoint to prevent duplicate signals.
 - [x] `GET /v1/integrations/github/repositories/:resourceId/signals?limit=20`.
 - [x] Require `projects.read` + `command-center` entitlement for signal consumption.
 - [x] Derive workspace, repository coordinates and encrypted credential server-side.
-- [x] Require a validated active GitHub connection.
 - [x] Sort combined signals by latest provider activity and cap the response at 50.
 - [x] Normalize provider 401 and invalidate the affected connection without credential leakage.
 - [x] Tolerate historical workflow runs without `head_branch`.
-- [x] Provider/API tests cover PR/issue/CI normalization, issue deduplication, authorization, ordering and credential redaction.
 - [x] API Docker image includes the `@kcc/integrations` workspace dependency.
-- [x] PR #18 final head `a06246f1d4844d5baf50b9b5bd210ec2299ae1cb` passed all six CI/release/smoke gates.
-- [x] PR #18 merged as `570bc0154fa167a9f3ee84d3dba93bb406757d9b`.
-- [x] Post-merge `main` started six workflows; all completed with no failure or cancellation.
+- [x] PR #18 final head `a06246f1d4844d5baf50b9b5bd210ec2299ae1cb` passed all six gates.
+- [x] PR #18 merged as `570bc0154fa167a9f3ee84d3dba93bb406757d9b` and post-merge validated.
 
 **Slice 4a: CLOSED / CERRADA.**
 
 ### Slice 4b — normalized release signals (PR #19)
 
+- [x] Normalize GitHub published releases, prereleases and drafts.
+- [x] Tolerate nullable release `name` and `published_at` fields.
+- [x] Map releases to existing `repository.release` `IntegrationSignal`.
+- [x] Use `published_at` when available and `created_at` otherwise.
+- [x] Include releases in the existing repository signal endpoint and global recent-first ordering.
+- [x] Provider/API tests cover release normalization and draft/null-field behavior.
+- [x] PR #19 final head `e6b4454933d33a3f1737d0af41b51cb43ac4735f` passed all six gates.
+- [x] PR #19 merged as `4a6619f84c55b67aa211014a46b85062d739fbae`.
+- [x] Post-merge `main` started six workflows; all completed with no failure or cancellation.
+
+**Slice 4b: CLOSED / CERRADA.**
+
+### Slice 4c — durable provider-neutral signal history
+
 Implemented in the active branch:
 
-- [x] Extend `GitHubProviderClient` with normalized release reads.
-- [x] Support published releases, prereleases and drafts.
-- [x] Tolerate nullable release `name` and `published_at` fields.
-- [x] Map GitHub releases to the existing `repository.release` `IntegrationSignal`.
-- [x] Use `published_at` as signal time when available and fall back to `created_at` otherwise.
-- [x] Include release signals in the existing repository signal endpoint and global recent-first ordering.
-- [x] Preserve the same workspace, entitlement, validated-connection and credential-redaction boundaries as Slice 4a.
-- [x] Provider/API tests cover release normalization and draft/null-field behavior.
-- [x] ES/EN integration documentation updated.
-- [ ] Final PR #19 CI/type/test/build/security/Docker gates.
+- [x] Add Mongo `integration_signals` store using the provider-neutral `IntegrationSignal` contract.
+- [x] Unique idempotency boundary `{ workspaceId, id }`.
+- [x] Flatten `resourceId` and `projectId` into internal indexed fields while preserving public provider-neutral payloads.
+- [x] Track first `ingestedAt` and latest local `updatedAt` internally.
+- [x] Reject signal writes whose workspace does not match the authenticated server path.
+- [x] Persist the complete normalized GitHub signal set after every successful live refresh.
+- [x] Add provider-neutral `GET /v1/integrations/signals` history endpoint.
+- [x] Filter history by resource, project and supported signal type; default 50/max 100 results.
+- [x] Derive history workspace from the authenticated session and require `projects.read` + product entitlement.
+- [x] Bootstrap signal indexes with the API runtime.
+- [x] Update worker Docker context for the new `@kcc/persistence` → `@kcc/integrations` dependency.
+- [x] Add API tests for durable refresh wiring, history filtering, workspace isolation and authorization.
+- [x] Add ES/EN persistence architecture documentation.
+- [ ] Open PR and complete CI/type/test/build/security/Docker gates.
 - [ ] Merge and post-merge validation.
 
 ### Deferred Phase 4 slices
 
-- [ ] Persist normalized signals for dashboard history and offline reads.
 - [ ] Scheduled/retryable sync jobs and rate-limit-aware backoff.
 - [ ] Verified GitHub webhooks.
 - [ ] GitHub-derived alerts and rule automation.
@@ -179,21 +179,23 @@ Implemented in the active branch:
 20. A provider 401 during sync or signal retrieval marks the connection invalid; repo-specific access errors do not silently invalidate it.
 21. Signal consumption is read-only and requires `projects.read`; integration configuration remains restricted to `integrations.manage`.
 22. Release timestamps are provider-derived; `created_at` is used only when `published_at` is absent.
+23. Durable signal identity is workspace-scoped; repeated provider refreshes upsert rather than duplicate the same signal.
+24. Persisted history queries always include the authenticated workspace boundary.
+25. Internal ingestion/index metadata is not exposed through the public signal contract.
 
 ## Next / Siguiente
 
-1. Finish PR #19 validation and merge only when all final-head gates are green.
-2. Verify the same gates on `main` after merge.
-3. Start the next small slice to persist provider-neutral signals idempotently for dashboard history and offline reads.
-4. Add scheduled refresh/backoff only after persistence is stable.
-5. Add verified webhooks only after polling/manual normalization and persistence are stable.
-6. Add signal-derived alerts and rule automation only after event ingestion is durable.
-7. When commercial publication is scheduled, create the Kairoseth Software catalog entry as **Gestor de Trabajo / Work Manager**.
+1. Open and validate the Slice 4c persistence PR.
+2. Merge only when all final-head gates are green, then validate `main`.
+3. Add scheduled/retryable refresh jobs and rate-limit-aware backoff as the next isolated slice.
+4. Add verified webhooks only after scheduled durable ingestion is stable.
+5. Add signal-derived alerts and rule automation only after event ingestion is durable.
+6. When commercial publication is scheduled, create the Kairoseth Software catalog entry as **Gestor de Trabajo / Work Manager**.
 
 ## Current blockers / Bloqueos actuales
 
-No known product blocker. PR #19 is the active development front; final CI validation is in progress.
+No known product blocker. Slice 4c durable signal history is the active development front.
 
 ## Operating rule
 
-Update this file at meaningful milestones. Keep Phase 4 slices small; do not mix provider reads, persistence, webhooks and automation rules in one PR.
+Update this file at meaningful milestones. Keep Phase 4 slices small; do not mix provider reads, persistence, scheduling, webhooks and automation rules in one PR.
