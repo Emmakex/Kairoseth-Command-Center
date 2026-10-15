@@ -2,6 +2,7 @@ import { MongoClient } from 'mongodb';
 import { loadApiConfig } from '@kcc/config';
 import { MongoOperationalStore } from '@kcc/persistence';
 import { MongoIntegrationSignalStore } from '@kcc/persistence/integration-signals';
+import { MongoIntegrationSyncJobStore } from '@kcc/persistence/integration-sync-jobs';
 import { buildApp } from './application';
 import { MongoDecisionLifecycleStore } from './decision-lifecycle-store';
 import { MongoGitHubConnectionStore } from './github-connection-store';
@@ -18,6 +19,7 @@ const operationalStore = new MongoOperationalStore(mongo.db());
 const operationalAuditStore = new MongoOperationalAuditStore(mongo, mongo.db());
 const decisionLifecycleStore = new MongoDecisionLifecycleStore(mongo, mongo.db());
 const integrationSignalStore = new MongoIntegrationSignalStore(mongo.db());
+const integrationSyncJobStore = new MongoIntegrationSyncJobStore(mongo.db());
 const githubRepositoryStore = new MongoGitHubRepositoryStore(mongo, mongo.db());
 const githubProviderClient = new GitHubRestClient(config.KCC_GITHUB_API_BASE_URL);
 const integrationSecretStore = config.KCC_INTEGRATION_SECRET_KEY
@@ -37,6 +39,7 @@ try {
     operationalStore.ensureIndexes(),
     decisionLifecycleStore.ensureIndexes(),
     integrationSignalStore.ensureIndexes(),
+    integrationSyncJobStore.ensureIndexes(),
     githubRepositoryStore.ensureIndexes(),
     ...(githubConnectionStore ? [githubConnectionStore.ensureIndexes()] : []),
   ]);
@@ -78,6 +81,7 @@ const app = buildApp({
   milestoneStore: operationalStore,
   decisionLifecycleStore,
   integrationSignalStore,
+  integrationSyncJobStore,
   githubRepositoryStore,
   githubProviderClient,
   ...(githubConnectionStore ? { githubConnectionStore } : {}),
