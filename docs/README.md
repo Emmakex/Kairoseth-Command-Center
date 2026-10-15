@@ -33,6 +33,7 @@ Esta carpeta es la fuente de verdad para las decisiones de producto, arquitectur
 26. [`21-integration-activity-surface.md`](21-integration-activity-surface.md) — workspace dashboard surface for normalized integration activity.
 27. [`22-github-setup-ui.md`](22-github-setup-ui.md) — admin-only GitHub connection and repository setup surface.
 28. [`23-github-maintenance-ui.md`](23-github-maintenance-ui.md) — safe token rotation, repository unlink and unused-connection removal.
+29. [`24-github-webhook-ui.md`](24-github-webhook-ui.md) — safe manual GitHub webhook provisioning, one-time secret reveal, rotation and removal.
 
 ## Living documents / Documentos vivos
 
