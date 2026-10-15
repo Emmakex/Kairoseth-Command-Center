@@ -172,6 +172,18 @@ class MemoryGitHubProviderClient implements GitHubProviderClient {
   async getLatestCommit(): Promise<GitHubRemoteCommit> {
     throw new Error('not_used');
   }
+
+  async listPullRequests() {
+    throw new Error('not_used');
+  }
+
+  async listIssues() {
+    throw new Error('not_used');
+  }
+
+  async listWorkflowRuns() {
+    throw new Error('not_used');
+  }
 }
 
 const headers = { authorization: 'Bearer valid-token' };
