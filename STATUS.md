@@ -1,10 +1,10 @@
 # Project status / Estado del proyecto
 
-**Current phase:** Phase 4 — GitHub integration  
+**Current phase:** Phase 4 — GitHub integration closure  
 **Technical/internal project:** Kairoseth Command Center  
 **Commercial names:** Gestor de Trabajo (ES) / Work Manager (EN)  
 **Category:** Kairoseth Software  
-**Status:** Phase 3 is closed. Phase 4 Slices 1–5i are merged and post-merge validated. Slice 5j — GitHub webhook administration UI / Administración de webhook GitHub — is active.
+**Status:** Phase 3 is closed. Phase 4 Slices 1–5j are merged. Slice 5j passed all nine gates on its final PR head and is merged; post-merge `main` validation is the only remaining closure step for the token-backed GitHub boundary.
 
 ## Naming rule / Regla de naming
 
@@ -45,41 +45,42 @@
 - [x] **Slice 5e — provider-neutral derived alerts (PR #27):** `e0b2e8d3454ddbfa1865ddc2031a0ae405220f66`.
 - [x] **Slice 5f — derived alert lifecycle (PR #28):** merged `938c5440730ac9a989f02c4da4f944e71788df4b`, post-merge 9/9 green.
 - [x] **Slice 5g — Integration activity / Actividad de integraciones (PR #29):** merged `2183aeccc3ff17bc698e35f12d48708a2fbcb56b`, post-merge 9/9 green.
-- [x] **Slice 5h — GitHub setup UI / Configuración de GitHub (PR #30):** admin-only create/validate/link/bind/manual-sync UI, write-only provider token, ES/EN, private-scope isolation; final head `1464ad6c281bf6c6643e68ef8e7eb0b52001717c`, merged `b282b17e82ec6347ffd9b20f5a0c55d6f2578274`, post-merge 9/9 green.
-- [x] **Slice 5i — GitHub maintenance UI / Mantenimiento de GitHub (PR #31):** write-only token rotation, repository unlink and unused-connection removal with explicit destructive confirmation; final head `c7f9de7a7cfc5f17b640c1315338b32c1cfe4dac`, merged `9f3f256690e7ea4cad63e26406886bdcdcaacefa`, post-merge 9/9 green.
+- [x] **Slice 5h — GitHub setup UI / Configuración de GitHub (PR #30):** admin-only create/validate/link/bind/manual-sync UI; merged `b282b17e82ec6347ffd9b20f5a0c55d6f2578274`, post-merge 9/9 green.
+- [x] **Slice 5i — GitHub maintenance UI / Mantenimiento de GitHub (PR #31):** token rotation, repository unlink and unused-connection removal; final head `c7f9de7a7cfc5f17b640c1315338b32c1cfe4dac`, merged `9f3f256690e7ea4cad63e26406886bdcdcaacefa`, post-merge 9/9 green.
+- [x] **Slice 5j — GitHub webhook administration UI / Administración de webhook GitHub (PR #32):** safe state lookup, provision/rotate/delete controls, ES/EN manual setup guidance and session-bound one-time HMAC secret reveal; final head `71d80ce89d0f654b83c90d1f7827f0af4e0b7431` validated 9/9, merged `1aeee36a7049afc03f02069297dfac01fa954f4a`.
 
-## Active / Activo
+### Phase 4 boundary / Frontera de Fase 4
 
-### Slice 5j — GitHub webhook administration UI / Administración de webhook GitHub
+The token-backed GitHub integration is functionally complete for the current product boundary:
 
-Implemented on `feat/phase-4-github-webhook-ui`:
+- [x] encrypted connection lifecycle;
+- [x] repository linking and manual sync;
+- [x] durable normalized PR/issue/CI/release signals;
+- [x] durable queue, worker, retries and recurring reconciliation;
+- [x] verified webhooks with HMAC/replay protection;
+- [x] provider-neutral derived alerts with resolve/reopen lifecycle;
+- [x] workspace integration activity UI;
+- [x] admin connection/repository maintenance UI;
+- [x] manual webhook provisioning/rotation/removal UI with one-time secret handling;
+- [ ] final post-merge `main` 9/9 validation for the closure commit.
 
-- [x] Server-side safe webhook-state lookup per GitHub connection.
-- [x] Webhook administration is loaded only in workspace scope for users with `integrations.manage`.
-- [x] Provision existing verified-webhook endpoint from an active validated GitHub connection.
-- [x] Rotate existing webhook HMAC secret through the existing backend endpoint.
-- [x] Remove webhook through the existing backend endpoint with explicit destructive confirmation.
-- [x] Configured, not-configured and unavailable states render fail-closed controls.
-- [x] Existing webhook metadata remains manageable if the provider token is temporarily in error; provisioning still requires active validation.
-- [x] Provision/rotation HMAC secret is never placed in a URL or normal dashboard state.
-- [x] One-time secret reveal uses AES-256-GCM sealed state bound to the current session token.
-- [x] Sealed reveal state is stored only in a short-lived `HttpOnly`, `SameSite=Strict`, path-scoped cookie.
-- [x] Reveal state rejects tampering, wrong session, stale timestamps and invalid webhook paths.
-- [x] Reveal route is no-store, clears the cookie on first use, HTML-escapes dynamic values and uses a restrictive CSP without client JavaScript.
-- [x] UI shows only the opaque payload path and does not guess the public API host.
-- [x] ES/EN webhook controls and manual GitHub configuration guidance.
-- [x] Unit coverage for webhook mutations and one-time secret sealing/reveal safety.
-- [x] Documentation in `docs/24-github-webhook-ui.md`.
-- [ ] Final-head nine-gate validation.
-- [ ] Merge and post-merge `main` validation.
+**Phase 4 token-backed boundary: CLOSURE VALIDATION / VALIDACIÓN DE CIERRE.**
 
-**Slice 5j: VALIDATION PENDING / VALIDACIÓN PENDIENTE.**
-
-### Deferred / Diferido
+### Deferred enhancements / Mejoras diferidas
 
 - [ ] GitHub App/OAuth authorization and automatic webhook registration/removal.
-- [ ] Customer-configurable rule editor.
-- [ ] Stale PR/issue policy rules.
+- [ ] Additional integration providers.
+
+These are enhancements/new adapter fronts, not blockers for the current token-backed GitHub product boundary.
+
+## Phase 5 candidates / Candidatos de Fase 5
+
+- [ ] Customer-configurable rules/automation.
+- [ ] Stale PR/issue policy rules built on normalized durable signals.
+- [ ] Cross-source operational signals when a second provider is intentionally opened.
+- [ ] Explainable prioritization and AI assistance only where core correctness remains deterministic.
+
+No Phase 5 implementation front opens until the Phase 4 closure `main` commit is 9/9 green.
 
 ## Security and correctness invariants
 
@@ -106,16 +107,15 @@ Implemented on `feat/phase-4-github-webhook-ui`:
 
 ## Next / Siguiente
 
-1. Open the isolated Slice 5j PR and require all nine checks green on its final head.
-2. Correct any webhook administration, secret-handling, isolation or regression failure directly on 5j.
-3. Merge with the exact validated head and revalidate resulting `main` 9/9.
-4. Reassess whether the token-backed GitHub Phase 4 boundary is complete before opening GitHub App/OAuth or moving to Phase 5 automation/rules.
-5. Keep OAuth/automatic registration, configurable rules and stale policies separate.
-6. When commercial publication is scheduled, create the Kairoseth Software catalog entry as **Gestor de Trabajo / Work Manager**.
+1. Require all nine workflows green on the current `main` closure commit.
+2. If any gate fails, correct that regression before opening Phase 5.
+3. Once 9/9 green, mark the Phase 4 token-backed GitHub boundary closed and start the first isolated Phase 5 automation/rules slice from that exact green commit.
+4. Keep GitHub App/OAuth and additional providers separate from Phase 5 rule logic.
+5. When commercial publication is scheduled, create the Kairoseth Software catalog entry as **Gestor de Trabajo / Work Manager**.
 
 ## Current blockers / Bloqueos actuales
 
-No known product blocker. Slice 5j is ready for PR validation; acceptance requires the final head and resulting `main` to pass all nine workflows.
+No known product blocker. Only final post-merge regression validation remains for the Phase 4 closure boundary.
 
 ## Operating rule
 
