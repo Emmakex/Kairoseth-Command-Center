@@ -61,8 +61,14 @@ export interface GitHubWebhookStore {
 }
 
 function endpointView(document: GitHubWebhookEndpointDocument): GitHubWebhookEndpoint {
-  const { secretRef: _secretRef, ...endpoint } = document;
-  return endpoint;
+  return {
+    id: document.id,
+    workspaceId: document.workspaceId,
+    connectionId: document.connectionId,
+    enabled: document.enabled,
+    createdAt: document.createdAt,
+    updatedAt: document.updatedAt,
+  };
 }
 
 function webhookSecret(): string {
