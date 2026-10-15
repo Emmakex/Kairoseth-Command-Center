@@ -10,12 +10,14 @@ import {
   MongoIntegrationSyncJobStore,
   type IntegrationSyncJob,
 } from '@kcc/persistence/integration-sync-jobs';
+import { MongoIntegrationSyncScheduleStore } from '@kcc/persistence/integration-sync-schedules';
 
 const config = loadWorkerConfig();
 const mongo = new MongoClient(config.MONGODB_URI, { serverSelectionTimeoutMS: 3000 });
 const db = mongo.db();
 const outbox = new MongoAuditOutboxStore(db);
 const syncJobs = new MongoIntegrationSyncJobStore(db);
+const syncSchedules = new MongoIntegrationSyncScheduleStore(db);
 const integrationSecretKey = config.KCC_INTEGRATION_SECRET_KEY;
 
 const githubExecution = integrationSecretKey
@@ -32,6 +34,7 @@ const githubExecution = integrationSecretKey
 
 let stopped = false;
 let initialized = false;
+let nextScheduleDiscoveryAt = 0;
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -77,7 +80,61 @@ async function retryClaimedJob(
     resourceId: job.resourceId,
     errorCode,
     status: retried?.status ?? 'claim_lost',
+    availableAt: retried?.availableAt,
   });
+}
+
+async function refreshGitHubSchedules(): Promise<number> {
+  if (!githubExecution) return 0;
+  const now = Date.now();
+  if (now < nextScheduleDiscoveryAt) return 0;
+
+  const repositories = await githubExecution.runtimeStore.listLinkedRepositories(1_000);
+  for (const repository of repositories) {
+    await syncSchedules.ensureRecurring({
+      workspaceId: repository.workspaceId,
+      provider: 'github',
+      kind: 'repository_signals',
+      resourceId: repository.resourceId,
+      intervalMs: config.KCC_GITHUB_REFRESH_INTERVAL_MS,
+    });
+  }
+  nextScheduleDiscoveryAt = now + 60_000;
+  return repositories.length;
+}
+
+async function enqueueDueGitHubSchedule(): Promise<'idle' | 'enqueued' | 'claim_lost'> {
+  const schedule = await syncSchedules.claimDue({ provider: 'github', kind: 'repository_signals' });
+  if (!schedule) return 'idle';
+  const claimToken = schedule.claimToken;
+  if (!claimToken) return 'claim_lost';
+
+  try {
+    await syncJobs.enqueue({
+      workspaceId: schedule.workspaceId,
+      provider: schedule.provider,
+      kind: schedule.kind,
+      resourceId: schedule.resourceId,
+      dedupeKey: `schedule:${schedule.id}:${schedule.nextRunAt}`,
+      availableAt: new Date().toISOString(),
+      maxAttempts: 8,
+    });
+    const advanced = await syncSchedules.completeRun(schedule.id, claimToken);
+    if (!advanced) return 'claim_lost';
+    return 'enqueued';
+  } catch (error) {
+    await syncSchedules.releaseClaim(schedule.id, claimToken);
+    throw error;
+  }
+}
+
+async function disableGitHubSchedule(job: IntegrationSyncJob): Promise<void> {
+  await syncSchedules.disableResource(
+    job.workspaceId,
+    'github',
+    'repository_signals',
+    job.resourceId,
+  );
 }
 
 async function executeGitHubSignalJob(job: IntegrationSyncJob): Promise<void> {
@@ -104,6 +161,7 @@ async function executeGitHubSignalJob(job: IntegrationSyncJob): Promise<void> {
   if (resolution.status !== 'ready') {
     const errorCode = `github_${resolution.status}`;
     await failClaimedJob(job, errorCode);
+    await disableGitHubSchedule(job);
     workerLog('error', 'github_refresh.runtime_unavailable', {
       jobId: job.id,
       resourceId: job.resourceId,
@@ -151,10 +209,12 @@ async function executeGitHubSignalJob(job: IntegrationSyncJob): Promise<void> {
             error.code,
           );
           await failClaimedJob(job, errorCode);
+          await disableGitHubSchedule(job);
           break;
         case 'forbidden':
         case 'not_found':
           await failClaimedJob(job, errorCode);
+          await disableGitHubSchedule(job);
           break;
         case 'rate_limited':
           await retryClaimedJob(job, errorCode, {
@@ -191,6 +251,7 @@ async function tick() {
       await Promise.all([
         outbox.ensureIndexes(),
         syncJobs.ensureIndexes(),
+        syncSchedules.ensureIndexes(),
         ...(githubExecution
           ? [githubExecution.secretStore.ensureIndexes(), githubExecution.signalStore.ensureIndexes()]
           : []),
@@ -198,13 +259,18 @@ async function tick() {
       initialized = true;
     }
 
-    const [drained, requeuedSyncJobs] = await Promise.all([
+    const [drained, requeuedSyncJobs, requeuedSchedules] = await Promise.all([
       outbox.drainPending(50),
       syncJobs.requeueExpired({ limit: 100 }),
+      syncSchedules.requeueExpired(),
     ]);
 
+    let discoveredSchedules = 0;
+    let scheduleGeneration: 'disabled' | 'idle' | 'enqueued' | 'claim_lost' = 'disabled';
     let githubRefresh: 'disabled' | 'idle' | 'processed' = 'disabled';
     if (githubExecution) {
+      discoveredSchedules = await refreshGitHubSchedules();
+      scheduleGeneration = await enqueueDueGitHubSchedule();
       const job = await syncJobs.claimDue({ provider: 'github', kind: 'repository_signals' });
       if (job) {
         githubRefresh = 'processed';
@@ -223,6 +289,9 @@ async function tick() {
       },
       integrationSync: {
         requeuedExpired: requeuedSyncJobs,
+        requeuedSchedules,
+        discoveredSchedules,
+        scheduleGeneration,
         executionEnabled: Boolean(githubExecution),
         githubRefresh,
       },
