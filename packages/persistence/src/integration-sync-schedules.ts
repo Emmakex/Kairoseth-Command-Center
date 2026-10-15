@@ -147,11 +147,6 @@ export class MongoIntegrationSyncScheduleStore implements IntegrationSyncSchedul
           nextRunAt,
           updatedAt: iso(now),
         },
-        $unset: {
-          claimToken: '',
-          claimedAt: '',
-          leaseExpiresAt: '',
-        },
       },
       { returnDocument: 'after' },
     );
