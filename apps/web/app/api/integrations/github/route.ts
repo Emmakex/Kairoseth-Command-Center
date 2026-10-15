@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { apiBaseUrl, SESSION_COOKIE } from '../../../../lib/api';
+import { sealGitHubWebhookSecret } from '../../../../lib/github-webhook-secret';
 import { parseGitHubSetupMutation } from '../../../../lib/github-setup';
+
+const WEBHOOK_REVEAL_COOKIE = 'kcc_github_webhook_reveal';
 
 function safeLocale(value: FormDataEntryValue | null): 'es' | 'en' {
   return value === 'en' ? 'en' : 'es';
@@ -22,6 +25,37 @@ function clearSession(response: NextResponse) {
     path: '/',
     expires: new Date(0),
   });
+  return response;
+}
+
+function webhookRevealResponse(
+  request: NextRequest,
+  locale: 'es' | 'en',
+  sessionToken: string,
+  payload: unknown,
+): NextResponse | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const body = payload as { webhook?: unknown; secret?: unknown };
+  if (!body.webhook || typeof body.webhook !== 'object' || typeof body.secret !== 'string') {
+    return null;
+  }
+  const path = (body.webhook as { path?: unknown }).path;
+  if (typeof path !== 'string') return null;
+  const sealed = sealGitHubWebhookSecret(sessionToken, { path, secret: body.secret });
+  if (!sealed) return null;
+
+  const url = new URL('/api/integrations/github/webhook-secret', request.url);
+  url.searchParams.set('locale', locale);
+  const response = NextResponse.redirect(url, 303);
+  response.cookies.set(WEBHOOK_REVEAL_COOKIE, sealed, {
+    httpOnly: true,
+    sameSite: 'strict',
+    secure: process.env.NODE_ENV === 'production',
+    path: '/api/integrations/github/webhook-secret',
+    maxAge: 120,
+  });
+  response.headers.set('cache-control', 'no-store, private');
+  response.headers.set('referrer-policy', 'no-referrer');
   return response;
 }
 
@@ -63,8 +97,16 @@ export async function POST(request: NextRequest) {
             ? 'forbidden'
             : response.status === 404
               ? 'not-found'
-              : 'error';
+              : response.status === 409
+                ? 'conflict'
+                : 'error';
       return NextResponse.redirect(dashboardUrl(request, locale, result), 303);
+    }
+
+    if (mutation.revealWebhookSecret) {
+      const payload = (await response.json()) as unknown;
+      const reveal = webhookRevealResponse(request, locale, token, payload);
+      return reveal ?? NextResponse.redirect(dashboardUrl(request, locale, 'error'), 303);
     }
 
     return NextResponse.redirect(dashboardUrl(request, locale, 'saved'), 303);
