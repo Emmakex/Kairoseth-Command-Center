@@ -2,9 +2,11 @@ import type { AuthProvider } from '@kcc/auth';
 import type { MilestoneStore, OperationalStore } from '@kcc/persistence';
 import type { IntegrationSignalStore } from '@kcc/persistence/integration-signals';
 import type { IntegrationSyncJobStore } from '@kcc/persistence/integration-sync-jobs';
+import type { SignalAlertRulePolicyStore } from '@kcc/persistence/signal-alert-rule-policies';
 import type { GitHubWebhookStore } from '@kcc/persistence/github-webhooks';
 import { buildApp as buildBaseApp } from './app';
 import type { ReadinessCheck } from './app';
+import { registerAutomationRulePolicyRoutes } from './automation-rule-policies';
 import { registerDecisionCompatibilityGuard } from './decision-compatibility';
 import { registerDecisionLifecycleRoutes } from './decisions';
 import type { DecisionLifecycleStore } from './decision-lifecycle-store';
@@ -41,6 +43,7 @@ type ApplicationOptions = {
   githubWebhookStore?: GitHubWebhookStore;
   integrationSignalStore?: IntegrationSignalStore;
   integrationSyncJobStore?: IntegrationSyncJobStore;
+  signalAlertRulePolicyStore?: SignalAlertRulePolicyStore;
 };
 
 export function buildApp(options: ApplicationOptions = {}) {
@@ -83,6 +86,13 @@ export function buildApp(options: ApplicationOptions = {}) {
     ...(options.authProvider ? { authProvider: options.authProvider } : {}),
     ...(options.integrationSignalStore
       ? { integrationSignalStore: options.integrationSignalStore }
+      : {}),
+  });
+
+  registerAutomationRulePolicyRoutes(app, {
+    ...(options.authProvider ? { authProvider: options.authProvider } : {}),
+    ...(options.signalAlertRulePolicyStore
+      ? { signalAlertRulePolicyStore: options.signalAlertRulePolicyStore }
       : {}),
   });
 
