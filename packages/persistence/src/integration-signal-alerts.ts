@@ -10,7 +10,7 @@ import { MongoAuditOutboxStore } from './audit-outbox.js';
 type WorkspaceScope = Extract<Scope, { kind: 'workspace' }>;
 
 export type MaterializeSignalAlertResult = {
-  status: 'created' | 'existing' | 'reopened';
+  status: 'created' | 'existing' | 'reopened' | 'updated';
   alert: Alert;
 };
 
@@ -19,6 +19,13 @@ function canReopen(existing: Alert, candidate: DerivedSignalAlert): boolean {
   const resolvedAt = Date.parse(existing.resolvedAt);
   const occurredAt = Date.parse(candidate.occurredAt);
   return Number.isFinite(resolvedAt) && Number.isFinite(occurredAt) && occurredAt > resolvedAt;
+}
+
+function canApplyPolicyUpdate(existing: Alert, candidate: DerivedSignalAlert): boolean {
+  return (
+    (existing.status === 'open' || existing.status === 'acknowledged') &&
+    existing.severity !== candidate.severity
+  );
 }
 
 export class MongoIntegrationSignalAlertStore {
@@ -72,51 +79,91 @@ export class MongoIntegrationSignalAlertStore {
 
     const existing = await this.alerts.findOne(filter);
     if (existing) {
-      if (!canReopen(existing, candidate)) return { status: 'existing', alert: existing };
-
-      return this.transaction(async (session) => {
-        const now = new Date().toISOString();
-        const update = await this.alerts.updateOne(
-          { ...filter, status: 'resolved', updatedAt: existing.updatedAt },
-          {
-            $set: {
-              status: 'open',
-              title: candidate.title,
-              severity: candidate.severity,
-              updatedAt: now,
+      if (canReopen(existing, candidate)) {
+        return this.transaction(async (session) => {
+          const now = new Date().toISOString();
+          const update = await this.alerts.updateOne(
+            { ...filter, status: 'resolved', updatedAt: existing.updatedAt },
+            {
+              $set: {
+                status: 'open',
+                title: candidate.title,
+                severity: candidate.severity,
+                updatedAt: now,
+              },
+              $unset: { acknowledgedAt: '', resolvedAt: '' },
             },
-            $unset: { acknowledgedAt: '', resolvedAt: '' },
-          },
-          { session },
-        );
-        if (update.matchedCount === 0) {
-          const current = await this.alerts.findOne(filter, { session });
-          if (!current) throw new Error('integration_signal_alert_reopen_lost');
-          return { status: 'existing', alert: current };
-        }
+            { session },
+          );
+          if (update.matchedCount === 0) {
+            const current = await this.alerts.findOne(filter, { session });
+            if (!current) throw new Error('integration_signal_alert_reopen_lost');
+            return { status: 'existing', alert: current };
+          }
 
-        const reopened = await this.alerts.findOne(filter, { session });
-        if (!reopened) throw new Error('integration_signal_alert_reopen_failed');
-        await this.outbox.enqueue(
-          {
-            scope,
-            type: 'alert.reopened',
-            entityType: 'alert',
-            entityId: reopened.id,
-            summary: reopened.title,
-            source: 'integration-rules',
-            metadata: {
-              ruleId: candidate.ruleId,
-              signalId: candidate.signalId,
-              signalType: candidate.signalType,
-              severity: candidate.severity,
-              occurredAt: candidate.occurredAt,
+          const reopened = await this.alerts.findOne(filter, { session });
+          if (!reopened) throw new Error('integration_signal_alert_reopen_failed');
+          await this.outbox.enqueue(
+            {
+              scope,
+              type: 'alert.reopened',
+              entityType: 'alert',
+              entityId: reopened.id,
+              summary: reopened.title,
+              source: 'integration-rules',
+              metadata: {
+                ruleId: candidate.ruleId,
+                signalId: candidate.signalId,
+                signalType: candidate.signalType,
+                severity: candidate.severity,
+                occurredAt: candidate.occurredAt,
+              },
             },
-          },
-          session,
-        );
-        return { status: 'reopened', alert: reopened };
-      });
+            session,
+          );
+          return { status: 'reopened', alert: reopened };
+        });
+      }
+
+      if (canApplyPolicyUpdate(existing, candidate)) {
+        return this.transaction(async (session) => {
+          const now = new Date().toISOString();
+          const update = await this.alerts.updateOne(
+            { ...filter, status: existing.status, updatedAt: existing.updatedAt },
+            { $set: { severity: candidate.severity, updatedAt: now } },
+            { session },
+          );
+          if (update.matchedCount === 0) {
+            const current = await this.alerts.findOne(filter, { session });
+            if (!current) throw new Error('integration_signal_alert_policy_update_lost');
+            return { status: 'existing', alert: current };
+          }
+          const updated = await this.alerts.findOne(filter, { session });
+          if (!updated) throw new Error('integration_signal_alert_policy_update_failed');
+          await this.outbox.enqueue(
+            {
+              scope,
+              type: 'alert.policy_updated',
+              entityType: 'alert',
+              entityId: updated.id,
+              summary: updated.title,
+              source: 'automation-rules',
+              metadata: {
+                ruleId: candidate.ruleId,
+                signalId: candidate.signalId,
+                signalType: candidate.signalType,
+                previousSeverity: existing.severity,
+                severity: candidate.severity,
+                occurredAt: candidate.occurredAt,
+              },
+            },
+            session,
+          );
+          return { status: 'updated', alert: updated };
+        });
+      }
+
+      return { status: 'existing', alert: existing };
     }
 
     const now = new Date().toISOString();
