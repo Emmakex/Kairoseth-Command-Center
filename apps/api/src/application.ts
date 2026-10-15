@@ -4,6 +4,7 @@ import { buildApp as buildBaseApp } from './app';
 import type { ReadinessCheck } from './app';
 import { registerDecisionCompatibilityGuard } from './decision-compatibility';
 import { registerDecisionLifecycleRoutes } from './decisions';
+import type { DecisionLifecycleStore } from './decision-lifecycle-store';
 import { registerGitHubConnectionRoutes } from './github-connections';
 import type { GitHubConnectionStore } from './github-connection-store';
 import type { GitHubProviderClient } from './github-provider-client';
