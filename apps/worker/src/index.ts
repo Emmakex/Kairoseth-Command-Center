@@ -2,10 +2,12 @@ import { MongoClient } from 'mongodb';
 import { loadWorkerConfig } from '@kcc/config';
 import { executeGitHubRepositorySignals } from '@kcc/integrations/github-signal-executor';
 import { GitHubProviderError, GitHubRestClient } from '@kcc/integrations/github';
+import { deriveAlertsFromIntegrationSignals } from '@kcc/integrations/signal-alert-rules';
 import { MongoAuditOutboxStore } from '@kcc/persistence/audit-outbox';
 import { MongoGitHubScheduleDiscoveryStore } from '@kcc/persistence/github-schedule-discovery';
 import { MongoGitHubSignalRuntimeStore } from '@kcc/persistence/github-signal-runtime';
 import { MongoEncryptedIntegrationSecretStore } from '@kcc/persistence/integration-secrets';
+import { MongoIntegrationSignalAlertStore } from '@kcc/persistence/integration-signal-alerts';
 import { MongoIntegrationSignalStore } from '@kcc/persistence/integration-signals';
 import {
   MongoIntegrationSyncJobStore,
@@ -20,6 +22,7 @@ const db = mongo.db();
 const outbox = new MongoAuditOutboxStore(db);
 const syncJobs = new MongoIntegrationSyncJobStore(db);
 const syncSchedules = new MongoIntegrationSyncScheduleStore(db);
+const signalAlerts = new MongoIntegrationSignalAlertStore(mongo, db);
 const integrationSecretKey = config.KCC_INTEGRATION_SECRET_KEY;
 
 const githubExecution = integrationSecretKey
@@ -140,6 +143,14 @@ async function executeGitHubSignalJob(job: IntegrationSyncJob): Promise<void> {
     });
 
     await githubExecution.signalStore.upsertSignals(runtime.workspaceId, signals);
+
+    const alertCandidates = deriveAlertsFromIntegrationSignals(signals);
+    let derivedAlertCount = 0;
+    for (const candidate of alertCandidates) {
+      const result = await signalAlerts.materialize(runtime.workspaceId, candidate);
+      if (result.status === 'created') derivedAlertCount += 1;
+    }
+
     const completed = await syncJobs.complete(job.id, claimToken);
     if (!completed) {
       workerLog('error', 'github_refresh.complete_claim_lost', {
@@ -153,6 +164,8 @@ async function executeGitHubSignalJob(job: IntegrationSyncJob): Promise<void> {
       jobId: job.id,
       resourceId: job.resourceId,
       signalCount: signals.length,
+      alertCandidateCount: alertCandidates.length,
+      derivedAlertCount,
     });
   } catch (error) {
     if (error instanceof GitHubProviderError) {
@@ -209,6 +222,7 @@ async function tick() {
         outbox.ensureIndexes(),
         syncJobs.ensureIndexes(),
         syncSchedules.ensureIndexes(),
+        signalAlerts.ensureIndexes(),
         ...(githubExecution
           ? [githubExecution.secretStore.ensureIndexes(), githubExecution.signalStore.ensureIndexes()]
           : []),
