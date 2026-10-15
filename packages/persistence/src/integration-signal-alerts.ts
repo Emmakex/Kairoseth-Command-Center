@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { ClientSession, Collection, Db, MongoClient } from 'mongodb';
+import { MongoServerError, type ClientSession, type Collection, type Db, type MongoClient } from 'mongodb';
 import type { Alert, Scope } from '@kcc/domain';
 import type { DerivedSignalAlert } from '@kcc/integrations/signal-alert-rules';
 import { MongoAuditOutboxStore } from './audit-outbox.js';
@@ -68,35 +68,43 @@ export class MongoIntegrationSignalAlertStore {
       ...(candidate.projectId ? { projectId: candidate.projectId } : {}),
     };
 
-    return this.transaction(async (session) => {
-      const result = await this.alerts.updateOne(
-        { scope, fingerprint: candidate.fingerprint },
-        { $setOnInsert: alert },
-        { upsert: true, session },
-      );
-      const stored = await this.alerts.findOne({ scope, fingerprint: candidate.fingerprint }, { session });
-      if (!stored) throw new Error('integration_signal_alert_materialization_failed');
-      if (result.upsertedCount === 0) return { status: 'existing', alert: stored };
+    try {
+      return await this.transaction(async (session) => {
+        const result = await this.alerts.updateOne(
+          { scope, fingerprint: candidate.fingerprint },
+          { $setOnInsert: alert },
+          { upsert: true, session },
+        );
+        const stored = await this.alerts.findOne({ scope, fingerprint: candidate.fingerprint }, { session });
+        if (!stored) throw new Error('integration_signal_alert_materialization_failed');
+        if (result.upsertedCount === 0) return { status: 'existing', alert: stored };
 
-      await this.outbox.enqueue(
-        {
-          scope,
-          type: 'alert.derived',
-          entityType: 'alert',
-          entityId: stored.id,
-          summary: stored.title,
-          source: 'integration-rules',
-          metadata: {
-            ruleId: candidate.ruleId,
-            signalId: candidate.signalId,
-            signalType: candidate.signalType,
-            severity: candidate.severity,
-            occurredAt: candidate.occurredAt,
+        await this.outbox.enqueue(
+          {
+            scope,
+            type: 'alert.derived',
+            entityType: 'alert',
+            entityId: stored.id,
+            summary: stored.title,
+            source: 'integration-rules',
+            metadata: {
+              ruleId: candidate.ruleId,
+              signalId: candidate.signalId,
+              signalType: candidate.signalType,
+              severity: candidate.severity,
+              occurredAt: candidate.occurredAt,
+            },
           },
-        },
-        session,
-      );
-      return { status: 'created', alert: stored };
-    });
+          session,
+        );
+        return { status: 'created', alert: stored };
+      });
+    } catch (error) {
+      if (error instanceof MongoServerError && error.code === 11000) {
+        const existing = await this.alerts.findOne({ scope, fingerprint: candidate.fingerprint });
+        if (existing) return { status: 'existing', alert: existing };
+      }
+      throw error;
+    }
   }
 }
