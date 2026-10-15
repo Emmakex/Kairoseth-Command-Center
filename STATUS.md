@@ -4,7 +4,7 @@
 **Technical/internal project:** Kairoseth Command Center  
 **Commercial names:** Gestor de Trabajo (ES) / Work Manager (EN)  
 **Category:** Kairoseth Software  
-**Status:** Phase 3 is closed. Phase 4 Slices 1–4b are merged and post-merge validated. Slice 4c is the active front: durable provider-neutral signal history for the dashboard.
+**Status:** Phase 3 is closed. Phase 4 Slices 1–4c are merged and post-merge validated. Slice 5a is the active front: durable provider-neutral integration sync jobs with leases and retry/backoff semantics.
 
 ## Naming rule / Regla de naming
 
@@ -60,41 +60,28 @@
 - [x] `integrations.manage` + `command-center` entitlement enforcement.
 - [x] Transactional link/unlink + audit outbox.
 - [x] Dedicated GitHub repository-links Docker smoke.
-- [x] PR #15 merged as `2c1219f4e0f6b7d568a1c0edb56026c1915ec121`.
-- [x] Post-merge CI #104, Local identities #30, Standalone #17 and Repository links #2 green.
+- [x] PR #15 merged as `2c1219f4e0f6b7d568a1c0edb56026c1915ec121` and validated.
 
 **Slice 1: CLOSED / CERRADA.**
 
 ### Slice 2 — encrypted GitHub connections (PR #16)
 
-- [x] Optional runtime `KCC_INTEGRATION_SECRET_KEY` (32 bytes / 64 hex chars).
-- [x] AES-256-GCM encrypted vault in separate `integration_secrets` collection.
-- [x] Workspace ID + `secretRef` authenticated as AAD.
-- [x] Plaintext token never persisted in domain documents or Mongo secret records.
-- [x] Create/list/rotate/delete GitHub connection API.
-- [x] API redacts token, `secretRef`, ciphertext, IV and auth tag.
-- [x] Missing vault key fails closed for credential operations without breaking core Work Manager features.
-- [x] Transactional credential rotation/deletion and audit delivery.
-- [x] Delete refuses while an `ExternalResource.connectionId` references the connection.
-- [x] Unit tests for permissions, redaction and ciphertext workspace/ref isolation.
-- [x] Dedicated encrypted-connection Docker smoke.
-- [x] Gitleaks false-positive fixture removed from PR history without adding scanner exceptions.
-- [x] PR #16 merged as `79053390c192c3b906847e2dab735ecf91d51531`.
-- [x] Post-merge CI #111, Local identities #37, Standalone #24, Repository links #9 and GitHub connections #7 green.
+- [x] AES-256-GCM encrypted provider credential vault with workspace/ref AAD.
+- [x] Create/list/rotate/delete GitHub connection API with redacted responses.
+- [x] Missing vault key fails closed for credential-backed actions.
+- [x] Transactional credential lifecycle and audit delivery.
+- [x] PR #16 merged as `79053390c192c3b906847e2dab735ecf91d51531` and post-merge validated.
 
 **Slice 2: CLOSED / CERRADA.**
 
 ### Slice 3 — live validation + manual repository sync (PR #17)
 
-- [x] Trusted deployment-level `KCC_GITHUB_API_BASE_URL`, defaulting to `https://api.github.com`.
-- [x] Isolated `GitHubRestClient` with bearer auth, provider timeout and normalized error categories.
-- [x] New/rotated credentials become `unverified`; only provider validation promotes to `active`.
+- [x] Trusted GitHub provider base URL and normalized provider client/errors.
+- [x] Provider credential validation with `unverified → active` lifecycle.
 - [x] Validated repository binding and manual repository sync.
 - [x] Normalized repository/default-branch/latest-commit snapshot.
-- [x] Provider errors and validation/sync audit paths normalized without credential leakage.
 - [x] Strict GitHub HTTP mock and dedicated live validation/sync Docker smoke.
-- [x] PR #17 final head passed all six gates and merged as `2e9062b373bcef4ffea407eecfe7863c1b5336f4`.
-- [x] Post-merge `main` validation completed without a failed gate.
+- [x] PR #17 merged as `2e9062b373bcef4ffea407eecfe7863c1b5336f4` and post-merge validated.
 
 **Slice 3: CLOSED / CERRADA.**
 
@@ -103,61 +90,68 @@
 - [x] Normalize pull requests, issues and Actions workflow runs into provider-neutral `IntegrationSignal`.
 - [x] Exclude PRs returned by GitHub's issues endpoint to prevent duplicate signals.
 - [x] `GET /v1/integrations/github/repositories/:resourceId/signals?limit=20`.
-- [x] Require `projects.read` + `command-center` entitlement for signal consumption.
+- [x] Require `projects.read` + `command-center` entitlement.
 - [x] Derive workspace, repository coordinates and encrypted credential server-side.
-- [x] Sort combined signals by latest provider activity and cap the response at 50.
-- [x] Normalize provider 401 and invalidate the affected connection without credential leakage.
-- [x] Tolerate historical workflow runs without `head_branch`.
-- [x] API Docker image includes the `@kcc/integrations` workspace dependency.
-- [x] PR #18 final head `a06246f1d4844d5baf50b9b5bd210ec2299ae1cb` passed all six gates.
+- [x] Sort signals by provider activity and tolerate historical workflow runs without a branch.
 - [x] PR #18 merged as `570bc0154fa167a9f3ee84d3dba93bb406757d9b` and post-merge validated.
 
 **Slice 4a: CLOSED / CERRADA.**
 
 ### Slice 4b — normalized release signals (PR #19)
 
-- [x] Normalize GitHub published releases, prereleases and drafts.
-- [x] Tolerate nullable release `name` and `published_at` fields.
-- [x] Map releases to existing `repository.release` `IntegrationSignal`.
-- [x] Use `published_at` when available and `created_at` otherwise.
-- [x] Include releases in the existing repository signal endpoint and global recent-first ordering.
-- [x] Provider/API tests cover release normalization and draft/null-field behavior.
-- [x] PR #19 final head `e6b4454933d33a3f1737d0af41b51cb43ac4735f` passed all six gates.
-- [x] PR #19 merged as `4a6619f84c55b67aa211014a46b85062d739fbae`.
-- [x] Post-merge `main` started six workflows; all completed with no failure or cancellation.
+- [x] Normalize published releases, prereleases and drafts.
+- [x] Tolerate nullable release `name` and `published_at`.
+- [x] Map releases to `repository.release` with provider-derived timestamps.
+- [x] PR #19 merged as `4a6619f84c55b67aa211014a46b85062d739fbae` and post-merge validated.
 
 **Slice 4b: CLOSED / CERRADA.**
 
-### Slice 4c — durable provider-neutral signal history
+### Slice 4c — durable provider-neutral signal history (PR #20)
+
+- [x] Mongo `integration_signals` store using provider-neutral `IntegrationSignal`.
+- [x] Idempotent `{ workspaceId, id }` upserts with batch de-duplication.
+- [x] Indexed internal `resourceId` / `projectId` fields and durable ingestion timestamps.
+- [x] Reject cross-workspace writes and invalid signal IDs/timestamps.
+- [x] Persist the complete normalized GitHub signal set after successful live refresh.
+- [x] Provider-neutral `GET /v1/integrations/signals` history endpoint.
+- [x] Resource/project/type filters with authenticated workspace isolation.
+- [x] Runtime index bootstrap and worker Docker dependency graph updated.
+- [x] API coverage for durable refresh, filters, isolation and authorization.
+- [x] PR #20 final head `e49083ff039028d8f24fd3cd25531a6651ef51fe` passed all six gates.
+- [x] PR #20 merged as `7b38bcf105a766ad39e697e181a634a0321c60ad`.
+- [x] Post-merge `main` ran six workflows; all completed with no failure or cancellation.
+
+**Slice 4c: CLOSED / CERRADA.**
+
+### Slice 5a — durable integration sync job queue
 
 Implemented in the active branch:
 
-- [x] Add Mongo `integration_signals` store using the provider-neutral `IntegrationSignal` contract.
-- [x] Unique idempotency boundary `{ workspaceId, id }`.
-- [x] Flatten `resourceId` and `projectId` into internal indexed fields while preserving public provider-neutral payloads.
-- [x] Track first `ingestedAt` and latest local `updatedAt` internally.
-- [x] Reject signal writes whose workspace does not match the authenticated server path.
-- [x] Persist the complete normalized GitHub signal set after every successful live refresh.
-- [x] Add provider-neutral `GET /v1/integrations/signals` history endpoint.
-- [x] Filter history by resource, project and supported signal type; default 50/max 100 results.
-- [x] Derive history workspace from the authenticated session and require `projects.read` + product entitlement.
-- [x] Bootstrap signal indexes with the API runtime.
-- [x] Update worker Docker context for the new `@kcc/persistence` → `@kcc/integrations` dependency.
-- [x] Add API tests for durable refresh wiring, history filtering, workspace isolation and authorization.
-- [x] Add ES/EN persistence architecture documentation.
+- [x] Provider-neutral Mongo `integration_sync_jobs` queue.
+- [x] Job lifecycle: `pending → processing → completed`, retry path and terminal `dead` state.
+- [x] Active-job dedupe boundary `{ workspaceId, dedupeKey }`.
+- [x] Atomic oldest-due claim with random claim token and bounded lease.
+- [x] Only the active claim holder may complete or retry a job.
+- [x] Bounded exponential retry backoff: 30s base, 60m cap by default.
+- [x] Configurable max attempts with hard cap of 20.
+- [x] Expired processing leases requeue safely with normalized `lease_expired` error code.
+- [x] Worker initializes queue indexes and repairs expired leases without claiming jobs yet.
+- [x] Unit coverage for retry/backoff boundaries.
+- [x] ES/EN architecture documentation for the queue and worker trust boundary.
 - [ ] Open PR and complete CI/type/test/build/security/Docker gates.
 - [ ] Merge and post-merge validation.
 
 ### Deferred Phase 4 slices
 
-- [ ] Scheduled/retryable sync jobs and rate-limit-aware backoff.
+- [ ] Slice 5b: shared GitHub sync executor + worker job execution.
+- [ ] Slice 5c: recurring schedule generation and provider rate-limit-aware `availableAt` handling.
 - [ ] Verified GitHub webhooks.
 - [ ] GitHub-derived alerts and rule automation.
 - [ ] OAuth/GitHub App authorization flow after the token-backed adapter boundary is proven.
 
 ## Security invariants
 
-1. Workspace/private scope is derived from the authenticated session, never authorized by raw client tenant/user IDs.
+1. Workspace/private scope is derived from authenticated/server-controlled context, never authorized by raw client tenant/user IDs.
 2. Product entitlement and capability checks are server-enforced.
 3. MongoDB queries include the applicable scope boundary.
 4. Timeline/audit events are server-authored and delivered idempotently through the transactional outbox.
@@ -172,30 +166,30 @@ Implemented in the active branch:
 13. Public API responses never expose provider token, `secretRef`, ciphertext, IV or auth tag.
 14. GitHub provider base URL is deployment configuration, never HTTP request input.
 15. Validation, sync and signal reads derive credentials and repository coordinates server-side.
-16. A repository may use credential-backed reads only through a same-workspace connection with `active` + `lastValidatedAt`.
-17. Provider responses are normalized before persistence or client exposure.
-18. Provider errors are reduced to stable error categories; raw provider bodies are not returned.
-19. Credential rotation returns a connection to `unverified` and clears prior validation metadata.
-20. A provider 401 during sync or signal retrieval marks the connection invalid; repo-specific access errors do not silently invalidate it.
-21. Signal consumption is read-only and requires `projects.read`; integration configuration remains restricted to `integrations.manage`.
-22. Release timestamps are provider-derived; `created_at` is used only when `published_at` is absent.
-23. Durable signal identity is workspace-scoped; repeated provider refreshes upsert rather than duplicate the same signal.
-24. Persisted history queries always include the authenticated workspace boundary.
-25. Internal ingestion/index metadata is not exposed through the public signal contract.
+16. Provider responses are normalized before persistence or client exposure.
+17. Provider errors are reduced to stable error categories; raw provider bodies are not returned.
+18. Durable signal identity is workspace-scoped; repeated provider refreshes upsert rather than duplicate.
+19. Persisted history queries always include the authenticated workspace boundary.
+20. Sync jobs never contain provider credentials or raw provider response bodies.
+21. Active jobs are workspace-scoped and deduplicated by a server-generated semantic key.
+22. Processing ownership is enforced with claim tokens and bounded leases.
+23. Expired worker claims are recovered before future execution.
+24. The worker does not claim integration jobs until the credential-backed executor exists as shared runtime code.
 
 ## Next / Siguiente
 
-1. Open and validate the Slice 4c persistence PR.
-2. Merge only when all final-head gates are green, then validate `main`.
-3. Add scheduled/retryable refresh jobs and rate-limit-aware backoff as the next isolated slice.
-4. Add verified webhooks only after scheduled durable ingestion is stable.
-5. Add signal-derived alerts and rule automation only after event ingestion is durable.
-6. When commercial publication is scheduled, create the Kairoseth Software catalog entry as **Gestor de Trabajo / Work Manager**.
+1. Validate and merge Slice 5a only when all final-head gates are green.
+2. Extract a shared GitHub sync executor so API and worker use the same credential/repository/signal logic.
+3. Enable worker claim/complete/retry against the durable queue.
+4. Add recurring schedule generation and rate-limit-aware next-run/backoff semantics.
+5. Add verified webhooks only after scheduled durable ingestion is stable.
+6. Add signal-derived alerts/rules only after all ingestion paths are durable.
+7. When commercial publication is scheduled, create the Kairoseth Software catalog entry as **Gestor de Trabajo / Work Manager**.
 
 ## Current blockers / Bloqueos actuales
 
-No known product blocker. Slice 4c durable signal history is the active development front.
+No known product blocker. Slice 5a durable sync job queue is the active development front.
 
 ## Operating rule
 
-Update this file at meaningful milestones. Keep Phase 4 slices small; do not mix provider reads, persistence, scheduling, webhooks and automation rules in one PR.
+Update this file at meaningful milestones. Keep Phase 4 slices small; do not mix queue infrastructure, credential-backed execution, recurring scheduling, webhooks and automation rules in one PR.
