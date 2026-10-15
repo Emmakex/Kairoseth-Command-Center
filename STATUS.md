@@ -4,7 +4,7 @@
 **Technical/internal project:** Kairoseth Command Center  
 **Commercial names:** Gestor de Trabajo (ES) / Work Manager (EN)  
 **Category:** Kairoseth Software  
-**Status:** Phase 3 is closed. Phase 4 Slices 1–4c are merged and post-merge validated. Slice 5a is the active front: durable provider-neutral integration sync jobs with leases and retry/backoff semantics.
+**Status:** Phase 3 is closed. Phase 4 Slices 1–5b are merged and validated. Slice 5c is implemented in PR #25 and is completing final-head validation; verified GitHub webhooks are next.
 
 ## Naming rule / Regla de naming
 
@@ -117,35 +117,67 @@
 - [x] Resource/project/type filters with authenticated workspace isolation.
 - [x] Runtime index bootstrap and worker Docker dependency graph updated.
 - [x] API coverage for durable refresh, filters, isolation and authorization.
-- [x] PR #20 final head `e49083ff039028d8f24fd3cd25531a6651ef51fe` passed all six gates.
-- [x] PR #20 merged as `7b38bcf105a766ad39e697e181a634a0321c60ad`.
-- [x] Post-merge `main` ran six workflows; all completed with no failure or cancellation.
+- [x] PR #20 merged as `7b38bcf105a766ad39e697e181a634a0321c60ad` and post-merge validated.
 
 **Slice 4c: CLOSED / CERRADA.**
 
-### Slice 5a — durable integration sync job queue
-
-Implemented in the active branch:
+### Slice 5a — durable integration sync job queue (PR #21)
 
 - [x] Provider-neutral Mongo `integration_sync_jobs` queue.
-- [x] Job lifecycle: `pending → processing → completed`, retry path and terminal `dead` state.
-- [x] Active-job dedupe boundary `{ workspaceId, dedupeKey }`.
-- [x] Atomic oldest-due claim with random claim token and bounded lease.
-- [x] Only the active claim holder may complete or retry a job.
-- [x] Bounded exponential retry backoff: 30s base, 60m cap by default.
-- [x] Configurable max attempts with hard cap of 20.
-- [x] Expired processing leases requeue safely with normalized `lease_expired` error code.
-- [x] Worker initializes queue indexes and repairs expired leases without claiming jobs yet.
-- [x] Unit coverage for retry/backoff boundaries.
-- [x] ES/EN architecture documentation for the queue and worker trust boundary.
-- [ ] Open PR and complete CI/type/test/build/security/Docker gates.
-- [ ] Merge and post-merge validation.
+- [x] Durable `pending → processing → completed/retry/dead` lifecycle.
+- [x] Workspace-scoped active-job dedupe boundary.
+- [x] Atomic due-job claim with claim token and bounded lease.
+- [x] Claim-token ownership for complete/retry transitions.
+- [x] Bounded exponential retry/backoff and hard attempt ceiling.
+- [x] Expired processing lease recovery.
+- [x] Unit coverage and ES/EN queue architecture documentation.
+- [x] PR #21 merged as `5a0b15e31257b42777e7da4d32a79fc33dab0f27`.
+
+**Slice 5a: CLOSED / CERRADA.**
+
+### Slice 5b — credential-backed worker execution (PRs #22–#24)
+
+- [x] GitHub repository-signal jobs are claimed and executed by the worker.
+- [x] Repository → validated connection → encrypted credential is resolved server-side.
+- [x] Provider credentials never enter durable jobs.
+- [x] Normalized PR/issue/workflow/release signals are persisted idempotently.
+- [x] Unauthorized credentials invalidate the connection; terminal/retryable provider failures are separated.
+- [x] Dedicated worker/background Docker smoke validates the real queue → worker → provider → signal path.
+- [x] Worker runtime/configuration and Docker networking gaps exposed after PR #22 were repaired in PR #23.
+- [x] API and worker share the same GitHub provider fetch + normalization executor after PR #24.
+- [x] PR #23 merged as `156b0e86931b70cab090abe7e8b9b9090e4658e7` with all seven gates green.
+- [x] PR #24 merged as `ed1542f1e3402a0d5b3b6a09b740c83df94226ce` with all seven gates green.
+
+**Slice 5b: CLOSED / CERRADA.**
+
+## Active / Activo
+
+### Slice 5c — durable recurring GitHub refresh schedules (PR #25)
+
+Implemented on the active PR:
+
+- [x] Provider-neutral `integration_sync_schedules` persistence with bounded cadence and leases.
+- [x] Tenant-safe discovery requiring a same-workspace active validated GitHub connection.
+- [x] One recurring `repository_signals` schedule per eligible GitHub repository.
+- [x] Default GitHub cadence of 15 minutes.
+- [x] Newly discovered schedules start after the first cadence instead of racing the initial/manual refresh.
+- [x] Existing schedule discovery preserves `nextRunAt` and active claims.
+- [x] Due schedule claim → deduplicated durable job enqueue → next-run advancement.
+- [x] Expired schedule lease recovery and bounded enqueue retry.
+- [x] GitHub rate-limit timing from `Retry-After` / `X-RateLimit-Reset` is persisted into durable job retry availability.
+- [x] Dedicated recurring-refresh Docker smoke covers schedule → job → worker → signals → next run.
+- [x] Existing background-refresh smoke remains compatible with recurring scheduling.
+- [x] No provider token is persisted in schedule/job operational records.
+- [x] ES/EN recurring scheduling and recovery documentation.
+- [ ] Final-head eight-gate validation after status update.
+- [ ] Merge PR #25 and validate `main` post-merge.
+
+**Slice 5c: FINAL VALIDATION / VALIDACIÓN FINAL.**
 
 ### Deferred Phase 4 slices
 
-- [ ] Slice 5b: shared GitHub sync executor + worker job execution.
-- [ ] Slice 5c: recurring schedule generation and provider rate-limit-aware `availableAt` handling.
-- [ ] Verified GitHub webhooks.
+- [ ] Verified GitHub webhooks with exact raw-body HMAC verification and replay protection.
+- [ ] Webhook-triggered enqueue through the existing durable `repository_signals` job path.
 - [ ] GitHub-derived alerts and rule automation.
 - [ ] OAuth/GitHub App authorization flow after the token-backed adapter boundary is proven.
 
@@ -174,22 +206,27 @@ Implemented in the active branch:
 21. Active jobs are workspace-scoped and deduplicated by a server-generated semantic key.
 22. Processing ownership is enforced with claim tokens and bounded leases.
 23. Expired worker claims are recovered before future execution.
-24. The worker does not claim integration jobs until the credential-backed executor exists as shared runtime code.
+24. The worker claims only the GitHub job kind it can execute and resolves credentials server-side at execution time.
+25. Recurring discovery requires the repository and active validated connection to belong to the same workspace.
+26. Recurring schedules contain operational identifiers and cadence only, never provider credentials.
+27. Schedule ownership is protected by bounded claim leases; recurring enqueue is deduplicated by schedule + due timestamp.
+28. Initial discovery does not immediately enqueue a second refresh; recurrence starts after its configured cadence.
 
 ## Next / Siguiente
 
-1. Validate and merge Slice 5a only when all final-head gates are green.
-2. Extract a shared GitHub sync executor so API and worker use the same credential/repository/signal logic.
-3. Enable worker claim/complete/retry against the durable queue.
-4. Add recurring schedule generation and rate-limit-aware next-run/backoff semantics.
-5. Add verified webhooks only after scheduled durable ingestion is stable.
-6. Add signal-derived alerts/rules only after all ingestion paths are durable.
-7. When commercial publication is scheduled, create the Kairoseth Software catalog entry as **Gestor de Trabajo / Work Manager**.
+1. Require all eight checks green on PR #25 final head, then merge and validate `main`.
+2. Create a clean branch from the resulting `main` for verified GitHub webhooks.
+3. Verify the exact raw request body with HMAC-SHA256 and a connection-specific encrypted webhook secret.
+4. Add tenant/connection-scoped delivery-ID replay protection.
+5. Route accepted webhook events into the existing durable `repository_signals` queue; do not persist signals directly from webhook payloads.
+6. Keep recurring polling as reconciliation/fallback even after webhooks are active.
+7. Add signal-derived alerts/rules only after both scheduled and webhook ingestion are durable.
+8. When commercial publication is scheduled, create the Kairoseth Software catalog entry as **Gestor de Trabajo / Work Manager**.
 
 ## Current blockers / Bloqueos actuales
 
-No known product blocker. Slice 5a durable sync job queue is the active development front.
+No known product blocker. PR #25 is in final CI validation after fixing the first-run schedule race exposed by the background and recurring Docker smokes.
 
 ## Operating rule
 
-Update this file at meaningful milestones. Keep Phase 4 slices small; do not mix queue infrastructure, credential-backed execution, recurring scheduling, webhooks and automation rules in one PR.
+Update this file at meaningful milestones. Keep Phase 4 slices small; do not mix recurring scheduling, webhooks and automation rules in one PR.
