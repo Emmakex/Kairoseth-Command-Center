@@ -1,0 +1,88 @@
+name: GitHub verified webhook smoke
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  github-webhook-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build and start stack with provider mocks
+        run: |
+          export KCC_AUTH_MODE=local
+          export KCC_LOCAL_ADMIN_EMAIL=ci-github-webhook@kcc.local
+          export KCC_LOCAL_ADMIN_PASSWORD="ci-github-webhook-${GITHUB_RUN_ID}-password"
+          export KCC_LOCAL_AUTH_SECRET="$(openssl rand -hex 32)"
+          export KCC_INTEGRATION_SECRET_KEY="$(openssl rand -hex 32)"
+          export KCC_GITHUB_MOCK_TOKEN="mock-${GITHUB_RUN_ID}-$(openssl rand -hex 16)"
+          export KCC_WORKER_POLL_MS=1000
+          {
+            echo "KCC_AUTH_MODE=$KCC_AUTH_MODE"
+            echo "KCC_LOCAL_ADMIN_EMAIL=$KCC_LOCAL_ADMIN_EMAIL"
+            echo "KCC_LOCAL_ADMIN_PASSWORD=$KCC_LOCAL_ADMIN_PASSWORD"
+            echo "KCC_LOCAL_AUTH_SECRET=$KCC_LOCAL_AUTH_SECRET"
+            echo "KCC_INTEGRATION_SECRET_KEY=$KCC_INTEGRATION_SECRET_KEY"
+            echo "KCC_GITHUB_MOCK_TOKEN=$KCC_GITHUB_MOCK_TOKEN"
+            echo "KCC_WORKER_POLL_MS=$KCC_WORKER_POLL_MS"
+          } >> "$GITHUB_ENV"
+          docker compose \
+            -f docker-compose.yml \
+            -f deployment/docker/docker-compose.github-mock.yml \
+            -f deployment/docker/docker-compose.github-background-mock.yml \
+            up -d --build
+
+      - name: Wait for API readiness
+        run: |
+          for attempt in {1..60}; do
+            if curl --fail --silent http://localhost:4000/ready >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose \
+            -f docker-compose.yml \
+            -f deployment/docker/docker-compose.github-mock.yml \
+            -f deployment/docker/docker-compose.github-background-mock.yml \
+            ps
+          docker compose \
+            -f docker-compose.yml \
+            -f deployment/docker/docker-compose.github-mock.yml \
+            -f deployment/docker/docker-compose.github-background-mock.yml \
+            logs api worker github-mock github-background-mock
+          exit 1
+
+      - name: Smoke verified GitHub webhook refresh
+        run: |
+          KCC_SMOKE_RUN_ID="$GITHUB_RUN_ID" \
+            bash deployment/docker/smoke-github-webhook-refresh.sh
+
+      - name: Show service state on failure
+        if: failure()
+        run: |
+          docker compose \
+            -f docker-compose.yml \
+            -f deployment/docker/docker-compose.github-mock.yml \
+            -f deployment/docker/docker-compose.github-background-mock.yml \
+            ps
+          docker compose \
+            -f docker-compose.yml \
+            -f deployment/docker/docker-compose.github-mock.yml \
+            -f deployment/docker/docker-compose.github-background-mock.yml \
+            logs --no-color
+
+      - name: Stop stack
+        if: always()
+        run: |
+          docker compose \
+            -f docker-compose.yml \
+            -f deployment/docker/docker-compose.github-mock.yml \
+            -f deployment/docker/docker-compose.github-background-mock.yml \
+            down -v
