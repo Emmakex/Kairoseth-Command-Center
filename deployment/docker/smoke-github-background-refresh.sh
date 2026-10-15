@@ -107,10 +107,24 @@ IFS='|' read -r ALERT_COUNT ALERT_ID ALERT_SEVERITY ALERT_STATUS <<< "$ALERT_DAT
 [[ "$ALERT_STATUS" == "open" ]]
 [[ -n "$ALERT_ID" ]]
 
-DERIVED_AUDIT_COUNT="$(${COMPOSE[@]} exec -T mongo mongosh --quiet kairoseth_command_center --eval "
+# `alert.derived` is delivered through the transactional audit outbox. The refresh job
+# may complete in the same worker tick that enqueues the outbox record, so wait for the
+# next drain instead of assuming Timeline is synchronous. Uniqueness is still strict.
+DERIVED_AUDIT_COUNT=0
+for attempt in {1..30}; do
+  DERIVED_AUDIT_COUNT="$(${COMPOSE[@]} exec -T mongo mongosh --quiet kairoseth_command_center --eval "
 print(db.timeline_events.countDocuments({type:'alert.derived',entityId:'$ALERT_ID','scope.workspaceId':'$WORKSPACE_ID'}));
 ")"
-DERIVED_AUDIT_COUNT="$(printf '%s' "$DERIVED_AUDIT_COUNT" | tr -d '\r\n')"
+  DERIVED_AUDIT_COUNT="$(printf '%s' "$DERIVED_AUDIT_COUNT" | tr -d '\r\n')"
+  if [[ "$DERIVED_AUDIT_COUNT" == "1" ]]; then
+    break
+  fi
+  if [[ "$DERIVED_AUDIT_COUNT" != "0" ]]; then
+    echo "Expected exactly one alert.derived event, found $DERIVED_AUDIT_COUNT" >&2
+    exit 1
+  fi
+  sleep 1
+done
 [[ "$DERIVED_AUDIT_COUNT" == "1" ]]
 
 WORKER_LOGS="$(${COMPOSE[@]} logs --no-color worker)"
