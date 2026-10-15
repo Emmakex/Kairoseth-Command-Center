@@ -1,6 +1,7 @@
 import { MongoClient } from 'mongodb';
 import { loadApiConfig } from '@kcc/config';
 import { MongoOperationalStore } from '@kcc/persistence';
+import { MongoGitHubWebhookStore } from '@kcc/persistence/github-webhooks';
 import { MongoIntegrationSignalStore } from '@kcc/persistence/integration-signals';
 import { MongoIntegrationSyncJobStore } from '@kcc/persistence/integration-sync-jobs';
 import { buildApp } from './application';
@@ -28,6 +29,9 @@ const integrationSecretStore = config.KCC_INTEGRATION_SECRET_KEY
 const githubConnectionStore = integrationSecretStore
   ? new MongoGitHubConnectionStore(mongo, mongo.db(), integrationSecretStore)
   : undefined;
+const githubWebhookStore = integrationSecretStore
+  ? new MongoGitHubWebhookStore(mongo, mongo.db(), integrationSecretStore)
+  : undefined;
 const localIdentityStore = new MongoLocalIdentityStore(mongo, mongo.db());
 let mongoReady = false;
 let localAuthProvider: PersistentLocalAuthProvider | undefined;
@@ -42,6 +46,7 @@ try {
     integrationSyncJobStore.ensureIndexes(),
     githubRepositoryStore.ensureIndexes(),
     ...(githubConnectionStore ? [githubConnectionStore.ensureIndexes()] : []),
+    ...(githubWebhookStore ? [githubWebhookStore.ensureIndexes()] : []),
   ]);
   mongoReady = true;
 
@@ -85,6 +90,7 @@ const app = buildApp({
   githubRepositoryStore,
   githubProviderClient,
   ...(githubConnectionStore ? { githubConnectionStore } : {}),
+  ...(githubWebhookStore ? { githubWebhookStore } : {}),
   ...(localAuthProvider
     ? {
         authProvider: localAuthProvider,
@@ -112,6 +118,7 @@ const app = buildApp({
             ? 'ok'
             : 'error',
       integrationSecrets: githubConnectionStore ? 'ok' : 'not_configured',
+      githubWebhooks: githubWebhookStore ? 'ok' : 'not_configured',
     };
   },
 });

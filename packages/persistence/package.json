@@ -10,6 +10,7 @@
     "./audit-outbox": { "types": "./dist/audit-outbox.d.ts", "import": "./dist/audit-outbox.js" },
     "./github-schedule-discovery": { "types": "./dist/github-schedule-discovery.d.ts", "import": "./dist/github-schedule-discovery.js" },
     "./github-signal-runtime": { "types": "./dist/github-signal-runtime.d.ts", "import": "./dist/github-signal-runtime.js" },
+    "./github-webhooks": { "types": "./dist/github-webhooks.d.ts", "import": "./dist/github-webhooks.js" },
     "./integration-secrets": { "types": "./dist/integration-secrets.d.ts", "import": "./dist/integration-secrets.js" },
     "./integration-signals": { "types": "./dist/integration-signals.d.ts", "import": "./dist/integration-signals.js" },
     "./integration-sync-jobs": { "types": "./dist/integration-sync-jobs.d.ts", "import": "./dist/integration-sync-jobs.js" },

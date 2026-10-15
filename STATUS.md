@@ -4,7 +4,7 @@
 **Technical/internal project:** Kairoseth Command Center  
 **Commercial names:** Gestor de Trabajo (ES) / Work Manager (EN)  
 **Category:** Kairoseth Software  
-**Status:** Phase 3 is closed. Phase 4 Slices 1–5b are merged and validated. Slice 5c is implemented in PR #25 and is completing final-head validation; verified GitHub webhooks are next.
+**Status:** Phase 3 is closed. Phase 4 Slices 1–5c are merged and post-merge validated. Slice 5d — verified GitHub webhooks — is active in PR #26.
 
 ## Naming rule / Regla de naming
 
@@ -150,11 +150,7 @@
 
 **Slice 5b: CLOSED / CERRADA.**
 
-## Active / Activo
-
 ### Slice 5c — durable recurring GitHub refresh schedules (PR #25)
-
-Implemented on the active PR:
 
 - [x] Provider-neutral `integration_sync_schedules` persistence with bounded cadence and leases.
 - [x] Tenant-safe discovery requiring a same-workspace active validated GitHub connection.
@@ -164,22 +160,48 @@ Implemented on the active PR:
 - [x] Existing schedule discovery preserves `nextRunAt` and active claims.
 - [x] Due schedule claim → deduplicated durable job enqueue → next-run advancement.
 - [x] Expired schedule lease recovery and bounded enqueue retry.
-- [x] GitHub rate-limit timing from `Retry-After` / `X-RateLimit-Reset` is persisted into durable job retry availability.
+- [x] GitHub rate-limit timing from provider retry headers is persisted into durable job retry availability.
 - [x] Dedicated recurring-refresh Docker smoke covers schedule → job → worker → signals → next run.
 - [x] Existing background-refresh smoke remains compatible with recurring scheduling.
 - [x] No provider token is persisted in schedule/job operational records.
 - [x] ES/EN recurring scheduling and recovery documentation.
-- [ ] Final-head eight-gate validation after status update.
-- [ ] Merge PR #25 and validate `main` post-merge.
+- [x] PR #25 final head validated with all eight gates green.
+- [x] PR #25 squash-merged as `715f441b8c4a69de3e1b9fd442c241798ec56302`.
+- [x] Resulting `main` commit post-merge validated with all eight workflows green.
 
-**Slice 5c: FINAL VALIDATION / VALIDACIÓN FINAL.**
+**Slice 5c: CLOSED / CERRADA.**
+
+## Active / Activo
+
+### Slice 5d — verified GitHub webhooks (PR #26)
+
+Implemented on the active PR:
+
+- [x] Opaque connection-scoped webhook endpoints.
+- [x] HMAC secret independent from the GitHub provider token and encrypted in the existing AES-256-GCM integration vault.
+- [x] Exact raw-body HMAC-SHA256 verification with constant-time comparison.
+- [x] Strict signature, delivery ID and event header validation.
+- [x] Durable `endpointId + deliveryId` replay claims with TTL retention.
+- [x] Active/validated backing connection required at receive time.
+- [x] Tenant + connection scoped repository resolution after signature verification.
+- [x] Relevant webhook events enqueue the existing durable `repository_signals` job instead of trusting payload state.
+- [x] Recurring 15-minute polling remains reconciliation/fallback.
+- [x] Provision/read/rotate/delete management API; plaintext webhook secret returned only on provision/rotation.
+- [x] Existing webhook can still be read/rotated/deleted while the provider credential is temporarily invalid.
+- [x] Enqueue failure releases the replay claim so a genuine GitHub retry can be processed.
+- [x] Transactional audit outbox events for webhook configure/secret rotation/delete without secret material.
+- [x] API coverage for provisioning, signature verification, replay, event filtering, tenant binding and enqueue failure recovery.
+- [x] Dedicated Docker smoke and ninth CI gate for `delivery → HMAC → replay → queue → worker → normalized signals`.
+- [x] ES/EN security and operations documentation.
+- [ ] Final-head nine-gate validation.
+- [ ] Merge PR #26 and validate `main` post-merge.
+
+**Slice 5d: VALIDATION IN PROGRESS / VALIDACIÓN EN CURSO.**
 
 ### Deferred Phase 4 slices
 
-- [ ] Verified GitHub webhooks with exact raw-body HMAC verification and replay protection.
-- [ ] Webhook-triggered enqueue through the existing durable `repository_signals` job path.
 - [ ] GitHub-derived alerts and rule automation.
-- [ ] OAuth/GitHub App authorization flow after the token-backed adapter boundary is proven.
+- [ ] OAuth/GitHub App authorization and automatic webhook registration after the token-backed adapter boundary is proven.
 
 ## Security invariants
 
@@ -211,21 +233,26 @@ Implemented on the active PR:
 26. Recurring schedules contain operational identifiers and cadence only, never provider credentials.
 27. Schedule ownership is protected by bounded claim leases; recurring enqueue is deduplicated by schedule + due timestamp.
 28. Initial discovery does not immediately enqueue a second refresh; recurrence starts after its configured cadence.
+29. GitHub webhook HMAC secrets are distinct from provider credentials and use the encrypted integration vault.
+30. HMAC verification operates on the exact raw request bytes before JSON parsing.
+31. Webhook delivery IDs are durably replay-protected before any provider refresh is enqueued.
+32. Webhook repository lookup is constrained by endpoint workspace + connection; payload repository names never grant access.
+33. Webhook payloads do not become persisted signal truth; accepted events enqueue an authoritative provider refresh.
+34. External webhook ingestion fails closed when the backing GitHub connection is not active and validated.
+35. Webhook configuration audit records never contain HMAC secrets, secret references or provider tokens.
 
 ## Next / Siguiente
 
-1. Require all eight checks green on PR #25 final head, then merge and validate `main`.
-2. Create a clean branch from the resulting `main` for verified GitHub webhooks.
-3. Verify the exact raw request body with HMAC-SHA256 and a connection-specific encrypted webhook secret.
-4. Add tenant/connection-scoped delivery-ID replay protection.
-5. Route accepted webhook events into the existing durable `repository_signals` queue; do not persist signals directly from webhook payloads.
-6. Keep recurring polling as reconciliation/fallback even after webhooks are active.
-7. Add signal-derived alerts/rules only after both scheduled and webhook ingestion are durable.
-8. When commercial publication is scheduled, create the Kairoseth Software catalog entry as **Gestor de Trabajo / Work Manager**.
+1. Require all nine checks green on PR #26 final head, then merge and validate `main`.
+2. Keep recurring polling active after webhooks merge as reconciliation/fallback.
+3. Start the next isolated slice for GitHub-derived alerts and rule automation.
+4. Define provider-neutral rule inputs from durable `IntegrationSignal` history rather than GitHub-specific payloads.
+5. Keep GitHub App/OAuth and automatic webhook registration separate from the current token-backed adapter proof.
+6. When commercial publication is scheduled, create the Kairoseth Software catalog entry as **Gestor de Trabajo / Work Manager**.
 
 ## Current blockers / Bloqueos actuales
 
-No known product blocker. PR #25 is in final CI validation after fixing the first-run schedule race exposed by the background and recurring Docker smokes.
+No known product blocker. PR #26 is in CI validation; the active goal is nine green gates including the new verified-webhook Docker smoke.
 
 ## Operating rule
 
