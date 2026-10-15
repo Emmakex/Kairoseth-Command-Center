@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer';
 import http from 'node:http';
 import process from 'node:process';
 import { URL } from 'node:url';
