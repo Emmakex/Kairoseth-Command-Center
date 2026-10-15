@@ -8,7 +8,8 @@
   "exports": {
     ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
     "./audit-outbox": { "types": "./dist/audit-outbox.d.ts", "import": "./dist/audit-outbox.js" },
-    "./integration-signals": { "types": "./dist/integration-signals.d.ts", "import": "./dist/integration-signals.js" }
+    "./integration-signals": { "types": "./dist/integration-signals.d.ts", "import": "./dist/integration-signals.js" },
+    "./integration-sync-jobs": { "types": "./dist/integration-sync-jobs.d.ts", "import": "./dist/integration-sync-jobs.js" }
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
