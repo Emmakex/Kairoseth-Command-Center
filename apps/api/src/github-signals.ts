@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { authorize } from '@kcc/auth';
 import type { AuthProvider, SessionContext } from '@kcc/auth';
 import type { Scope } from '@kcc/domain';
-import type { IntegrationSignal } from '@kcc/integrations';
+import { normalizeGitHubRepositorySignals } from '@kcc/integrations/github-signals';
 import type { IntegrationSignalStore } from '@kcc/persistence/integration-signals';
 import type { GitHubConnectionStore } from './github-connection-store';
 import { GitHubProviderError } from './github-provider-client';
@@ -75,10 +75,6 @@ function providerHttpError(error: GitHubProviderError): { status: number; error:
   }
 }
 
-function compareSignals(left: IntegrationSignal, right: IntegrationSignal): number {
-  return Date.parse(right.occurredAt) - Date.parse(left.occurredAt);
-}
-
 export function registerGitHubSignalRoutes(
   app: FastifyInstance,
   options: {
@@ -129,110 +125,23 @@ export function registerGitHubSignalRoutes(
 
     try {
       const [pullRequests, issues, workflowRuns, releases] = await Promise.all([
-        options.githubProviderClient.listPullRequests(
-          token,
-          coordinates.owner,
-          coordinates.repository,
-          limit,
-        ),
-        options.githubProviderClient.listIssues(
-          token,
-          coordinates.owner,
-          coordinates.repository,
-          limit,
-        ),
-        options.githubProviderClient.listWorkflowRuns(
-          token,
-          coordinates.owner,
-          coordinates.repository,
-          limit,
-        ),
-        options.githubProviderClient.listReleases(
-          token,
-          coordinates.owner,
-          coordinates.repository,
-          limit,
-        ),
+        options.githubProviderClient.listPullRequests(token, coordinates.owner, coordinates.repository, limit),
+        options.githubProviderClient.listIssues(token, coordinates.owner, coordinates.repository, limit),
+        options.githubProviderClient.listWorkflowRuns(token, coordinates.owner, coordinates.repository, limit),
+        options.githubProviderClient.listReleases(token, coordinates.owner, coordinates.repository, limit),
       ]);
 
-      const repository = `${coordinates.owner}/${coordinates.repository}`;
-      const commonPayload = {
+      const signals = normalizeGitHubRepositorySignals({
+        workspaceId: scope.workspaceId,
         resourceId: resource.id,
         ...(resource.projectId ? { projectId: resource.projectId } : {}),
-        repository,
-      };
+        repository: `${coordinates.owner}/${coordinates.repository}`,
+        pullRequests,
+        issues,
+        workflowRuns,
+        releases,
+      });
 
-      const signals: IntegrationSignal[] = [
-        ...pullRequests.map((pullRequest): IntegrationSignal => ({
-          id: `github:pull-request:${pullRequest.id}`,
-          source: 'github',
-          type: 'repository.pull_request',
-          workspaceId: scope.workspaceId,
-          occurredAt: pullRequest.updatedAt,
-          payload: {
-            ...commonPayload,
-            providerId: pullRequest.id,
-            number: pullRequest.number,
-            title: pullRequest.title,
-            state: pullRequest.state,
-            draft: pullRequest.draft,
-            merged: Boolean(pullRequest.mergedAt),
-            url: pullRequest.htmlUrl,
-          },
-        })),
-        ...issues.map((issue): IntegrationSignal => ({
-          id: `github:issue:${issue.id}`,
-          source: 'github',
-          type: 'repository.issue',
-          workspaceId: scope.workspaceId,
-          occurredAt: issue.updatedAt,
-          payload: {
-            ...commonPayload,
-            providerId: issue.id,
-            number: issue.number,
-            title: issue.title,
-            state: issue.state,
-            url: issue.htmlUrl,
-          },
-        })),
-        ...workflowRuns.map((workflowRun): IntegrationSignal => ({
-          id: `github:workflow-run:${workflowRun.id}`,
-          source: 'github',
-          type: 'repository.ci',
-          workspaceId: scope.workspaceId,
-          occurredAt: workflowRun.updatedAt,
-          payload: {
-            ...commonPayload,
-            providerId: workflowRun.id,
-            name: workflowRun.name,
-            status: workflowRun.status,
-            ...(workflowRun.conclusion ? { conclusion: workflowRun.conclusion } : {}),
-            event: workflowRun.event,
-            ...(workflowRun.headBranch ? { headBranch: workflowRun.headBranch } : {}),
-            headSha: workflowRun.headSha,
-            url: workflowRun.htmlUrl,
-          },
-        })),
-        ...releases.map((release): IntegrationSignal => ({
-          id: `github:release:${release.id}`,
-          source: 'github',
-          type: 'repository.release',
-          workspaceId: scope.workspaceId,
-          occurredAt: release.publishedAt ?? release.createdAt,
-          payload: {
-            ...commonPayload,
-            providerId: release.id,
-            tagName: release.tagName,
-            ...(release.name ? { name: release.name } : {}),
-            draft: release.draft,
-            prerelease: release.prerelease,
-            targetCommitish: release.targetCommitish,
-            url: release.htmlUrl,
-          },
-        })),
-      ];
-
-      signals.sort(compareSignals);
       if (options.integrationSignalStore) {
         await options.integrationSignalStore.upsertSignals(scope.workspaceId, signals);
       }
