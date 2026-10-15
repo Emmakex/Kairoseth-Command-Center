@@ -40,6 +40,14 @@ let initialized = false;
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+function providerRetryDelayMs(retryAt: string | undefined): number {
+  const fallbackMs = 5 * 60_000;
+  if (!retryAt) return fallbackMs;
+  const retryAtMs = Date.parse(retryAt);
+  if (!Number.isFinite(retryAtMs)) return fallbackMs;
+  return Math.min(24 * 60 * 60_000, Math.max(1_000, retryAtMs - Date.now()));
+}
+
 function workerLog(level: 'info' | 'error', event: string, details: Record<string, unknown> = {}) {
   const entry = JSON.stringify({
     level,
@@ -81,6 +89,7 @@ async function retryClaimedJob(
     jobId: job.id,
     resourceId: job.resourceId,
     errorCode,
+    availableAt: retried?.availableAt,
     status: retried?.status ?? 'claim_lost',
   });
 }
@@ -161,12 +170,14 @@ async function executeGitHubSignalJob(job: IntegrationSyncJob): Promise<void> {
         case 'not_found':
           await failClaimedJob(job, errorCode);
           break;
-        case 'rate_limited':
+        case 'rate_limited': {
+          const delayMs = providerRetryDelayMs(error.retryAt);
           await retryClaimedJob(job, errorCode, {
-            baseDelayMs: 5 * 60_000,
-            maxDelayMs: 60 * 60_000,
+            baseDelayMs: delayMs,
+            maxDelayMs: delayMs,
           });
           break;
+        }
         case 'timeout':
         case 'upstream_error':
           await retryClaimedJob(job, errorCode);
@@ -176,6 +187,7 @@ async function executeGitHubSignalJob(job: IntegrationSyncJob): Promise<void> {
         jobId: job.id,
         resourceId: job.resourceId,
         errorCode,
+        retryAt: error.retryAt,
       });
       return;
     }
