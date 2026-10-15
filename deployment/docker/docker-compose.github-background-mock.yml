@@ -1,0 +1,17 @@
+services:
+  github-background-mock:
+    image: node:22-alpine
+    working_dir: /mock
+    command: ["node", "/mock/github-background-mock-server.mjs"]
+    environment:
+      PORT: 8081
+      KCC_GITHUB_MOCK_TOKEN: ${KCC_GITHUB_MOCK_TOKEN}
+    volumes:
+      - ./deployment/docker/github-background-mock-server.mjs:/mock/github-background-mock-server.mjs:ro
+
+  worker:
+    environment:
+      KCC_GITHUB_API_BASE_URL: http://github-background-mock:8081
+    depends_on:
+      github-background-mock:
+        condition: service_started
