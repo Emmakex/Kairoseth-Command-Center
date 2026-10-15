@@ -1,6 +1,6 @@
 export type GitHubSetupMutation = {
   path: string;
-  method: 'POST' | 'PATCH';
+  method: 'POST' | 'PATCH' | 'DELETE';
   body?: Record<string, unknown>;
 };
 
@@ -56,6 +56,27 @@ export function parseGitHubSetupMutation(form: FormData): GitHubSetupMutation | 
     };
   }
 
+  if (operation === 'connection-rotate') {
+    const connectionId = requiredText(form, 'connectionId', 100);
+    const token = tokenValue(form);
+    if (!connectionId || !token) return null;
+    return {
+      path: `/v1/integrations/github/connections/${encodeURIComponent(connectionId)}/credential`,
+      method: 'PATCH',
+      body: { token },
+    };
+  }
+
+  if (operation === 'connection-delete') {
+    const connectionId = requiredText(form, 'connectionId', 100);
+    const confirmation = form.get('confirmation');
+    if (!connectionId || confirmation !== 'disconnect') return null;
+    return {
+      path: `/v1/integrations/github/connections/${encodeURIComponent(connectionId)}`,
+      method: 'DELETE',
+    };
+  }
+
   if (operation === 'repository-create') {
     const projectId = requiredText(form, 'projectId', 100);
     const owner = requiredText(form, 'owner', 100);
@@ -100,6 +121,16 @@ export function parseGitHubSetupMutation(form: FormData): GitHubSetupMutation | 
     return {
       path: `/v1/integrations/github/repositories/${encodeURIComponent(resourceId)}/sync`,
       method: 'POST',
+    };
+  }
+
+  if (operation === 'repository-delete') {
+    const resourceId = requiredText(form, 'resourceId', 100);
+    const confirmation = form.get('confirmation');
+    if (!resourceId || confirmation !== 'unlink') return null;
+    return {
+      path: `/v1/integrations/github/repositories/${encodeURIComponent(resourceId)}`,
+      method: 'DELETE',
     };
   }
 
