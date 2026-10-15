@@ -3,6 +3,7 @@ import { loadWorkerConfig } from '@kcc/config';
 import { executeGitHubRepositorySignals } from '@kcc/integrations/github-signal-executor';
 import { GitHubProviderError, GitHubRestClient } from '@kcc/integrations/github';
 import { MongoAuditOutboxStore } from '@kcc/persistence/audit-outbox';
+import { MongoGitHubScheduleDiscoveryStore } from '@kcc/persistence/github-schedule-discovery';
 import { MongoGitHubSignalRuntimeStore } from '@kcc/persistence/github-signal-runtime';
 import { MongoEncryptedIntegrationSecretStore } from '@kcc/persistence/integration-secrets';
 import { MongoIntegrationSignalStore } from '@kcc/persistence/integration-signals';
@@ -10,12 +11,15 @@ import {
   MongoIntegrationSyncJobStore,
   type IntegrationSyncJob,
 } from '@kcc/persistence/integration-sync-jobs';
+import { MongoIntegrationSyncScheduleStore } from '@kcc/persistence/integration-sync-schedules';
+import { discoverGitHubSchedules, enqueueDueGitHubSchedule } from './integration-scheduler';
 
 const config = loadWorkerConfig();
 const mongo = new MongoClient(config.MONGODB_URI, { serverSelectionTimeoutMS: 3000 });
 const db = mongo.db();
 const outbox = new MongoAuditOutboxStore(db);
 const syncJobs = new MongoIntegrationSyncJobStore(db);
+const syncSchedules = new MongoIntegrationSyncScheduleStore(db);
 const integrationSecretKey = config.KCC_INTEGRATION_SECRET_KEY;
 
 const githubExecution = integrationSecretKey
@@ -24,6 +28,7 @@ const githubExecution = integrationSecretKey
       return {
         secretStore,
         runtimeStore: new MongoGitHubSignalRuntimeStore(db, secretStore),
+        scheduleDiscoveryStore: new MongoGitHubScheduleDiscoveryStore(db),
         signalStore: new MongoIntegrationSignalStore(db),
         providerClient: new GitHubRestClient(config.KCC_GITHUB_API_BASE_URL),
       };
@@ -191,6 +196,7 @@ async function tick() {
       await Promise.all([
         outbox.ensureIndexes(),
         syncJobs.ensureIndexes(),
+        syncSchedules.ensureIndexes(),
         ...(githubExecution
           ? [githubExecution.secretStore.ensureIndexes(), githubExecution.signalStore.ensureIndexes()]
           : []),
@@ -198,13 +204,22 @@ async function tick() {
       initialized = true;
     }
 
-    const [drained, requeuedSyncJobs] = await Promise.all([
+    const [drained, requeuedSyncJobs, requeuedSchedules] = await Promise.all([
       outbox.drainPending(50),
       syncJobs.requeueExpired({ limit: 100 }),
+      syncSchedules.requeueExpired({ limit: 100 }),
     ]);
 
     let githubRefresh: 'disabled' | 'idle' | 'processed' = 'disabled';
+    let githubSchedule: 'disabled' | 'idle' | 'enqueued' | 'claim_lost' = 'disabled';
+    let discoveredSchedules = 0;
     if (githubExecution) {
+      discoveredSchedules = await discoverGitHubSchedules(
+        githubExecution.scheduleDiscoveryStore,
+        syncSchedules,
+      );
+      githubSchedule = await enqueueDueGitHubSchedule(syncSchedules, syncJobs);
+
       const job = await syncJobs.claimDue({ provider: 'github', kind: 'repository_signals' });
       if (job) {
         githubRefresh = 'processed';
@@ -225,6 +240,11 @@ async function tick() {
         requeuedExpired: requeuedSyncJobs,
         executionEnabled: Boolean(githubExecution),
         githubRefresh,
+        schedules: {
+          discovered: discoveredSchedules,
+          requeuedExpired: requeuedSchedules,
+          github: githubSchedule,
+        },
       },
     });
   } catch (error) {
