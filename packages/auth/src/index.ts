@@ -15,6 +15,7 @@ export type Capability =
   | 'decisions.write'
   | 'timeline.read'
   | 'integrations.manage'
+  | 'automation.manage'
   | 'billing.manage'
   | 'internal.development.read'
   | `products.access:${string}`;
@@ -61,6 +62,7 @@ const ROLE_CAPABILITIES: Record<Exclude<MembershipRole, 'platform_admin'>, reado
     'decisions.write',
     'timeline.read',
     'integrations.manage',
+    'automation.manage',
     'billing.manage',
   ],
   admin: [
@@ -78,6 +80,7 @@ const ROLE_CAPABILITIES: Record<Exclude<MembershipRole, 'platform_admin'>, reado
     'decisions.write',
     'timeline.read',
     'integrations.manage',
+    'automation.manage',
   ],
   member: [
     'projects.read',
