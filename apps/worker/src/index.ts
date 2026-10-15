@@ -84,6 +84,20 @@ async function retryClaimedJob(
   });
 }
 
+function rateLimitRetryWindow(retryAt: string | undefined): {
+  baseDelayMs: number;
+  maxDelayMs: number;
+} {
+  const fallback = 5 * 60_000;
+  const parsed = retryAt ? Date.parse(retryAt) : NaN;
+  const hinted = Number.isFinite(parsed) ? Math.max(0, parsed - Date.now()) : 0;
+  const baseDelayMs = Math.min(24 * 60 * 60_000, Math.max(fallback, hinted));
+  return {
+    baseDelayMs,
+    maxDelayMs: Math.max(60 * 60_000, baseDelayMs),
+  };
+}
+
 async function refreshGitHubSchedules(): Promise<number> {
   if (!githubExecution) return 0;
   const now = Date.now();
@@ -217,10 +231,7 @@ async function executeGitHubSignalJob(job: IntegrationSyncJob): Promise<void> {
           await disableGitHubSchedule(job);
           break;
         case 'rate_limited':
-          await retryClaimedJob(job, errorCode, {
-            baseDelayMs: 5 * 60_000,
-            maxDelayMs: 60 * 60_000,
-          });
+          await retryClaimedJob(job, errorCode, rateLimitRetryWindow(error.retryAt));
           break;
         case 'timeout':
         case 'upstream_error':
@@ -231,6 +242,7 @@ async function executeGitHubSignalJob(job: IntegrationSyncJob): Promise<void> {
         jobId: job.id,
         resourceId: job.resourceId,
         errorCode,
+        ...(error.retryAt ? { retryAt: error.retryAt } : {}),
       });
       return;
     }
