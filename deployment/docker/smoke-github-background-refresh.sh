@@ -74,7 +74,7 @@ print(doc ? doc.status : 'missing');
 set_ci_state() {
   local conclusion="$1"
   local updated_at="$2"
-  ${COMPOSE[@]} exec -T github-background-mock node -e "
+  ${COMPOSE[@]} exec -T github-background-mock node --input-type=module -e "
 const response = await fetch('http://127.0.0.1:8081/__test__/workflow', {
   method: 'POST',
   headers: {
