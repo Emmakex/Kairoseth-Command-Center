@@ -18,6 +18,10 @@ const copy = {
     tokenPlaceholder: 'github_pat_…',
     addConnection: 'Añadir conexión',
     validate: 'Validar',
+    rotateToken: 'Rotar token',
+    rotateHelp: 'El token nuevo vuelve a dejar la conexión pendiente de validación.',
+    removeConnection: 'Eliminar conexión',
+    connectionInUse: 'Desenlaza primero los repositorios que usan esta conexión.',
     account: 'Cuenta',
     noConnections: 'Todavía no hay conexiones GitHub.',
     repositories: 'Repositorios enlazados',
@@ -27,6 +31,7 @@ const copy = {
     repository: 'Repositorio',
     defaultBranch: 'Rama por defecto',
     addRepository: 'Enlazar repositorio',
+    unlinkRepository: 'Desenlazar repositorio',
     noProjects: 'Crea primero un proyecto para enlazar un repositorio.',
     noRepositories: 'Todavía no hay repositorios enlazados.',
     connection: 'Conexión',
@@ -54,6 +59,10 @@ const copy = {
     tokenPlaceholder: 'github_pat_…',
     addConnection: 'Add connection',
     validate: 'Validate',
+    rotateToken: 'Rotate token',
+    rotateHelp: 'The new token returns the connection to pending validation.',
+    removeConnection: 'Remove connection',
+    connectionInUse: 'Unlink the repositories using this connection first.',
     account: 'Account',
     noConnections: 'There are no GitHub connections yet.',
     repositories: 'Linked repositories',
@@ -63,6 +72,7 @@ const copy = {
     repository: 'Repository',
     defaultBranch: 'Default branch',
     addRepository: 'Link repository',
+    unlinkRepository: 'Unlink repository',
     noProjects: 'Create a project before linking a repository.',
     noRepositories: 'There are no linked repositories yet.',
     connection: 'Connection',
@@ -116,6 +126,11 @@ export function GitHubSetupPanel({
   );
   const projectNames = new Map(projects.map((project) => [project.id, project.name]));
   const connectionNames = new Map((connections ?? []).map((connection) => [connection.id, connection.displayName]));
+  const usedConnectionIds = new Set(
+    (repositories ?? []).flatMap((repository) =>
+      repository.connectionId ? [repository.connectionId] : [],
+    ),
+  );
 
   return (
     <article className="panel github-setup-panel">
@@ -163,32 +178,74 @@ export function GitHubSetupPanel({
 
         {connections?.length ? (
           <div className="github-setup-list">
-            {connections.map((connection) => (
-              <div className="github-setup-card" key={connection.id}>
-                <div className="github-setup-card-copy">
-                  <div className="github-setup-title-row">
-                    <strong>{connection.displayName}</strong>
-                    <span className={`github-connection-status github-connection-status-${connection.status}`}>
-                      {statusLabel(connection.status, locale)}
+            {connections.map((connection) => {
+              const inUse = usedConnectionIds.has(connection.id);
+              return (
+                <div className="github-setup-card github-connection-card" key={connection.id}>
+                  <div className="github-setup-card-copy">
+                    <div className="github-setup-title-row">
+                      <strong>{connection.displayName}</strong>
+                      <span className={`github-connection-status github-connection-status-${connection.status}`}>
+                        {statusLabel(connection.status, locale)}
+                      </span>
+                    </div>
+                    <span>
+                      {connection.remoteAccountLabel
+                        ? `${t.account}: ${connection.remoteAccountLabel}`
+                        : t.configured}
                     </span>
+                    {connection.lastErrorCode ? <code>{connection.lastErrorCode}</code> : null}
                   </div>
-                  <span>
-                    {connection.remoteAccountLabel
-                      ? `${t.account}: ${connection.remoteAccountLabel}`
-                      : t.configured}
-                  </span>
-                  {connection.lastErrorCode ? <code>{connection.lastErrorCode}</code> : null}
+                  <div className="github-connection-actions">
+                    <form action="/api/integrations/github" method="post">
+                      <input type="hidden" name="locale" value={locale} />
+                      <input type="hidden" name="operation" value="connection-validate" />
+                      <input type="hidden" name="connectionId" value={connection.id} />
+                      <button className="secondary-button" type="submit">
+                        {t.validate}
+                      </button>
+                    </form>
+                    <form className="github-rotate-form" action="/api/integrations/github" method="post">
+                      <input type="hidden" name="locale" value={locale} />
+                      <input type="hidden" name="operation" value="connection-rotate" />
+                      <input type="hidden" name="connectionId" value={connection.id} />
+                      <label>
+                        <span className="sr-only">{t.rotateHelp}</span>
+                        <input
+                          name="token"
+                          type="password"
+                          minLength={20}
+                          maxLength={2048}
+                          placeholder={t.tokenPlaceholder}
+                          autoComplete="off"
+                          aria-label={t.rotateToken}
+                          required
+                        />
+                      </label>
+                      <button className="secondary-button" type="submit">
+                        {t.rotateToken}
+                      </button>
+                    </form>
+                    <form action="/api/integrations/github" method="post">
+                      <input type="hidden" name="locale" value={locale} />
+                      <input type="hidden" name="operation" value="connection-delete" />
+                      <input type="hidden" name="connectionId" value={connection.id} />
+                      <button
+                        className="danger-button"
+                        type="submit"
+                        name="confirmation"
+                        value="disconnect"
+                        disabled={inUse}
+                        title={inUse ? t.connectionInUse : undefined}
+                      >
+                        {t.removeConnection}
+                      </button>
+                    </form>
+                    {inUse ? <span className="github-setup-hint">{t.connectionInUse}</span> : null}
+                  </div>
                 </div>
-                <form action="/api/integrations/github" method="post">
-                  <input type="hidden" name="locale" value={locale} />
-                  <input type="hidden" name="operation" value="connection-validate" />
-                  <input type="hidden" name="connectionId" value={connection.id} />
-                  <button className="secondary-button" type="submit">
-                    {t.validate}
-                  </button>
-                </form>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : connections ? (
           <p className="empty-state">{t.noConnections}</p>
@@ -301,6 +358,14 @@ export function GitHubSetupPanel({
                       <input type="hidden" name="resourceId" value={repository.id} />
                       <button className="primary-button" type="submit" disabled={!repository.connectionId}>
                         {t.sync}
+                      </button>
+                    </form>
+                    <form action="/api/integrations/github" method="post">
+                      <input type="hidden" name="locale" value={locale} />
+                      <input type="hidden" name="operation" value="repository-delete" />
+                      <input type="hidden" name="resourceId" value={repository.id} />
+                      <button className="danger-button" type="submit" name="confirmation" value="unlink">
+                        {t.unlinkRepository}
                       </button>
                     </form>
                   </div>
