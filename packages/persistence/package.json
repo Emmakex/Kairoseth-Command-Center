@@ -8,10 +8,12 @@
   "exports": {
     ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
     "./audit-outbox": { "types": "./dist/audit-outbox.d.ts", "import": "./dist/audit-outbox.js" },
+    "./github-schedule-discovery": { "types": "./dist/github-schedule-discovery.d.ts", "import": "./dist/github-schedule-discovery.js" },
     "./github-signal-runtime": { "types": "./dist/github-signal-runtime.d.ts", "import": "./dist/github-signal-runtime.js" },
     "./integration-secrets": { "types": "./dist/integration-secrets.d.ts", "import": "./dist/integration-secrets.js" },
     "./integration-signals": { "types": "./dist/integration-signals.d.ts", "import": "./dist/integration-signals.js" },
-    "./integration-sync-jobs": { "types": "./dist/integration-sync-jobs.d.ts", "import": "./dist/integration-sync-jobs.js" }
+    "./integration-sync-jobs": { "types": "./dist/integration-sync-jobs.d.ts", "import": "./dist/integration-sync-jobs.js" },
+    "./integration-sync-schedules": { "types": "./dist/integration-sync-schedules.d.ts", "import": "./dist/integration-sync-schedules.js" }
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
