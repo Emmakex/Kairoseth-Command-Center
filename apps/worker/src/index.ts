@@ -16,13 +16,11 @@ const mongo = new MongoClient(config.MONGODB_URI, { serverSelectionTimeoutMS: 30
 const db = mongo.db();
 const outbox = new MongoAuditOutboxStore(db);
 const syncJobs = new MongoIntegrationSyncJobStore(db);
+const integrationSecretKey = config.KCC_INTEGRATION_SECRET_KEY;
 
-const githubExecution = config.KCC_INTEGRATION_SECRET_KEY
+const githubExecution = integrationSecretKey
   ? (() => {
-      const secretStore = new MongoEncryptedIntegrationSecretStore(
-        db,
-        config.KCC_INTEGRATION_SECRET_KEY,
-      );
+      const secretStore = new MongoEncryptedIntegrationSecretStore(db, integrationSecretKey);
       return {
         secretStore,
         runtimeStore: new MongoGitHubSignalRuntimeStore(db, secretStore),
@@ -50,11 +48,12 @@ function workerLog(level: 'info' | 'error', event: string, details: Record<strin
 }
 
 async function failClaimedJob(job: IntegrationSyncJob, errorCode: string): Promise<void> {
-  if (!job.claimToken) {
+  const claimToken = job.claimToken;
+  if (!claimToken) {
     workerLog('error', 'integration_sync.claim_token_missing', { jobId: job.id, errorCode });
     return;
   }
-  await syncJobs.fail(job.id, job.claimToken, errorCode);
+  await syncJobs.fail(job.id, claimToken, errorCode);
 }
 
 async function retryClaimedJob(
@@ -62,13 +61,14 @@ async function retryClaimedJob(
   errorCode: string,
   options: { baseDelayMs?: number; maxDelayMs?: number } = {},
 ): Promise<void> {
-  if (!job.claimToken) {
+  const claimToken = job.claimToken;
+  if (!claimToken) {
     workerLog('error', 'integration_sync.claim_token_missing', { jobId: job.id, errorCode });
     return;
   }
   const retried = await syncJobs.retry({
     jobId: job.id,
-    claimToken: job.claimToken,
+    claimToken,
     errorCode,
     ...options,
   });
@@ -82,12 +82,25 @@ async function retryClaimedJob(
 
 async function executeGitHubSignalJob(job: IntegrationSyncJob): Promise<void> {
   if (!githubExecution) return;
-  if (!job.claimToken) {
+  const claimToken = job.claimToken;
+  if (!claimToken) {
     workerLog('error', 'integration_sync.claim_token_missing', { jobId: job.id });
     return;
   }
 
-  const resolution = await githubExecution.runtimeStore.resolve(job.workspaceId, job.resourceId);
+  let resolution;
+  try {
+    resolution = await githubExecution.runtimeStore.resolve(job.workspaceId, job.resourceId);
+  } catch {
+    await failClaimedJob(job, 'github_runtime_error');
+    workerLog('error', 'github_refresh.runtime_error', {
+      jobId: job.id,
+      resourceId: job.resourceId,
+      errorCode: 'github_runtime_error',
+    });
+    return;
+  }
+
   if (resolution.status !== 'ready') {
     const errorCode = `github_${resolution.status}`;
     await failClaimedJob(job, errorCode);
@@ -130,7 +143,7 @@ async function executeGitHubSignalJob(job: IntegrationSyncJob): Promise<void> {
     });
 
     await githubExecution.signalStore.upsertSignals(runtime.workspaceId, signals);
-    const completed = await syncJobs.complete(job.id, job.claimToken);
+    const completed = await syncJobs.complete(job.id, claimToken);
     if (!completed) {
       workerLog('error', 'github_refresh.complete_claim_lost', {
         jobId: job.id,
