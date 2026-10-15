@@ -2,6 +2,7 @@ import type { AuthProvider } from '@kcc/auth';
 import type { MilestoneStore, OperationalStore } from '@kcc/persistence';
 import type { IntegrationSignalStore } from '@kcc/persistence/integration-signals';
 import type { IntegrationSyncJobStore } from '@kcc/persistence/integration-sync-jobs';
+import type { GitHubWebhookStore } from '@kcc/persistence/github-webhooks';
 import { buildApp as buildBaseApp } from './app';
 import type { ReadinessCheck } from './app';
 import { registerDecisionCompatibilityGuard } from './decision-compatibility';
@@ -14,6 +15,7 @@ import { registerGitHubRepositoryRoutes } from './github-repositories';
 import type { GitHubRepositoryStore } from './github-repository-store';
 import { registerGitHubSignalRoutes } from './github-signals';
 import { registerGitHubSyncJobRoutes } from './github-sync-jobs';
+import { registerGitHubWebhookRoutes } from './github-webhooks';
 import { registerIntegrationSignalRoutes } from './integration-signals';
 import { registerStandaloneAuthRoutes } from './local-auth';
 import type { LocalLoginProvider } from './local-auth';
@@ -36,6 +38,7 @@ type ApplicationOptions = {
   githubRepositoryStore?: GitHubRepositoryStore;
   githubConnectionStore?: GitHubConnectionStore;
   githubProviderClient?: GitHubProviderClient;
+  githubWebhookStore?: GitHubWebhookStore;
   integrationSignalStore?: IntegrationSignalStore;
   integrationSyncJobStore?: IntegrationSyncJobStore;
 };
@@ -132,6 +135,17 @@ export function buildApp(options: ApplicationOptions = {}) {
       : {}),
     ...(options.githubProviderClient
       ? { githubProviderClient: options.githubProviderClient }
+      : {}),
+  });
+
+  registerGitHubWebhookRoutes(app, {
+    ...(options.authProvider ? { authProvider: options.authProvider } : {}),
+    ...(options.githubConnectionStore
+      ? { githubConnectionStore: options.githubConnectionStore }
+      : {}),
+    ...(options.githubWebhookStore ? { githubWebhookStore: options.githubWebhookStore } : {}),
+    ...(options.integrationSyncJobStore
+      ? { integrationSyncJobStore: options.integrationSyncJobStore }
       : {}),
   });
 
