@@ -1,6 +1,6 @@
 import type { IntegrationSignal } from './index';
 import type { GitHubProviderClient } from './github';
-import { normalizeGitHubRepositorySignals } from './github-signals';
+import { normalizeGitHubRepositorySignals } from './github-signals.js';
 
 export type ExecuteGitHubRepositorySignalsInput = {
   providerClient: GitHubProviderClient;
