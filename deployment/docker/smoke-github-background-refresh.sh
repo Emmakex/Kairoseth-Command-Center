@@ -90,6 +90,22 @@ if (!response.ok) {
 " >/dev/null
 }
 
+set_failed_rule_policy() {
+  local enabled="$1"
+  local severity="$2"
+  ${COMPOSE[@]} exec -T mongo mongosh --quiet kairoseth_command_center --eval "
+const now = new Date().toISOString();
+db.signal_alert_rule_policies.updateOne(
+  {workspaceId:'$WORKSPACE_ID',ruleId:'repository.ci.failed.v1'},
+  {
+    \$set:{enabled:$enabled,severity:'$severity',updatedByUserId:'background-smoke',updatedAt:now},
+    \$setOnInsert:{id:'background-smoke-rule-policy-${RUN_ID}',workspaceId:'$WORKSPACE_ID',ruleId:'repository.ci.failed.v1',createdAt:now}
+  },
+  {upsert:true}
+);
+" >/dev/null
+}
+
 wait_for_timeline_count() {
   local event_type="$1"
   local alert_id="$2"
@@ -103,7 +119,7 @@ print(db.timeline_events.countDocuments({type:'$event_type',entityId:'$alert_id'
     if [[ "$count" == "$expected" ]]; then
       return 0
     fi
-    if [[ "$count" != "0" ]]; then
+    if (( count > expected )); then
       echo "Expected $expected $event_type event(s), found $count" >&2
       return 1
     fi
@@ -182,9 +198,38 @@ if (db.timeline_events.countDocuments({type:'alert.derived',entityId:'$ALERT_ID'
 " >/dev/null
 wait_for_timeline_count 'alert.reopened' "$ALERT_ID" 1
 
+# Phase 5 rule policies are workspace-scoped overrides on the existing deterministic
+# rule IDs. A severity override must update the same active alert, never duplicate it.
+set_failed_rule_policy true critical
+POLICY_SEVERITY_JOB_ID="${JOB_ID}-policy-severity"
+insert_job "$POLICY_SEVERITY_JOB_ID" "${DEDUPE_KEY}:policy-severity"
+wait_for_job "$POLICY_SEVERITY_JOB_ID"
+
+${COMPOSE[@]} exec -T mongo mongosh --quiet kairoseth_command_center --eval "
+const alert=db.alerts.findOne({id:'$ALERT_ID',fingerprint:'$ALERT_FINGERPRINT'});
+if (!alert || alert.status !== 'open' || alert.severity !== 'critical') quit(2);
+if (db.alerts.countDocuments({'scope.workspaceId':'$WORKSPACE_ID',fingerprint:'$ALERT_FINGERPRINT'}) !== 1) quit(3);
+" >/dev/null
+wait_for_timeline_count 'alert.policy_updated' "$ALERT_ID" 1
+
+# Disabling the rule suppresses the active candidate. Reconciliation must resolve the
+# existing alert rather than deleting it, preserving the complete audit history.
+set_failed_rule_policy false critical
+POLICY_DISABLE_JOB_ID="${JOB_ID}-policy-disable"
+insert_job "$POLICY_DISABLE_JOB_ID" "${DEDUPE_KEY}:policy-disable"
+wait_for_job "$POLICY_DISABLE_JOB_ID"
+
+${COMPOSE[@]} exec -T mongo mongosh --quiet kairoseth_command_center --eval "
+const alert=db.alerts.findOne({id:'$ALERT_ID',fingerprint:'$ALERT_FINGERPRINT'});
+if (!alert || alert.status !== 'resolved' || !alert.resolvedAt) quit(2);
+if (new Date(alert.resolvedAt).toISOString() !== '2026-10-15T06:50:00.000Z') quit(3);
+if (db.alerts.countDocuments({'scope.workspaceId':'$WORKSPACE_ID',fingerprint:'$ALERT_FINGERPRINT'}) !== 1) quit(4);
+" >/dev/null
+wait_for_timeline_count 'alert.auto_resolved' "$ALERT_ID" 2
+
 # Durable alert + audit state above are the canonical behavior assertions. Keep logs
 # only for the security invariant that provider credentials must never be emitted.
 WORKER_LOGS="$(${COMPOSE[@]} logs --no-color worker)"
 [[ "$WORKER_LOGS" != *"${KCC_GITHUB_MOCK_TOKEN}"* ]]
 
-echo "GitHub background refresh + derived alert lifecycle smoke passed"
+echo "GitHub background refresh + workspace rule policy smoke passed"
