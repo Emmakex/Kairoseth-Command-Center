@@ -31,6 +31,12 @@ const apiSchema = z.object({
 const workerSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   KCC_WORKER_POLL_MS: z.coerce.number().int().positive().default(30000),
+  KCC_GITHUB_REFRESH_INTERVAL_MS: z.coerce
+    .number()
+    .int()
+    .min(60_000)
+    .max(24 * 60 * 60_000)
+    .default(5 * 60_000),
   MONGODB_URI: z.string().min(1).default('mongodb://localhost:27017/kairoseth_command_center'),
   KCC_INTEGRATION_SECRET_KEY: integrationSecretKey,
   KCC_GITHUB_API_BASE_URL: z.string().url().default('https://api.github.com'),
