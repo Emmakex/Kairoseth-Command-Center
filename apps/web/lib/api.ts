@@ -152,13 +152,20 @@ export type OperationalPriorityReasonSummary = {
     | 'task.blocked'
     | 'task.overdue'
     | 'task.due_today'
-    | 'alert.severity';
+    | 'alert.severity'
+    | 'project.blocked'
+    | 'project.overdue'
+    | 'project.due_today'
+    | 'project.remaining_progress'
+    | 'milestone.overdue'
+    | 'milestone.due_today'
+    | 'milestone.weight';
   contribution: number;
   value?: string | number;
 };
 
 export type OperationalPrioritySummary = {
-  kind: 'task' | 'alert';
+  kind: 'task' | 'alert' | 'project' | 'milestone';
   id: string;
   title: string;
   score: number;
