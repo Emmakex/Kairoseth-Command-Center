@@ -1,0 +1,79 @@
+.freshness {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.online {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.stale {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.offline {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.connectorList {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.connectorRow {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto;
+  gap: 8px 16px;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.connectorIdentity {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.connectorIdentity strong,
+.connectorIdentity span {
+  overflow-wrap: anywhere;
+}
+
+.connectorIdentity span,
+.connectorStatus,
+.toolHealth span {
+  color: #64748b;
+  font-size: 0.78rem;
+}
+
+.connectorStatus {
+  font-weight: 800;
+}
+
+.toolHealth {
+  display: flex;
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+
+@media (max-width: 720px) {
+  .connectorRow {
+    grid-template-columns: 1fr;
+  }
+
+  .toolHealth {
+    grid-column: 1;
+  }
+}
