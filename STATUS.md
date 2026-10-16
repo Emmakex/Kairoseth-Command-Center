@@ -4,7 +4,7 @@
 **Technical/internal project:** Kairoseth Command Center  
 **Commercial names:** Gestor de Trabajo (ES) / Work Manager (EN)  
 **Category:** Kairoseth Software  
-**Status:** Phase 5 Slice 12 is merged as `e33323da5abe83b74a0d4b5ceb9c491b1764fe0a` and post-merge validated 9/9. Phase 5 Slice 13 — Dependency start readiness / Preparación de inicio por dependencias — is active.
+**Status:** Phase 5 Slice 13 is merged as `1820cf457d5ca2c1eddc3b2f5e26287d940479c4` and post-merge validated 9/9. Phase 5 Slice 14 — Task reminders / Recordatorios de tareas — is active.
 
 ## Naming rule / Regla de naming
 
@@ -47,50 +47,54 @@
 - [x] Slice 10 — Task dependencies — PR #42 `67da2d81b3cca2a40f77b0710bb91cb8270499a8`.
 - [x] Slice 11 — Dependency-aware prioritization — PR #43 `fc9670d00579d4a9e2a59753326e5506a0067308`.
 - [x] Slice 12 — Task dependency UI — PR #44 `e33323da5abe83b74a0d4b5ceb9c491b1764fe0a`.
+- [x] Slice 13 — Dependency start readiness — PR #46 `1820cf457d5ca2c1eddc3b2f5e26287d940479c4`.
 
-Every resulting `main` boundary through Slice 12 was validated with all nine workflows green.
-
-### Phase 5 Slice 12 — Task dependency UI / UI de dependencias entre tareas
-
-- [x] ES/EN dependency editor on task cards.
-- [x] Same-origin guarded mutation parser with authority-field rejection.
-- [x] Backend remains authoritative for scope, existence, cycles, capability, entitlement and audit.
-- [x] PR #44 merged as `e33323da5abe83b74a0d4b5ceb9c491b1764fe0a`; resulting `main` validated 9/9.
-
-**Phase 5 Slice 12: CLOSED / CERRADA.**
-
-## Active / Activo
+Every resulting `main` boundary through Slice 13 was validated with all nine workflows green.
 
 ### Phase 5 Slice 13 — Dependency start readiness / Preparación de inicio por dependencias
 
-Implemented on `feat/phase-5-dependency-start-guard` so far:
+- [x] Server-authoritative `in_progress` guard requires every explicit same-scope dependency to be `done`.
+- [x] Missing/foreign dependencies are treated as incomplete without leaking foreign state.
+- [x] Full scoped task catalog replaces truncated Today data for dependency editing/readiness.
+- [x] ES/EN pending-dependency UI and Start-button convenience guard.
+- [x] PR #46 merged as `1820cf457d5ca2c1eddc3b2f5e26287d940479c4`; resulting `main` validated 9/9.
 
-- [x] Server-side pre-handler guards only transitions to `in_progress`.
-- [x] Workspace/private scope is derived from the authenticated session.
-- [x] `tasks.write` and `command-center` entitlement are enforced before dependency inspection.
-- [x] Every explicit dependency must resolve in the same authenticated scope with status `done`.
-- [x] Missing/foreign-scope dependency IDs are treated as incomplete and do not leak foreign task state.
-- [x] Rejected starts return `409 task_dependencies_incomplete` with pending dependency IDs and perform no status mutation.
-- [x] Explicit non-start transitions remain unchanged; no automatic blocking/start/completion is introduced.
-- [x] Dependency editor now loads the complete scoped `/v1/tasks` catalog instead of the truncated 12-task Today list.
-- [x] Completed dependency names remain visible; all same-scope task candidates are available.
-- [x] ES/EN task cards show pending dependency names and disable Start as a convenience when pending dependencies are known.
-- [x] Backend remains authoritative even if the browser is bypassed.
-- [x] API tests cover rejection, successful start, cross-scope/missing dependency handling and unaffected non-start transitions.
-- [x] Product/security documentation in `docs/37-dependency-start-readiness.md`.
+**Phase 5 Slice 13: CLOSED / CERRADA.**
+
+## Active / Activo
+
+### Phase 5 Slice 14 — Task reminders / Recordatorios de tareas
+
+Implemented on `feat/phase-5-task-reminders` so far:
+
+- [x] Optional backward-compatible `Task.reminderRules` model.
+- [x] First deterministic rule type: `{ kind: 'at', remindAt: ISO instant }`.
+- [x] Reminder instants canonicalized to UTC ISO and sorted chronologically.
+- [x] Maximum 10 reminders per task; duplicate instants rejected.
+- [x] Guarded `PUT /v1/tasks/:id/reminders` mutation for workspace and private scope.
+- [x] Scope and actor are derived from authenticated session; tenant/user authority fields are rejected.
+- [x] `tasks.write` + `command-center` entitlement enforced.
+- [x] Transactional task mutation + `task.reminders_changed` audit-outbox event.
+- [x] Optimistic `updatedAt` conflict protection.
+- [x] Unit/API coverage for normalization, limits, malformed input, capability, private/workspace scope, missing task and conflicts.
+- [x] Docker smoke proves real Mongo persistence and delivered reminder audit event.
+- [x] Product/security documentation in `docs/38-task-reminders.md`.
 - [ ] Final-head regression validation.
 - [ ] Merge and post-merge `main` validation.
 
-**Phase 5 Slice 13: VALIDATION PENDING / VALIDACIÓN PENDIENTE.**
+**Phase 5 Slice 14: VALIDATION PENDING / VALIDACIÓN PENDIENTE.**
 
 ## Deliberately deferred / Diferido expresamente
 
+- [ ] Reminder execution/materialization into in-app alerts.
+- [ ] Recurring reminder rules.
+- [ ] Email, push, SMS or third-party reminder delivery.
 - [ ] Dedicated graph visualization or drag-and-drop dependency editor.
 - [ ] Automatic task status mutations driven by dependency changes.
 - [ ] Critical-path duration forecasting or probabilistic deadline prediction.
 - [ ] Arbitrary user-authored conditions or executable rule DSL.
 - [ ] Automation actions beyond current derived-alert behavior.
-- [ ] AI-generated rules, weights, thresholds, dependencies or silent priority changes.
+- [ ] AI-generated rules, weights, thresholds, dependencies, reminders or silent priority changes.
 - [ ] GitHub App/OAuth and additional providers.
 
 ## Security and correctness invariants
@@ -99,31 +103,31 @@ Implemented on `feat/phase-5-dependency-start-guard` so far:
 2. Product entitlement and capability checks are server-enforced.
 3. Provider credentials never enter durable jobs, signals, alerts, policies, prioritization or audit events.
 4. Derived automation and prioritization remain deterministic, explainable and AI-independent.
-5. Private scope never crosses workspace dependency graphs.
+5. Private scope never crosses workspace dependency or reminder data.
 6. Human dismissed decisions remain authoritative.
 7. Legacy stored prioritization policies preserve configured values while inheriting new defaults.
 8. Task dependencies reference local same-scope task IDs only and remain acyclic.
 9. Dependency scoring uses only explicit stored graph edges; no text/AI inference occurs.
 10. Completed/cancelled work does not create dependency impact.
-11. Every dependency score contribution is exposed through stable reason code `task.dependency_impact`.
-12. Final priority scores remain capped at `100`.
-13. Browser dependency mutations cannot supply tenant or actor authority fields.
-14. A task cannot be explicitly started while any same-scope dependency is not `done` at the guard check.
-15. Dependency readiness never causes silent status mutation; users retain explicit control over status changes.
-16. The dependency editor uses the full authenticated task catalog; Today truncation is not a dependency-authority boundary.
+11. A task cannot be explicitly started while any same-scope dependency is not `done` at the guard check.
+12. Dependency readiness never causes silent status mutation.
+13. Reminder intent is explicit user-authored data; no reminder time is inferred by AI.
+14. Reminder mutations cannot supply tenant or actor authority fields.
+15. Reminder mutation and audit commit atomically.
+16. Reminder execution remains separate until a scheduler/materializer is explicitly implemented and validated.
 
 ## Next / Siguiente
 
-1. Validate Slice 13 final head with lint, typecheck, tests, build and all existing regression workflows.
-2. Correct any API/UI regression directly on this slice.
+1. Validate Slice 14 final head with lint, typecheck, tests, build and all existing regression workflows.
+2. Correct any model/API/Docker regression directly on this slice.
 3. Merge the exact validated head and revalidate resulting `main`.
-4. Select the next isolated Phase 5 slice only from the resulting green repository state.
-5. Keep graph visualization, automatic status behavior, critical-path forecasting, arbitrary DSL, AI changes, OAuth and additional providers as separate fronts.
+4. If green, implement reminder execution/materialization as the next isolated Phase 5 slice.
+5. Keep recurring rules, external delivery, graph visualization, automatic status behavior, critical-path forecasting, arbitrary DSL, AI changes, OAuth and additional providers as separate fronts.
 6. When commercial publication is scheduled, create the Kairoseth Software catalog entry as **Gestor de Trabajo / Work Manager**.
 
 ## Current blockers / Bloqueos actuales
 
-No known product blocker. Slice 13 is ready for regression validation.
+No known product blocker. Slice 14 is ready for regression validation.
 
 ## Operating rule
 
