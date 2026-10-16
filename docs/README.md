@@ -34,6 +34,7 @@ Esta carpeta es la fuente de verdad para las decisiones de producto, arquitectur
 27. [`22-github-setup-ui.md`](22-github-setup-ui.md) — admin-only GitHub connection and repository setup surface.
 28. [`23-github-maintenance-ui.md`](23-github-maintenance-ui.md) — safe token rotation, repository unlink and unused-connection removal.
 29. [`24-github-webhook-ui.md`](24-github-webhook-ui.md) — safe manual GitHub webhook provisioning, one-time secret reveal, rotation and removal.
+30. [`25-automation-rule-policies.md`](25-automation-rule-policies.md) — workspace-scoped enable/severity policies for deterministic built-in automation rules.
 
 ## Living documents / Documentos vivos
 

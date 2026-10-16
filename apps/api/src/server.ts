@@ -4,6 +4,7 @@ import { MongoOperationalStore } from '@kcc/persistence';
 import { MongoGitHubWebhookStore } from '@kcc/persistence/github-webhooks';
 import { MongoIntegrationSignalStore } from '@kcc/persistence/integration-signals';
 import { MongoIntegrationSyncJobStore } from '@kcc/persistence/integration-sync-jobs';
+import { MongoSignalAlertRulePolicyStore } from '@kcc/persistence/signal-alert-rule-policies';
 import { buildApp } from './application';
 import { MongoDecisionLifecycleStore } from './decision-lifecycle-store';
 import { MongoGitHubConnectionStore } from './github-connection-store';
@@ -21,6 +22,7 @@ const operationalAuditStore = new MongoOperationalAuditStore(mongo, mongo.db());
 const decisionLifecycleStore = new MongoDecisionLifecycleStore(mongo, mongo.db());
 const integrationSignalStore = new MongoIntegrationSignalStore(mongo.db());
 const integrationSyncJobStore = new MongoIntegrationSyncJobStore(mongo.db());
+const signalAlertRulePolicyStore = new MongoSignalAlertRulePolicyStore(mongo, mongo.db());
 const githubRepositoryStore = new MongoGitHubRepositoryStore(mongo, mongo.db());
 const githubProviderClient = new GitHubRestClient(config.KCC_GITHUB_API_BASE_URL);
 const integrationSecretStore = config.KCC_INTEGRATION_SECRET_KEY
@@ -44,6 +46,7 @@ try {
     decisionLifecycleStore.ensureIndexes(),
     integrationSignalStore.ensureIndexes(),
     integrationSyncJobStore.ensureIndexes(),
+    signalAlertRulePolicyStore.ensureIndexes(),
     githubRepositoryStore.ensureIndexes(),
     ...(githubConnectionStore ? [githubConnectionStore.ensureIndexes()] : []),
     ...(githubWebhookStore ? [githubWebhookStore.ensureIndexes()] : []),
@@ -87,6 +90,7 @@ const app = buildApp({
   decisionLifecycleStore,
   integrationSignalStore,
   integrationSyncJobStore,
+  signalAlertRulePolicyStore,
   githubRepositoryStore,
   githubProviderClient,
   ...(githubConnectionStore ? { githubConnectionStore } : {}),

@@ -14,6 +14,7 @@ import {
   type IntegrationSyncJob,
 } from '@kcc/persistence/integration-sync-jobs';
 import { MongoIntegrationSyncScheduleStore } from '@kcc/persistence/integration-sync-schedules';
+import { MongoSignalAlertRulePolicyStore } from '@kcc/persistence/signal-alert-rule-policies';
 import { discoverGitHubSchedules, enqueueDueGitHubSchedule } from './integration-scheduler';
 
 const config = loadWorkerConfig();
@@ -23,6 +24,7 @@ const outbox = new MongoAuditOutboxStore(db);
 const syncJobs = new MongoIntegrationSyncJobStore(db);
 const syncSchedules = new MongoIntegrationSyncScheduleStore(db);
 const signalAlerts = new MongoIntegrationSignalAlertStore(mongo, db);
+const signalAlertRulePolicies = new MongoSignalAlertRulePolicyStore(mongo, db);
 const integrationSecretKey = config.KCC_INTEGRATION_SECRET_KEY;
 
 const githubExecution = integrationSecretKey
@@ -149,19 +151,24 @@ async function executeGitHubSignalJob(job: IntegrationSyncJob): Promise<void> {
     await githubExecution.signalStore.upsertSignals(runtime.workspaceId, signals);
 
     workerStage = 'alert_materialization';
-    const lifecycleSignals = await githubExecution.signalStore.listSignals({
-      workspaceId: runtime.workspaceId,
-      resourceId: runtime.resourceId,
-      types: ['repository.ci'],
-      limit: 500,
-    });
-    const reconciliation = reconcileAlertsFromIntegrationSignals(lifecycleSignals);
+    const [lifecycleSignals, rulePolicies] = await Promise.all([
+      githubExecution.signalStore.listSignals({
+        workspaceId: runtime.workspaceId,
+        resourceId: runtime.resourceId,
+        types: ['repository.ci'],
+        limit: 500,
+      }),
+      signalAlertRulePolicies.getPolicyMap(runtime.workspaceId),
+    ]);
+    const reconciliation = reconcileAlertsFromIntegrationSignals(lifecycleSignals, rulePolicies);
     let derivedAlertCount = 0;
     let reopenedAlertCount = 0;
+    let policyUpdatedAlertCount = 0;
     for (const candidate of reconciliation.active) {
       const result = await signalAlerts.materialize(runtime.workspaceId, candidate);
       if (result.status === 'created') derivedAlertCount += 1;
       if (result.status === 'reopened') reopenedAlertCount += 1;
+      if (result.status === 'updated') policyUpdatedAlertCount += 1;
     }
     const resolvedAlertCount = await signalAlerts.resolve(runtime.workspaceId, reconciliation.resolve);
 
@@ -182,8 +189,10 @@ async function executeGitHubSignalJob(job: IntegrationSyncJob): Promise<void> {
       lifecycleSignalCount: lifecycleSignals.length,
       alertCandidateCount: reconciliation.active.length,
       alertResolutionCandidateCount: reconciliation.resolve.length,
+      rulePolicyCount: Object.keys(rulePolicies).length,
       derivedAlertCount,
       reopenedAlertCount,
+      policyUpdatedAlertCount,
       resolvedAlertCount,
     });
   } catch (error) {
@@ -245,6 +254,7 @@ async function tick() {
         syncJobs.ensureIndexes(),
         syncSchedules.ensureIndexes(),
         signalAlerts.ensureIndexes(),
+        signalAlertRulePolicies.ensureIndexes(),
         ...(githubExecution
           ? [githubExecution.secretStore.ensureIndexes(), githubExecution.signalStore.ensureIndexes()]
           : []),
