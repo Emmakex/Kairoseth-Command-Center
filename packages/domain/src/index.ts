@@ -81,6 +81,11 @@ export interface Milestone {
   updatedAt: string;
 }
 
+export type TaskReminderRule = {
+  kind: 'at';
+  remindAt: string;
+};
+
 export interface Task {
   id: string;
   scope: Scope;
@@ -95,6 +100,11 @@ export interface Task {
    * Optional for backward compatibility with documents created before dependency support.
    */
   dependencyIds?: string[];
+  /**
+   * Explicit in-app reminder rules. The first supported rule is a one-time ISO instant.
+   * Optional for backward compatibility with documents created before reminder support.
+   */
+  reminderRules?: TaskReminderRule[];
   dueAt?: string;
   completedAt?: string;
   createdAt: string;
