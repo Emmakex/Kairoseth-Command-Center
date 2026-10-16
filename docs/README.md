@@ -36,6 +36,7 @@ Esta carpeta es la fuente de verdad para las decisiones de producto, arquitectur
 29. [`24-github-webhook-ui.md`](24-github-webhook-ui.md) — safe manual GitHub webhook provisioning, one-time secret reveal, rotation and removal.
 30. [`25-automation-rule-policies.md`](25-automation-rule-policies.md) — workspace-scoped enable/severity policies for deterministic built-in automation rules.
 31. [`26-automation-rule-policy-ui.md`](26-automation-rule-policy-ui.md) — ES/EN workspace administration surface for the proven built-in automation policies.
+32. [`27-stale-work-rules.md`](27-stale-work-rules.md) — provider-neutral seven-day stale pull-request/issue rules and lifecycle semantics.
 
 ## Living documents / Documentos vivos
 

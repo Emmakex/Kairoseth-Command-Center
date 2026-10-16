@@ -155,7 +155,7 @@ async function executeGitHubSignalJob(job: IntegrationSyncJob): Promise<void> {
       githubExecution.signalStore.listSignals({
         workspaceId: runtime.workspaceId,
         resourceId: runtime.resourceId,
-        types: ['repository.ci'],
+        types: ['repository.ci', 'repository.pull_request', 'repository.issue'],
         limit: 500,
       }),
       signalAlertRulePolicies.getPolicyMap(runtime.workspaceId),
