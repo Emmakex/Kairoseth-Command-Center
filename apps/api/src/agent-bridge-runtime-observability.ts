@@ -45,9 +45,8 @@ async function resolveSession(
 
 async function resolveRuntimeIdentity(
   request: FastifyRequest,
-  provider?: AgentBridgeRuntimeIdentityProvider,
+  provider: AgentBridgeRuntimeIdentityProvider,
 ): Promise<AgentBridgeRuntimeIdentity | null> {
-  if (!provider) return null;
   const authorization = request.headers.authorization;
   const cookie = request.headers.cookie;
   return provider.resolveRuntimeIdentity({
@@ -244,7 +243,13 @@ function validHealthBinding(
       connector,
     ]),
   );
-  if (inventory.size !== connectors.length) return false;
+  const healthKeys = health.map((item) => instanceKey(item.connectorId, item.connectorInstanceId));
+  if (
+    inventory.size !== connectors.length ||
+    new Set(healthKeys).size !== health.length
+  ) {
+    return false;
+  }
 
   for (const item of health) {
     const connector = inventory.get(instanceKey(item.connectorId, item.connectorInstanceId));
@@ -312,6 +317,9 @@ export function registerAgentBridgeRuntimeObservabilityRoutes(
     reply.header('cache-control', 'no-store');
     if (!options.runtimeObservabilityStore) {
       return reply.code(503).send({ code: 'runtime_observability_store_unavailable' });
+    }
+    if (!options.runtimeIdentityProvider) {
+      return reply.code(503).send({ code: 'runtime_identity_provider_unavailable' });
     }
     const identity = await resolveRuntimeIdentity(request, options.runtimeIdentityProvider);
     if (!identity) return reply.code(401).send({ code: 'runtime_session_required' });
