@@ -44,6 +44,7 @@ Esta carpeta es la fuente de verdad para las decisiones de producto, arquitectur
 37. [`32-stale-threshold-policies.md`](32-stale-threshold-policies.md) — workspace-scoped 1..365-day inactivity thresholds for the two stale-work rules.
 38. [`33-stale-threshold-ui.md`](33-stale-threshold-ui.md) — ES/EN stale-work threshold editor and strict same-origin mutation boundary.
 39. [`34-task-dependencies.md`](34-task-dependencies.md) — explicit same-scope acyclic task dependency graph, guarded mutation and transactional audit.
+40. [`35-dependency-prioritization.md`](35-dependency-prioritization.md) — deterministic dependency-chain impact scoring with legacy weight-policy compatibility.
 
 ## Living documents / Documentos vivos
 
