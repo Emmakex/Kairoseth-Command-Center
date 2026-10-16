@@ -103,7 +103,7 @@ function app() {
 }
 
 describe('automation rule policy routes', () => {
-  it('returns the built-in defaults before a workspace creates overrides', async () => {
+  it('returns CI defaults plus safely-disabled stale-work defaults before workspace overrides', async () => {
     const response = await app().inject({
       method: 'GET',
       url: '/v1/automation/rules',
@@ -125,11 +125,23 @@ describe('automation rule policy routes', () => {
           severity: 'warning',
           overridden: false,
         },
+        {
+          ruleId: 'repository.pull_request.stale.v1',
+          enabled: false,
+          severity: 'warning',
+          overridden: false,
+        },
+        {
+          ruleId: 'repository.issue.stale.v1',
+          enabled: false,
+          severity: 'warning',
+          overridden: false,
+        },
       ],
     });
   });
 
-  it('updates one rule while preserving unspecified effective values', async () => {
+  it('updates one CI rule while preserving unspecified effective values', async () => {
     const instance = app();
     const update = await instance.inject({
       method: 'PATCH',
@@ -154,13 +166,30 @@ describe('automation rule policy routes', () => {
     expect(read.json().rules[0]).toMatchObject({ enabled: true, severity: 'critical' });
   });
 
+  it('enables a stale pull-request rule through the same guarded policy API', async () => {
+    const response = await app().inject({
+      method: 'PATCH',
+      url: '/v1/automation/rules/repository.pull_request.stale.v1',
+      headers: { authorization: 'Bearer admin', 'content-type': 'application/json' },
+      payload: { enabled: true, severity: 'urgent' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().rule).toMatchObject({
+      ruleId: 'repository.pull_request.stale.v1',
+      enabled: true,
+      severity: 'urgent',
+      overridden: true,
+    });
+  });
+
   it('keeps workspace rule policies isolated', async () => {
     const instance = app();
     await instance.inject({
       method: 'PATCH',
-      url: '/v1/automation/rules/repository.ci.failed.v1',
+      url: '/v1/automation/rules/repository.issue.stale.v1',
       headers: { authorization: 'Bearer admin', 'content-type': 'application/json' },
-      payload: { enabled: false },
+      payload: { enabled: true },
     });
 
     const otherWorkspace = await instance.inject({
@@ -168,7 +197,7 @@ describe('automation rule policy routes', () => {
       url: '/v1/automation/rules',
       headers: { authorization: 'Bearer workspace-b' },
     });
-    expect(otherWorkspace.json().rules[0]).toMatchObject({ enabled: true, severity: 'urgent' });
+    expect(otherWorkspace.json().rules[3]).toMatchObject({ enabled: false, severity: 'warning' });
   });
 
   it('requires automation.manage and rejects unknown rules or invalid policy values', async () => {
