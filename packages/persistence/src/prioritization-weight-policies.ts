@@ -9,7 +9,7 @@ type WorkspaceScope = Extract<Scope, { kind: 'workspace' }>;
 export type StoredPrioritizationWeightPolicy = {
   id: string;
   workspaceId: string;
-  weights: PrioritizationWeights;
+  weights: Partial<PrioritizationWeights>;
   updatedByUserId: string;
   createdAt: string;
   updatedAt: string;
@@ -28,7 +28,7 @@ export interface PrioritizationWeightPolicyStore {
     workspaceId: string;
     actorUserId: string;
     weights: PrioritizationWeights;
-  }): Promise<StoredPrioritizationWeightPolicy>;
+  }): Promise<StoredPrioritizationWeightPolicy & { weights: PrioritizationWeights }>;
 }
 
 const WEIGHT_KEYS = Object.keys(defaultPrioritizationWeights()) as (keyof PrioritizationWeights)[];
@@ -51,6 +51,15 @@ export function validatePrioritizationWeights(weights: PrioritizationWeights): P
     validated[key] = value;
   }
   return validated;
+}
+
+export function effectivePrioritizationWeights(
+  stored?: Partial<PrioritizationWeights> | null,
+): PrioritizationWeights {
+  return validatePrioritizationWeights({
+    ...defaultPrioritizationWeights(),
+    ...(stored ?? {}),
+  });
 }
 
 export class MongoPrioritizationWeightPolicyStore implements PrioritizationWeightPolicyStore {
@@ -90,7 +99,11 @@ export class MongoPrioritizationWeightPolicyStore implements PrioritizationWeigh
     const normalizedWorkspaceId = validText(workspaceId, 'workspace_id');
     const stored = await this.policies.findOne({ workspaceId: normalizedWorkspaceId });
     return stored
-      ? { weights: validatePrioritizationWeights(stored.weights), overridden: true, updatedAt: stored.updatedAt }
+      ? {
+          weights: effectivePrioritizationWeights(stored.weights),
+          overridden: true,
+          updatedAt: stored.updatedAt,
+        }
       : { weights: defaultPrioritizationWeights(), overridden: false };
   }
 
@@ -98,7 +111,7 @@ export class MongoPrioritizationWeightPolicyStore implements PrioritizationWeigh
     workspaceId: string;
     actorUserId: string;
     weights: PrioritizationWeights;
-  }): Promise<StoredPrioritizationWeightPolicy> {
+  }): Promise<StoredPrioritizationWeightPolicy & { weights: PrioritizationWeights }> {
     const workspaceId = validText(input.workspaceId, 'workspace_id');
     const actorUserId = validText(input.actorUserId, 'actor_user_id');
     const weights = validatePrioritizationWeights(input.weights);
@@ -109,7 +122,7 @@ export class MongoPrioritizationWeightPolicyStore implements PrioritizationWeigh
       const now = new Date().toISOString();
 
       if (!existing) {
-        const policy: StoredPrioritizationWeightPolicy = {
+        const policy: StoredPrioritizationWeightPolicy & { weights: PrioritizationWeights } = {
           id: randomUUID(),
           workspaceId,
           weights,
@@ -146,19 +159,23 @@ export class MongoPrioritizationWeightPolicyStore implements PrioritizationWeigh
       );
       if (!updated) throw new Error('prioritization_weight_policy_update_conflict');
 
+      const effectiveUpdated = { ...updated, weights: effectivePrioritizationWeights(updated.weights) };
       await this.outbox.enqueue(
         {
           scope,
           type: 'prioritization.weights_changed',
           entityType: 'prioritization_weight_policy',
-          entityId: updated.id,
+          entityId: effectiveUpdated.id,
           summary: 'Prioritization weights changed',
           source: 'prioritization-policy',
-          metadata: { weights: updated.weights, previous: existing.weights },
+          metadata: {
+            weights: effectiveUpdated.weights,
+            previous: effectivePrioritizationWeights(existing.weights),
+          },
         },
         session,
       );
-      return updated;
+      return effectiveUpdated;
     });
   }
 }
