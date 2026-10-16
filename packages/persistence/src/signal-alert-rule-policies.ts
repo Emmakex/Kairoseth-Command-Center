@@ -2,8 +2,12 @@ import { randomUUID } from 'node:crypto';
 import type { ClientSession, Collection, Db, MongoClient } from 'mongodb';
 import type { Scope } from '@kcc/domain';
 import {
+  MAX_STALE_WORK_AFTER_DAYS,
+  MIN_STALE_WORK_AFTER_DAYS,
+  STALE_WORK_AFTER_DAYS,
   defaultSignalAlertRulePolicies,
   isBuiltInSignalAlertRuleId,
+  isStaleWorkRuleId,
   type BuiltInSignalAlertRuleId,
   type DerivedAlertSeverity,
   type SignalAlertRulePolicy,
@@ -36,6 +40,7 @@ export interface SignalAlertRulePolicyStore {
     ruleId: BuiltInSignalAlertRuleId;
     enabled: boolean;
     severity: DerivedAlertSeverity;
+    staleAfterDays?: number;
   }): Promise<StoredSignalAlertRulePolicy>;
 }
 
@@ -52,6 +57,28 @@ function validText(value: string, field: string, maxLength = 200): string {
 function validSeverity(value: DerivedAlertSeverity): DerivedAlertSeverity {
   if (!severities.has(value)) throw new Error('signal_alert_rule_policy_severity_invalid');
   return value;
+}
+
+function validStaleAfterDays(
+  ruleId: BuiltInSignalAlertRuleId,
+  value: number | undefined,
+): number | undefined {
+  if (!isStaleWorkRuleId(ruleId)) {
+    if (value !== undefined) {
+      throw new Error('signal_alert_rule_policy_stale_after_days_not_supported');
+    }
+    return undefined;
+  }
+
+  const candidate = value ?? STALE_WORK_AFTER_DAYS;
+  if (
+    !Number.isInteger(candidate) ||
+    candidate < MIN_STALE_WORK_AFTER_DAYS ||
+    candidate > MAX_STALE_WORK_AFTER_DAYS
+  ) {
+    throw new Error('signal_alert_rule_policy_stale_after_days_invalid');
+  }
+  return candidate;
 }
 
 export class MongoSignalAlertRulePolicyStore implements SignalAlertRulePolicyStore {
@@ -94,15 +121,19 @@ export class MongoSignalAlertRulePolicyStore implements SignalAlertRulePolicySto
 
     return defaultSignalAlertRulePolicies().map((defaults) => {
       const override = byRule.get(defaults.ruleId);
-      return override
-        ? {
-            ruleId: override.ruleId,
-            enabled: override.enabled,
-            severity: override.severity,
-            overridden: true,
-            updatedAt: override.updatedAt,
-          }
-        : { ...defaults, overridden: false };
+      if (!override) return { ...defaults, overridden: false };
+
+      const staleAfterDays = isStaleWorkRuleId(defaults.ruleId)
+        ? validStaleAfterDays(defaults.ruleId, override.staleAfterDays ?? defaults.staleAfterDays)
+        : undefined;
+      return {
+        ruleId: override.ruleId,
+        enabled: override.enabled,
+        severity: override.severity,
+        ...(staleAfterDays !== undefined ? { staleAfterDays } : {}),
+        overridden: true,
+        updatedAt: override.updatedAt,
+      };
     });
   }
 
@@ -111,7 +142,11 @@ export class MongoSignalAlertRulePolicyStore implements SignalAlertRulePolicySto
     return Object.fromEntries(
       effective.map((policy) => [
         policy.ruleId,
-        { enabled: policy.enabled, severity: policy.severity },
+        {
+          enabled: policy.enabled,
+          severity: policy.severity,
+          ...(policy.staleAfterDays !== undefined ? { staleAfterDays: policy.staleAfterDays } : {}),
+        },
       ]),
     ) as SignalAlertRulePolicyMap;
   }
@@ -122,6 +157,7 @@ export class MongoSignalAlertRulePolicyStore implements SignalAlertRulePolicySto
     ruleId: BuiltInSignalAlertRuleId;
     enabled: boolean;
     severity: DerivedAlertSeverity;
+    staleAfterDays?: number;
   }): Promise<StoredSignalAlertRulePolicy> {
     const workspaceId = validText(input.workspaceId, 'workspace_id');
     const actorUserId = validText(input.actorUserId, 'actor_user_id');
@@ -132,6 +168,7 @@ export class MongoSignalAlertRulePolicyStore implements SignalAlertRulePolicySto
       throw new Error('signal_alert_rule_policy_enabled_invalid');
     }
     const severity = validSeverity(input.severity);
+    const staleAfterDays = validStaleAfterDays(input.ruleId, input.staleAfterDays);
     const scope: WorkspaceScope = { kind: 'workspace', workspaceId };
 
     return this.transaction(async (session) => {
@@ -148,6 +185,7 @@ export class MongoSignalAlertRulePolicyStore implements SignalAlertRulePolicySto
           ruleId: input.ruleId,
           enabled: input.enabled,
           severity,
+          ...(staleAfterDays !== undefined ? { staleAfterDays } : {}),
           updatedByUserId: actorUserId,
           createdAt: now,
           updatedAt: now,
@@ -165,6 +203,9 @@ export class MongoSignalAlertRulePolicyStore implements SignalAlertRulePolicySto
               ruleId: policy.ruleId,
               enabled: policy.enabled,
               severity: policy.severity,
+              ...(policy.staleAfterDays !== undefined
+                ? { staleAfterDays: policy.staleAfterDays }
+                : {}),
               previous: null,
             },
           },
@@ -179,6 +220,7 @@ export class MongoSignalAlertRulePolicyStore implements SignalAlertRulePolicySto
           $set: {
             enabled: input.enabled,
             severity,
+            ...(staleAfterDays !== undefined ? { staleAfterDays } : {}),
             updatedByUserId: actorUserId,
             updatedAt: now,
           },
@@ -199,9 +241,18 @@ export class MongoSignalAlertRulePolicyStore implements SignalAlertRulePolicySto
             ruleId: updated.ruleId,
             enabled: updated.enabled,
             severity: updated.severity,
+            ...(updated.staleAfterDays !== undefined
+              ? { staleAfterDays: updated.staleAfterDays }
+              : {}),
             previous: {
               enabled: existing.enabled,
               severity: existing.severity,
+              ...(isStaleWorkRuleId(existing.ruleId)
+                ? {
+                    staleAfterDays:
+                      existing.staleAfterDays ?? STALE_WORK_AFTER_DAYS,
+                  }
+                : {}),
             },
           },
         },
