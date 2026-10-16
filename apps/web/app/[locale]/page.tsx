@@ -25,6 +25,7 @@ import {
   getPrioritizationWeightPolicy,
   getProjects,
   getSession,
+  getTasks,
   getTimeline,
   getToday,
   readSessionToken,
@@ -68,6 +69,7 @@ export default async function CommandCenterPage({
     today,
     priorities,
     projects,
+    tasks,
     milestones,
     decisions,
     githubConnections,
@@ -81,6 +83,7 @@ export default async function CommandCenterPage({
     getToday(token, scope),
     canReadPriorities ? getPriorities(token, scope, 8) : Promise.resolve(null),
     getProjects(token, scope),
+    getTasks(token, scope),
     getMilestones(token, scope),
     scope === 'workspace' ? getDecisions(token) : Promise.resolve(null),
     scope === 'workspace' && canManageIntegrations
@@ -116,6 +119,7 @@ export default async function CommandCenterPage({
   const otherLocale = locale === 'es' ? 'en' : 'es';
   const summary = today?.summary;
   const projectCatalog = projects ?? [];
+  const taskCatalog = tasks ?? today?.tasks ?? [];
   const resultMessages: Record<string, string> = {
     saved: copy.actionSaved,
     invalid: copy.actionInvalid,
@@ -190,7 +194,7 @@ export default async function CommandCenterPage({
 
       {canReadPriorities ? <PriorityPanel locale={locale} priorities={priorities} /> : null}
 
-      <OperationalPanels locale={locale} scope={scope} copy={copy} today={today} />
+      <OperationalPanels locale={locale} scope={scope} copy={copy} today={today} taskCatalog={taskCatalog} />
 
       <section className="management-grid">
         <MilestonePanel

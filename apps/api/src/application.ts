@@ -31,6 +31,7 @@ import { registerPriorityRoutes } from './priorities';
 import { registerPrioritizationWeightPolicyRoutes } from './prioritization-weight-policies';
 import { registerTaskDependencyRoutes } from './task-dependencies';
 import type { TaskDependencyStore } from './task-dependency-store';
+import { registerTaskStartGuard } from './task-start-guard';
 
 type ApplicationOptions = {
   readinessCheck?: ReadinessCheck;
@@ -62,6 +63,10 @@ export function buildApp(options: ApplicationOptions = {}) {
   });
 
   registerDecisionCompatibilityGuard(app);
+  registerTaskStartGuard(app, {
+    ...(options.authProvider ? { authProvider: options.authProvider } : {}),
+    ...(options.operationalStore ? { operationalStore: options.operationalStore } : {}),
+  });
   registerOperationalAuditRoutes(app, {
     ...(options.authProvider ? { authProvider: options.authProvider } : {}),
     ...(options.operationalAuditStore ? { auditStore: options.operationalAuditStore } : {}),
@@ -173,8 +178,7 @@ export function buildApp(options: ApplicationOptions = {}) {
       ? { githubConnectionStore: options.githubConnectionStore }
       : {}),
     ...(options.githubProviderClient
-      ? { githubProviderClient: options.githubProviderClient }
-      : {}),
+      ? { githubProviderClient: options.githubProviderClient } : {}),
   });
 
   registerGitHubWebhookRoutes(app, {
