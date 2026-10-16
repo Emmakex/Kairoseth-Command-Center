@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { Card } from '@kcc/ui';
 import { AccountPanel } from '../../components/account-panel';
+import { AutomationRulePolicyPanel } from '../../components/automation-rule-policy-panel';
 import { DecisionPanel } from '../../components/decision-panel';
 import { GitHubSetupPanel } from '../../components/github-setup-panel';
 import { IntegrationActivityPanel } from '../../components/integration-activity-panel';
@@ -11,6 +12,7 @@ import { OperationalPanels } from '../../components/operational-panels';
 import { QuickCapturePanel } from '../../components/quick-capture-panel';
 import { TimelinePanel } from '../../components/timeline-panel';
 import {
+  getAutomationRules,
   getDecisions,
   getGitHubConnections,
   getGitHubRepositories,
@@ -52,6 +54,7 @@ export default async function CommandCenterPage({
   const scope = requestedScope === 'private' ? 'private' : 'workspace';
   const canManageMembers = session.capabilities.includes('members.manage');
   const canManageIntegrations = session.capabilities.includes('integrations.manage');
+  const canManageAutomation = session.capabilities.includes('automation.manage');
   const [
     today,
     projects,
@@ -60,6 +63,7 @@ export default async function CommandCenterPage({
     githubConnections,
     githubRepositories,
     integrationSignals,
+    automationRules,
     timeline,
     members,
   ] = await Promise.all([
@@ -74,6 +78,9 @@ export default async function CommandCenterPage({
       ? getGitHubRepositories(token)
       : Promise.resolve(null),
     scope === 'workspace' ? getIntegrationSignals(token, 12) : Promise.resolve(null),
+    scope === 'workspace' && canManageAutomation
+      ? getAutomationRules(token)
+      : Promise.resolve(null),
     getTimeline(token, scope),
     scope === 'workspace' && canManageMembers ? getLocalMembers(token) : Promise.resolve(null),
   ]);
@@ -189,6 +196,9 @@ export default async function CommandCenterPage({
             <p className="empty-state">{copy.decisionWorkspaceOnly}</p>
           </article>
         )}
+        {scope === 'workspace' && canManageAutomation ? (
+          <AutomationRulePolicyPanel locale={locale} rules={automationRules} />
+        ) : null}
         {scope === 'workspace' && canManageIntegrations ? (
           <GitHubSetupPanel
             locale={locale}

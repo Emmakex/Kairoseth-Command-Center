@@ -132,6 +132,16 @@ export type GitHubWebhookState =
   | { state: 'not-configured' }
   | { state: 'unavailable' };
 
+export type AutomationRuleSeverity = 'info' | 'warning' | 'urgent' | 'critical';
+
+export type AutomationRulePolicySummary = {
+  ruleId: 'repository.ci.failed.v1' | 'repository.ci.action_required.v1';
+  enabled: boolean;
+  severity: AutomationRuleSeverity;
+  overridden: boolean;
+  updatedAt?: string;
+};
+
 export type TodayResponse = {
   scope: 'workspace' | 'private';
   range: { start: string; end: string };
@@ -155,6 +165,7 @@ export type TimelineResponse = { events: TimelineEventSummary[] };
 export type IntegrationSignalsResponse = { signals: IntegrationSignalSummary[] };
 export type GitHubConnectionsResponse = { connections: GitHubConnectionSummary[] };
 export type GitHubRepositoriesResponse = { repositories: GitHubRepositorySummary[] };
+export type AutomationRulesResponse = { rules: AutomationRulePolicySummary[] };
 
 export function apiBaseUrl(): string {
   return (
@@ -249,6 +260,11 @@ export async function getGitHubRepositories(token: string): Promise<GitHubReposi
     token,
   );
   return response?.repositories ?? null;
+}
+
+export async function getAutomationRules(token: string): Promise<AutomationRulePolicySummary[] | null> {
+  const response = await authenticatedGet<AutomationRulesResponse>('/v1/automation/rules', token);
+  return response?.rules ?? null;
 }
 
 export async function getGitHubWebhookState(

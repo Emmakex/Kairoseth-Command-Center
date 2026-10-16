@@ -4,7 +4,7 @@
 **Technical/internal project:** Kairoseth Command Center  
 **Commercial names:** Gestor de Trabajo (ES) / Work Manager (EN)  
 **Category:** Kairoseth Software  
-**Status:** Phase 4 token-backed GitHub boundary is closed and post-merge validated 9/9 on `d1bfa929b6b2aa409991949513218826f10c2bb0`. Phase 5 Slice 1 — Automation rule policies / Políticas de reglas de automatización — is active.
+**Status:** Phase 5 Slice 1 is merged and post-merge validated 9/9 on `3bda1db529e46e9f52ce1cf4cf4726495fa6a0e4`. Phase 5 Slice 2 — Automation rule policy UI / UI de políticas de reglas de automatización — is active.
 
 ## Naming rule / Regla de naming
 
@@ -45,36 +45,45 @@ Deferred GitHub enhancements are not Phase 4 blockers:
 - [ ] GitHub App/OAuth authorization and automatic webhook registration/removal.
 - [ ] Additional integration providers.
 
-## Active / Activo
-
 ### Phase 5 Slice 1 — Automation rule policies / Políticas de reglas de automatización
 
-Implemented on `feat/phase-5-rule-policies`:
+- [x] Versioned built-in CI rule definitions with unchanged Phase 4 defaults.
+- [x] Workspace-scoped durable policy overrides for `enabled` and `severity`.
+- [x] Dedicated `automation.manage` capability for owner/admin presets.
+- [x] `GET /v1/automation/rules` and guarded `PATCH /v1/automation/rules/:ruleId`.
+- [x] Transactional policy-change and alert-policy audit events.
+- [x] Worker reconciliation applies effective policies without changing deterministic alert identities.
+- [x] Severity changes update eligible active alerts in place.
+- [x] Disabling a built-in rule resolves matching active derived alerts without deleting history.
+- [x] Unit/API/background-refresh acceptance coverage.
+- [x] PR #33 merged as `3bda1db529e46e9f52ce1cf4cf4726495fa6a0e4`.
+- [x] Resulting `main` validated with all nine workflows green.
 
-- [x] Existing built-in CI alert rules exported as explicit versioned definitions with unchanged defaults.
-- [x] Workspace-scoped `signal_alert_rule_policies` persistence with unique workspace + rule identity.
-- [x] Effective policy merge keeps Phase 4 behavior unchanged when no overrides exist.
-- [x] Dedicated `automation.manage` capability granted to owner/admin presets, not members.
-- [x] `GET /v1/automation/rules` returns effective policies for the authenticated workspace.
-- [x] `PATCH /v1/automation/rules/:ruleId` changes `enabled` and/or `severity` for known built-in rules only.
-- [x] API requires authenticated workspace, `automation.manage` and `command-center` entitlement.
-- [x] Policy changes emit transactional `automation.rule_policy_changed` audit work.
-- [x] Worker loads effective workspace policies before durable CI alert reconciliation.
-- [x] Severity override changes the existing open/acknowledged derived alert in place without changing ID/fingerprint.
-- [x] Severity update emits transactional `alert.policy_updated` audit work.
-- [x] Disabling a rule suppresses its active candidate and lifecycle reconciliation resolves the existing derived alert rather than deleting history.
-- [x] Pure rule tests cover historical defaults, severity override, disabled-rule resolution and rule isolation.
-- [x] API tests cover defaults, partial update, workspace isolation, capability enforcement and invalid input.
-- [x] Existing background-refresh Docker smoke strengthened to prove `urgent → critical → disabled/resolved` on the same durable alert/fingerprint.
-- [x] Architecture/operations documentation in `docs/25-automation-rule-policies.md`.
+**Phase 5 Slice 1: CLOSED / CERRADA.**
+
+## Active / Activo
+
+### Phase 5 Slice 2 — Automation rule policy UI / UI de políticas de reglas de automatización
+
+Implemented on `feat/phase-5-rule-policy-ui` so far:
+
+- [x] ES/EN workspace administration panel for the two proven built-in CI rules.
+- [x] Friendly ES/EN rule labels while retaining versioned rule IDs as technical context.
+- [x] Enable/disable and severity controls for `info`, `warning`, `urgent`, `critical`.
+- [x] Default-vs-custom effective policy indicator.
+- [x] Dashboard loads rule policies only in workspace scope when the session has `automation.manage`.
+- [x] Private scope does not load or render rule administration.
+- [x] Same-origin web mutation boundary forwards only allow-listed policy changes to the authenticated API.
+- [x] Mutation parser rejects arbitrary rule IDs, invalid booleans and invalid severities.
+- [x] Unit coverage for the web mutation parser.
+- [x] Architecture/operations documentation in `docs/26-automation-rule-policy-ui.md`.
 - [ ] Final-head regression validation.
 - [ ] Merge and post-merge `main` validation.
 
-**Phase 5 Slice 1: VALIDATION PENDING / VALIDACIÓN PENDIENTE.**
+**Phase 5 Slice 2: VALIDATION PENDING / VALIDACIÓN PENDIENTE.**
 
 ## Deliberately deferred / Diferido expresamente
 
-- [ ] Customer-facing ES/EN rule policy UI — next isolated slice after runtime/API foundation is green.
 - [ ] Arbitrary user-authored conditions or rule DSL.
 - [ ] Stale PR/issue built-in rules.
 - [ ] Automation actions beyond current derived-alert behavior.
@@ -98,19 +107,21 @@ Implemented on `feat/phase-5-rule-policies`:
 13. Disabling a built-in rule resolves active derived conditions instead of deleting alerts or audit history.
 14. Severity policy changes update only eligible open/acknowledged derived alerts and do not override dismissed human decisions.
 15. Every stored policy change and derived-alert policy mutation is delivered through the transactional audit outbox.
+16. The customer-facing rule-policy UI never widens the executable rule allow-list defined by the API/runtime.
+17. Private scope never loads or renders workspace automation administration.
 
 ## Next / Siguiente
 
-1. Require all existing regression workflows green on the final Slice 1 head, including the strengthened background-refresh smoke.
-2. Correct any policy/runtime/API regression directly on this slice; do not open the UI slice while a gate is red.
-3. Merge with the exact validated head and revalidate resulting `main`.
-4. Start Phase 5 Slice 2 from that green commit: ES/EN workspace rule-policy administration UI for the two proven built-in rules.
+1. Validate the final Slice 2 head with lint, typecheck, tests, build and all existing regression workflows.
+2. Correct any UI/web-boundary regression directly on this slice.
+3. Merge the exact validated head and revalidate resulting `main`.
+4. Only then select the next isolated Phase 5 automation slice from the green repository state.
 5. Keep custom DSL, stale PR/issue rules, AI rules, OAuth and additional providers as separate fronts.
 6. When commercial publication is scheduled, create the Kairoseth Software catalog entry as **Gestor de Trabajo / Work Manager**.
 
 ## Current blockers / Bloqueos actuales
 
-No known product blocker. Slice 1 is ready for CI validation.
+No known product blocker. Slice 2 is ready for regression validation.
 
 ## Operating rule
 

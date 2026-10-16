@@ -1,0 +1,79 @@
+import { describe, expect, it } from 'vitest';
+import { parseAutomationRulePolicyMutation } from '../lib/automation-rule-policies';
+
+function form(values: Record<string, string>) {
+  const data = new FormData();
+  for (const [key, value] of Object.entries(values)) data.set(key, value);
+  return data;
+}
+
+describe('parseAutomationRulePolicyMutation', () => {
+  it('builds a safe built-in rule policy update', () => {
+    expect(
+      parseAutomationRulePolicyMutation(
+        form({
+          operation: 'rule-update',
+          ruleId: 'repository.ci.failed.v1',
+          enabled: 'false',
+          severity: 'critical',
+        }),
+      ),
+    ).toEqual({
+      path: '/v1/automation/rules/repository.ci.failed.v1',
+      method: 'PATCH',
+      body: { enabled: false, severity: 'critical' },
+    });
+  });
+
+  it('accepts the second proven built-in rule', () => {
+    expect(
+      parseAutomationRulePolicyMutation(
+        form({
+          operation: 'rule-update',
+          ruleId: 'repository.ci.action_required.v1',
+          enabled: 'true',
+          severity: 'warning',
+        }),
+      ),
+    ).toEqual({
+      path: '/v1/automation/rules/repository.ci.action_required.v1',
+      method: 'PATCH',
+      body: { enabled: true, severity: 'warning' },
+    });
+  });
+
+  it('rejects arbitrary rule IDs, booleans and severities', () => {
+    expect(
+      parseAutomationRulePolicyMutation(
+        form({
+          operation: 'rule-update',
+          ruleId: 'custom.javascript.rule',
+          enabled: 'true',
+          severity: 'critical',
+        }),
+      ),
+    ).toBeNull();
+
+    expect(
+      parseAutomationRulePolicyMutation(
+        form({
+          operation: 'rule-update',
+          ruleId: 'repository.ci.failed.v1',
+          enabled: 'yes',
+          severity: 'critical',
+        }),
+      ),
+    ).toBeNull();
+
+    expect(
+      parseAutomationRulePolicyMutation(
+        form({
+          operation: 'rule-update',
+          ruleId: 'repository.ci.failed.v1',
+          enabled: 'true',
+          severity: 'blocker',
+        }),
+      ),
+    ).toBeNull();
+  });
+});
