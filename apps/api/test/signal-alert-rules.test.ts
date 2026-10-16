@@ -27,11 +27,39 @@ function ciSignal(
   };
 }
 
+function workSignal(
+  type: 'repository.pull_request' | 'repository.issue',
+  payload: Record<string, unknown>,
+  options: { id?: string; occurredAt?: string } = {},
+): IntegrationSignal {
+  return {
+    id:
+      options.id ??
+      (type === 'repository.pull_request' ? 'provider:pull-request:17' : 'provider:issue:42'),
+    source: 'provider-x',
+    type,
+    workspaceId: 'workspace-a',
+    occurredAt: options.occurredAt ?? '2026-10-01T10:00:00.000Z',
+    payload: {
+      resourceId: 'resource-1',
+      projectId: 'project-a',
+      repository: 'acme/product',
+      number: type === 'repository.pull_request' ? 17 : 42,
+      title: type === 'repository.pull_request' ? 'Ship automation UI' : 'Investigate retry drift',
+      state: 'open',
+      ...(type === 'repository.pull_request' ? { merged: false } : {}),
+      ...payload,
+    },
+  };
+}
+
 describe('provider-neutral integration signal alert rules', () => {
-  it('keeps the historical built-in defaults unchanged', () => {
+  it('keeps historical CI defaults and introduces stale-work rules safely disabled', () => {
     expect(defaultSignalAlertRulePolicies()).toEqual([
       { ruleId: 'repository.ci.failed.v1', enabled: true, severity: 'urgent' },
       { ruleId: 'repository.ci.action_required.v1', enabled: true, severity: 'warning' },
+      { ruleId: 'repository.pull_request.stale.v1', enabled: false, severity: 'warning' },
+      { ruleId: 'repository.issue.stale.v1', enabled: false, severity: 'warning' },
     ]);
   });
 
@@ -68,7 +96,7 @@ describe('provider-neutral integration signal alert rules', () => {
     );
   });
 
-  it('suppresses a disabled rule and emits its fingerprint as a resolution candidate', () => {
+  it('suppresses a disabled CI rule and emits its fingerprint as a resolution candidate', () => {
     const signal = ciSignal({ conclusion: 'failure' });
     const result = reconcileAlertsFromIntegrationSignals([signal], {
       'repository.ci.failed.v1': { enabled: false, severity: 'urgent' },
@@ -88,12 +116,121 @@ describe('provider-neutral integration signal alert rules', () => {
     ).toBe('warning');
   });
 
-  it('ignores non-CI signals even if their payload contains a failure-like field', () => {
-    const signal: IntegrationSignal = {
-      ...ciSignal({ conclusion: 'failure' }),
-      type: 'repository.issue',
-    };
+  it('ignores an issue with a failure-like field when the stale rule is still disabled', () => {
+    const signal = workSignal('repository.issue', { conclusion: 'failure' });
     expect(deriveAlertsFromIntegrationSignal(signal)).toEqual([]);
+  });
+
+  it('derives a stale pull-request alert after seven days when explicitly enabled', () => {
+    const signal = workSignal('repository.pull_request', {});
+    const [alert] = deriveAlertsFromIntegrationSignal(
+      signal,
+      {
+        'repository.pull_request.stale.v1': { enabled: true, severity: 'urgent' },
+      },
+      { now: '2026-10-08T10:00:00.000Z' },
+    );
+
+    expect(alert).toEqual({
+      ruleId: 'repository.pull_request.stale.v1',
+      fingerprint: 'integration-rule:repository.pull_request.stale.v1:provider:pull-request:17',
+      title: 'Stale PR · #17 · Ship automation UI',
+      message: 'acme/product · no activity for 7+ days',
+      severity: 'urgent',
+      signalId: 'provider:pull-request:17',
+      signalType: 'repository.pull_request',
+      occurredAt: '2026-10-08T10:00:00.000Z',
+      projectId: 'project-a',
+    });
+  });
+
+  it('does not mark recent, closed or merged pull requests stale', () => {
+    const policy = {
+      'repository.pull_request.stale.v1': { enabled: true, severity: 'warning' as const },
+    };
+
+    expect(
+      deriveAlertsFromIntegrationSignal(
+        workSignal('repository.pull_request', {}, { occurredAt: '2026-10-02T10:00:00.000Z' }),
+        policy,
+        { now: '2026-10-08T09:59:59.000Z' },
+      ),
+    ).toEqual([]);
+    expect(
+      deriveAlertsFromIntegrationSignal(
+        workSignal('repository.pull_request', { state: 'closed' }),
+        policy,
+        { now: '2026-10-08T10:00:00.000Z' },
+      ),
+    ).toEqual([]);
+    expect(
+      deriveAlertsFromIntegrationSignal(
+        workSignal('repository.pull_request', { merged: true }),
+        policy,
+        { now: '2026-10-08T10:00:00.000Z' },
+      ),
+    ).toEqual([]);
+  });
+
+  it('derives a stale issue alert after seven days when explicitly enabled', () => {
+    const signal = workSignal('repository.issue', {});
+    const [alert] = deriveAlertsFromIntegrationSignal(
+      signal,
+      {
+        'repository.issue.stale.v1': { enabled: true, severity: 'critical' },
+      },
+      { now: '2026-10-08T10:00:00.000Z' },
+    );
+
+    expect(alert?.ruleId).toBe('repository.issue.stale.v1');
+    expect(alert?.title).toBe('Stale Issue · #42 · Investigate retry drift');
+    expect(alert?.severity).toBe('critical');
+    expect(alert?.occurredAt).toBe('2026-10-08T10:00:00.000Z');
+  });
+
+  it('resolves an existing stale-work fingerprint when the work becomes recent or the rule is disabled', () => {
+    const pullRequest = workSignal('repository.pull_request', {}, { occurredAt: '2026-10-07T10:00:00.000Z' });
+    const issue = workSignal('repository.issue', {});
+    const result = reconcileAlertsFromIntegrationSignals(
+      [pullRequest, issue],
+      {
+        'repository.pull_request.stale.v1': { enabled: true, severity: 'warning' },
+        'repository.issue.stale.v1': { enabled: false, severity: 'warning' },
+      },
+      { now: '2026-10-08T10:00:00.000Z' },
+    );
+
+    expect(result.active).toEqual([]);
+    expect(result.resolve).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          ruleId: 'repository.pull_request.stale.v1',
+          fingerprint: 'integration-rule:repository.pull_request.stale.v1:provider:pull-request:17',
+          occurredAt: '2026-10-08T10:00:00.000Z',
+        }),
+        expect.objectContaining({
+          ruleId: 'repository.issue.stale.v1',
+          fingerprint: 'integration-rule:repository.issue.stale.v1:provider:issue:42',
+          occurredAt: '2026-10-08T10:00:00.000Z',
+        }),
+      ]),
+    );
+  });
+
+  it('uses evaluation time for stale candidates so a previously resolved alert can reopen later', () => {
+    const signal = workSignal('repository.issue', {}, { occurredAt: '2026-10-01T10:00:00.000Z' });
+    const policy = {
+      'repository.issue.stale.v1': { enabled: true, severity: 'warning' as const },
+    };
+    const first = deriveAlertsFromIntegrationSignal(signal, policy, {
+      now: '2026-10-08T10:00:00.000Z',
+    })[0];
+    const later = deriveAlertsFromIntegrationSignal(signal, policy, {
+      now: '2026-10-15T10:00:00.000Z',
+    })[0];
+
+    expect(Date.parse(later!.occurredAt)).toBeGreaterThan(Date.parse(first!.occurredAt));
+    expect(later?.fingerprint).toBe(first?.fingerprint);
   });
 
   it('resolves both possible alert fingerprints when the current CI signal becomes healthy', () => {
