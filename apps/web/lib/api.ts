@@ -226,6 +226,7 @@ export type TodayResponse = {
 };
 
 export type ProjectsResponse = { projects: ProjectSummary[] };
+export type TasksResponse = { tasks: TaskSummary[] };
 export type MilestonesResponse = { milestones: MilestoneSummary[] };
 export type DecisionsResponse = { decisions: DecisionSummary[] };
 export type TimelineResponse = { events: TimelineEventSummary[] };
@@ -292,6 +293,14 @@ export async function getProjects(
 ): Promise<ProjectSummary[] | null> {
   const response = await authenticatedGet<ProjectsResponse>(`/v1/projects?scope=${scope}`, token);
   return response?.projects ?? null;
+}
+
+export async function getTasks(
+  token: string,
+  scope: 'workspace' | 'private',
+): Promise<TaskSummary[] | null> {
+  const response = await authenticatedGet<TasksResponse>(`/v1/tasks?scope=${scope}`, token);
+  return response?.tasks ?? null;
 }
 
 export async function getMilestones(
