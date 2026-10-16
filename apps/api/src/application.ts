@@ -2,6 +2,7 @@ import type { AuthProvider } from '@kcc/auth';
 import type { MilestoneStore, OperationalStore } from '@kcc/persistence';
 import type { IntegrationSignalStore } from '@kcc/persistence/integration-signals';
 import type { IntegrationSyncJobStore } from '@kcc/persistence/integration-sync-jobs';
+import type { PrioritizationWeightPolicyStore } from '@kcc/persistence/prioritization-weight-policies';
 import type { SignalAlertRulePolicyStore } from '@kcc/persistence/signal-alert-rule-policies';
 import type { GitHubWebhookStore } from '@kcc/persistence/github-webhooks';
 import { buildApp as buildBaseApp } from './app';
@@ -27,6 +28,7 @@ import { registerMilestoneRoutes } from './milestones';
 import { registerOperationalAuditRoutes } from './operational-audit-routes';
 import type { OperationalAuditStore } from './operational-audit-store';
 import { registerPriorityRoutes } from './priorities';
+import { registerPrioritizationWeightPolicyRoutes } from './prioritization-weight-policies';
 
 type ApplicationOptions = {
   readinessCheck?: ReadinessCheck;
@@ -45,6 +47,7 @@ type ApplicationOptions = {
   integrationSignalStore?: IntegrationSignalStore;
   integrationSyncJobStore?: IntegrationSyncJobStore;
   signalAlertRulePolicyStore?: SignalAlertRulePolicyStore;
+  prioritizationWeightPolicyStore?: PrioritizationWeightPolicyStore;
 };
 
 export function buildApp(options: ApplicationOptions = {}) {
@@ -87,6 +90,16 @@ export function buildApp(options: ApplicationOptions = {}) {
     ...(options.authProvider ? { authProvider: options.authProvider } : {}),
     ...(options.operationalStore ? { operationalStore: options.operationalStore } : {}),
     ...(options.milestoneStore ? { milestoneStore: options.milestoneStore } : {}),
+    ...(options.prioritizationWeightPolicyStore
+      ? { prioritizationWeightPolicyStore: options.prioritizationWeightPolicyStore }
+      : {}),
+  });
+
+  registerPrioritizationWeightPolicyRoutes(app, {
+    ...(options.authProvider ? { authProvider: options.authProvider } : {}),
+    ...(options.prioritizationWeightPolicyStore
+      ? { prioritizationWeightPolicyStore: options.prioritizationWeightPolicyStore }
+      : {}),
   });
 
   registerIntegrationSignalRoutes(app, {

@@ -4,6 +4,7 @@ import { MongoOperationalStore } from '@kcc/persistence';
 import { MongoGitHubWebhookStore } from '@kcc/persistence/github-webhooks';
 import { MongoIntegrationSignalStore } from '@kcc/persistence/integration-signals';
 import { MongoIntegrationSyncJobStore } from '@kcc/persistence/integration-sync-jobs';
+import { MongoPrioritizationWeightPolicyStore } from '@kcc/persistence/prioritization-weight-policies';
 import { MongoSignalAlertRulePolicyStore } from '@kcc/persistence/signal-alert-rule-policies';
 import { buildApp } from './application';
 import { MongoDecisionLifecycleStore } from './decision-lifecycle-store';
@@ -23,6 +24,7 @@ const decisionLifecycleStore = new MongoDecisionLifecycleStore(mongo, mongo.db()
 const integrationSignalStore = new MongoIntegrationSignalStore(mongo.db());
 const integrationSyncJobStore = new MongoIntegrationSyncJobStore(mongo.db());
 const signalAlertRulePolicyStore = new MongoSignalAlertRulePolicyStore(mongo, mongo.db());
+const prioritizationWeightPolicyStore = new MongoPrioritizationWeightPolicyStore(mongo, mongo.db());
 const githubRepositoryStore = new MongoGitHubRepositoryStore(mongo, mongo.db());
 const githubProviderClient = new GitHubRestClient(config.KCC_GITHUB_API_BASE_URL);
 const integrationSecretStore = config.KCC_INTEGRATION_SECRET_KEY
@@ -47,6 +49,7 @@ try {
     integrationSignalStore.ensureIndexes(),
     integrationSyncJobStore.ensureIndexes(),
     signalAlertRulePolicyStore.ensureIndexes(),
+    prioritizationWeightPolicyStore.ensureIndexes(),
     githubRepositoryStore.ensureIndexes(),
     ...(githubConnectionStore ? [githubConnectionStore.ensureIndexes()] : []),
     ...(githubWebhookStore ? [githubWebhookStore.ensureIndexes()] : []),
@@ -91,6 +94,7 @@ const app = buildApp({
   integrationSignalStore,
   integrationSyncJobStore,
   signalAlertRulePolicyStore,
+  prioritizationWeightPolicyStore,
   githubRepositoryStore,
   githubProviderClient,
   ...(githubConnectionStore ? { githubConnectionStore } : {}),

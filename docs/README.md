@@ -39,6 +39,7 @@ Esta carpeta es la fuente de verdad para las decisiones de producto, arquitectur
 32. [`27-stale-work-rules.md`](27-stale-work-rules.md) — provider-neutral seven-day stale pull-request/issue rules and lifecycle semantics.
 33. [`28-explainable-prioritization.md`](28-explainable-prioritization.md) — deterministic cross-source task/alert ranking with explicit score reasons.
 34. [`29-project-milestone-priority-risk.md`](29-project-milestone-priority-risk.md) — deterministic project/milestone delivery-risk contributions in the explainable ranking.
+35. [`30-prioritization-weight-policies.md`](30-prioritization-weight-policies.md) — workspace-scoped configurable weights for deterministic explainable prioritization.
 
 ## Living documents / Documentos vivos
 
