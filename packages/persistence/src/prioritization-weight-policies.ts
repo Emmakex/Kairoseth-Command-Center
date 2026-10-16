@@ -53,6 +53,15 @@ export function validatePrioritizationWeights(weights: PrioritizationWeights): P
   return validated;
 }
 
+export function effectivePrioritizationWeights(
+  stored?: Partial<PrioritizationWeights> | null,
+): PrioritizationWeights {
+  return validatePrioritizationWeights({
+    ...defaultPrioritizationWeights(),
+    ...(stored ?? {}),
+  });
+}
+
 export class MongoPrioritizationWeightPolicyStore implements PrioritizationWeightPolicyStore {
   private readonly policies: Collection<StoredPrioritizationWeightPolicy>;
   private readonly outbox: MongoAuditOutboxStore;
@@ -90,7 +99,11 @@ export class MongoPrioritizationWeightPolicyStore implements PrioritizationWeigh
     const normalizedWorkspaceId = validText(workspaceId, 'workspace_id');
     const stored = await this.policies.findOne({ workspaceId: normalizedWorkspaceId });
     return stored
-      ? { weights: validatePrioritizationWeights(stored.weights), overridden: true, updatedAt: stored.updatedAt }
+      ? {
+          weights: effectivePrioritizationWeights(stored.weights),
+          overridden: true,
+          updatedAt: stored.updatedAt,
+        }
       : { weights: defaultPrioritizationWeights(), overridden: false };
   }
 
@@ -146,19 +159,26 @@ export class MongoPrioritizationWeightPolicyStore implements PrioritizationWeigh
       );
       if (!updated) throw new Error('prioritization_weight_policy_update_conflict');
 
+      const effectiveUpdated: StoredPrioritizationWeightPolicy = {
+        ...updated,
+        weights: effectivePrioritizationWeights(updated.weights),
+      };
       await this.outbox.enqueue(
         {
           scope,
           type: 'prioritization.weights_changed',
           entityType: 'prioritization_weight_policy',
-          entityId: updated.id,
+          entityId: effectiveUpdated.id,
           summary: 'Prioritization weights changed',
           source: 'prioritization-policy',
-          metadata: { weights: updated.weights, previous: existing.weights },
+          metadata: {
+            weights: effectiveUpdated.weights,
+            previous: effectivePrioritizationWeights(existing.weights),
+          },
         },
         session,
       );
-      return updated;
+      return effectiveUpdated;
     });
   }
 }

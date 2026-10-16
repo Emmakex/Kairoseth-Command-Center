@@ -18,6 +18,7 @@ const copy = {
     score: 'Puntuación',
     manualPriority: 'Prioridad manual',
     blocked: 'Tarea bloqueada',
+    dependencyImpact: 'Desbloquea tareas activas',
     overdue: 'Tarea vencida',
     dueToday: 'Vence hoy',
     severity: 'Severidad',
@@ -45,6 +46,7 @@ const copy = {
     score: 'Score',
     manualPriority: 'Manual priority',
     blocked: 'Task blocked',
+    dependencyImpact: 'Unblocks active tasks',
     overdue: 'Task overdue',
     dueToday: 'Due today',
     severity: 'Severity',
@@ -86,6 +88,8 @@ function reasonLabel(locale: Locale, reason: OperationalPriorityReasonSummary): 
       return `${t.manualPriority} ${reason.value ?? '—'}/100 (${suffix})`;
     case 'task.blocked':
       return `${t.blocked} (${suffix})`;
+    case 'task.dependency_impact':
+      return `${t.dependencyImpact}: ${reason.value ?? 0} (${suffix})`;
     case 'task.overdue':
       return `${t.overdue} (${suffix})`;
     case 'task.due_today':

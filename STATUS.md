@@ -4,7 +4,7 @@
 **Technical/internal project:** Kairoseth Command Center  
 **Commercial names:** Gestor de Trabajo (ES) / Work Manager (EN)  
 **Category:** Kairoseth Software  
-**Status:** Phase 5 Slice 9 is merged as `74cbf3b8462b2c4720a6d7d9bd369ec63bc156ce` and post-merge validated 9/9. Phase 5 Slice 10 — Task dependencies / Dependencias entre tareas — is active.
+**Status:** Phase 5 Slice 10 is merged as `67da2d81b3cca2a40f77b0710bb91cb8270499a8` and post-merge validated 9/9. Phase 5 Slice 11 — Dependency-aware prioritization / Priorización por dependencias — is active.
 
 ## Naming rule / Regla de naming
 
@@ -33,104 +33,64 @@
 
 **Phase 4 token-backed GitHub boundary: CLOSED / CERRADA.**
 
-### Phase 5 Slice 1 — Automation rule policies
+### Phase 5 — Closed slices / Slices cerradas
 
-- [x] Workspace-scoped enable/severity policies for deterministic built-in CI rules.
-- [x] Guarded API, `automation.manage`, worker reconciliation and transactional audit.
-- [x] PR #33 merged as `3bda1db529e46e9f52ce1cf4cf4726495fa6a0e4`; `main` 9/9 green.
+- [x] Slice 1 — Automation rule policies — PR #33 `3bda1db529e46e9f52ce1cf4cf4726495fa6a0e4`.
+- [x] Slice 2 — Automation rule policy UI — PR #34 `37755e580fef985dfda96645f7ccc86704a84e08`.
+- [x] Slice 3 — Stale work rules — PR #35 `1a88ae5280d0115fbdf2e61834859d6847bcc77e`.
+- [x] Slice 4 — Explainable prioritization — PR #36 `375b9d2ecef75243f6335732bd1f6e646df1c3f0`.
+- [x] Slice 5 — Project/milestone priority risk — PR #37 `f533c480ea841e61303819e63df3d5801f6ec54d`.
+- [x] Slice 6 — Prioritization weight policies — PR #38 `f4ef6e27f50b35c88f7c39e298c63035fe7ee684`.
+- [x] Slice 7 — Prioritization weight UI — PR #39 `76e59d11c7471682d80ce9b0c65fb571b9e50acd`.
+- [x] Slice 8 — Stale threshold policies — PR #40 `720f06ddd78d7a9c615621f6301357993338004e`.
+- [x] Slice 9 — Stale threshold UI — PR #41 `74cbf3b8462b2c4720a6d7d9bd369ec63bc156ce`.
+- [x] Slice 10 — Task dependencies — PR #42 `67da2d81b3cca2a40f77b0710bb91cb8270499a8`.
 
-### Phase 5 Slice 2 — Automation rule policy UI
-
-- [x] ES/EN workspace administration surface and safe same-origin mutation boundary.
-- [x] PR #34 merged as `37755e580fef985dfda96645f7ccc86704a84e08`; `main` 9/9 green.
-
-### Phase 5 Slice 3 — Stale work rules
-
-- [x] Provider-neutral stale PR/issue rules with seven-day default and opt-in defaults.
-- [x] Stable fingerprints, resolve/reopen lifecycle and ES/EN configuration UI.
-- [x] PR #35 merged as `1a88ae5280d0115fbdf2e61834859d6847bcc77e`; `main` 9/9 green.
-
-### Phase 5 Slice 4 — Explainable prioritization
-
-- [x] Deterministic task/alert ranking with stable reasons, timezone-aware day boundaries and ES/EN Today surface.
-- [x] PR #36 merged as `375b9d2ecef75243f6335732bd1f6e646df1c3f0`; `main` 9/9 green.
-
-### Phase 5 Slice 5 — Project/milestone priority risk
-
-- [x] Project and milestone delivery risk added to the same deterministic priority ranking.
-- [x] API capability boundary expanded to task/alert/project/milestone reads.
-- [x] PR #37 merged as `f533c480ea841e61303819e63df3d5801f6ec54d`; `main` 9/9 green.
-
-### Phase 5 Slice 6 — Prioritization weight policies
-
-- [x] Explicit `PrioritizationWeights` model with exact historical defaults.
-- [x] Workspace-scoped durable policies, integer bounds `0..100`, guarded API and transactional audit.
-- [x] Workspace ranking applies effective weights; private ranking intentionally keeps product defaults.
-- [x] PR #38 merged as `f4ef6e27f50b35c88f7c39e298c63035fe7ee684`; `main` 9/9 green.
-
-### Phase 5 Slice 7 — Prioritization weight UI
-
-- [x] ES/EN workspace editor for all 15 deterministic prioritization weights.
-- [x] Workspace-only + `automation.manage` loading/rendering and strict same-origin mutation boundary.
-- [x] PR #39 merged as `76e59d11c7471682d80ce9b0c65fb571b9e50acd`; `main` 9/9 green.
-
-### Phase 5 Slice 8 — Stale threshold policies / Políticas de umbral de inactividad
-
-- [x] Historical default remains exactly seven days when no threshold override exists.
-- [x] Only stale PR/issue rules support `staleAfterDays`, bounded to whole days `1..365`.
-- [x] Provider-neutral reconciliation applies the effective workspace threshold without changing rule IDs or alert fingerprints.
-- [x] Raising/lowering thresholds uses the existing resolve/reopen lifecycle with stable history.
-- [x] Legacy stored stale policies without the field read as seven days.
-- [x] Existing policy persistence, guarded API and transactional audit include current/previous thresholds.
-- [x] Partial enable/severity updates preserve the effective threshold and CI rules reject threshold fields.
-- [x] Unit/API coverage and `docs/32-stale-threshold-policies.md`.
-- [x] PR #40 merged as `720f06ddd78d7a9c615621f6301357993338004e`.
-- [x] Resulting `main` validated with all nine workflows green.
-
-**Phase 5 Slice 8: CLOSED / CERRADA.**
-
-### Phase 5 Slice 9 — Stale threshold UI / UI de umbral de inactividad
-
-- [x] ES/EN automation-rule cards expose the stale inactivity threshold only for stale PR/issue rules.
-- [x] Whole-day bounds `1..365`, historical seven-day fallback and strict same-origin parser boundary.
-- [x] CI rules reject threshold input and private scope never loads the editor.
-- [x] Parser coverage and `docs/33-stale-threshold-ui.md`.
-- [x] PR #41 merged as `74cbf3b8462b2c4720a6d7d9bd369ec63bc156ce`.
-- [x] Resulting `main` validated with all nine workflows green.
-
-**Phase 5 Slice 9: CLOSED / CERRADA.**
-
-## Active / Activo
+Every resulting `main` boundary through Slice 10 was validated with all nine workflows green.
 
 ### Phase 5 Slice 10 — Task dependencies / Dependencias entre tareas
 
-Implemented on `feat/phase-5-task-dependencies` so far:
+- [x] Explicit `Task.dependencyIds` graph with legacy compatibility.
+- [x] Guarded `PUT /v1/tasks/:id/dependencies` for workspace/private scope.
+- [x] Same-scope references only, maximum 50, no self-reference and no cycles.
+- [x] Per-scope transactional graph serialization prevents concurrent write-skew cycles.
+- [x] `task.dependencies_changed` is transactionally audited.
+- [x] Unit/API coverage plus real Docker persistence/audit smoke.
+- [x] PR #42 final head `26b386323e3ebd6c40d539abe1436c389e449776` validated 9/9.
+- [x] Merged as `67da2d81b3cca2a40f77b0710bb91cb8270499a8`; resulting `main` validated 9/9.
 
-- [x] `Task.dependencyIds` introduces an explicit local dependency graph while legacy tasks without the field remain compatible.
-- [x] `PUT /v1/tasks/:id/dependencies` replaces the direct dependency set.
-- [x] Workspace/private scope and actor are derived from the authenticated session; administration requires `tasks.write` plus `command-center` entitlement.
-- [x] Maximum 50 unique dependency IDs with strict ID validation.
-- [x] Self-dependencies are rejected.
-- [x] Every dependency must resolve in the exact same server-derived scope; foreign workspace/private references are treated as missing.
-- [x] Direct and transitive cycles are rejected before persistence.
-- [x] Dependency mutations commit transactionally with `task.dependencies_changed` audit outbox events containing previous/resulting IDs.
-- [x] Per-scope graph-version locking serializes concurrent dependency mutations so write-skew cannot create cycles from stale snapshots.
-- [x] API/unit coverage for actor/scope derivation, private isolation, capabilities, invalid arrays, missing references, self-dependencies and cycles.
-- [x] Domain/security documentation in `docs/03-domain-data-model.md` and `docs/34-task-dependencies.md`.
-- [ ] Docker smoke for real Mongo mutation + delivered audit event.
+**Phase 5 Slice 10: CLOSED / CERRADA.**
+
+## Active / Activo
+
+### Phase 5 Slice 11 — Dependency-aware prioritization / Priorización por dependencias
+
+Implemented on `feat/phase-5-dependency-prioritization` so far:
+
+- [x] Deterministic reverse traversal of explicit `dependencyIds` calculates unique active downstream dependents.
+- [x] Completed/cancelled downstream tasks are excluded and stop transitive propagation through that node.
+- [x] New stable reason code `task.dependency_impact` exposes dependent count and exact contribution.
+- [x] New configurable weight `taskDependencyImpactPerDependent`, default `10`, range `0..100`.
+- [x] Dependency reason contribution is `min(100, active dependent count × configured weight)`; final score remains capped at `100`.
+- [x] Legacy persisted 15-field weight policies automatically inherit the new default without destructive migration.
+- [x] Workspace weight API automatically accepts the new allow-listed key through the existing effective-policy boundary.
+- [x] ES/EN weight editor exposes the new task weight.
+- [x] ES/EN priority explanations render **Desbloquea tareas activas / Unblocks active tasks** with count and contribution.
+- [x] Unit coverage for transitive/unique counting, completed/cancelled boundaries, configurable scoring, cap behavior and legacy policy compatibility.
+- [x] Product documentation in `docs/35-dependency-prioritization.md`.
 - [ ] Final-head regression validation.
 - [ ] Merge and post-merge `main` validation.
 
-**Phase 5 Slice 10: IMPLEMENTATION ACTIVE / IMPLEMENTACIÓN ACTIVA.**
+**Phase 5 Slice 11: VALIDATION PENDING / VALIDACIÓN PENDIENTE.**
 
 ## Deliberately deferred / Diferido expresamente
 
-- [ ] Dependency-chain scoring; it starts only after the graph model/mutation boundary is green.
 - [ ] Customer-facing task dependency editor/graph UI.
 - [ ] Automatic task status mutations driven by dependencies.
-- [ ] Arbitrary user-authored conditions or rule DSL.
+- [ ] Critical-path duration forecasting or probabilistic deadline prediction.
+- [ ] Arbitrary user-authored conditions or executable rule DSL.
 - [ ] Automation actions beyond current derived-alert behavior.
-- [ ] AI-generated automation rules, weights, thresholds, dependencies or silent priority changes.
+- [ ] AI-generated rules, weights, thresholds, dependencies or silent priority changes.
 - [ ] GitHub App/OAuth and additional providers.
 
 ## Security and correctness invariants
@@ -138,34 +98,29 @@ Implemented on `feat/phase-5-task-dependencies` so far:
 1. Workspace/private scope is server-derived from authenticated context.
 2. Product entitlement and capability checks are server-enforced.
 3. Provider credentials never enter durable jobs, signals, alerts, policies, prioritization or audit events.
-4. Derived automation remains provider-neutral over normalized durable signals.
-5. Versioned rule IDs and deterministic alert fingerprints remain stable across policy changes.
-6. Private scope never loads workspace automation or prioritization administration.
-7. Human dismissed decisions remain authoritative.
-8. Priority ranking remains deterministic, explainable and AI-independent.
-9. Missing prioritization policy preserves exact product defaults.
-10. Missing stale threshold preserves the historical seven-day default exactly.
-11. Stale thresholds are whole days `1..365` and accepted only for the two stale-work rules.
-12. Browser/API clients cannot choose tenant or actor identity; those are derived from session context.
-13. Task dependencies reference local task IDs only and cannot cross the resolved scope boundary.
-14. Task dependency graphs are acyclic; self-dependencies, missing references and cycles are rejected before commit.
-15. Dependency graph mutations are transactionally audited and serialized per scope against concurrent write-skew.
-16. Legacy tasks without `dependencyIds` are interpreted as having no dependencies.
-17. Dependency data does not affect priority scores until the dedicated later scoring slice.
+4. Derived automation and prioritization remain deterministic, explainable and AI-independent.
+5. Private scope never loads workspace administration and cannot cross workspace dependency graphs.
+6. Human dismissed decisions remain authoritative.
+7. Missing prioritization policy preserves current product defaults.
+8. Legacy stored prioritization policies gain new default fields by effective merge, without changing existing configured values.
+9. Task dependencies reference local same-scope task IDs only and remain acyclic.
+10. Dependency scoring uses only explicit stored graph edges; no text/AI inference occurs.
+11. Completed/cancelled work does not create dependency impact.
+12. Every dependency score contribution is exposed through stable reason code `task.dependency_impact`.
+13. Final priority scores remain capped at `100`.
 
 ## Next / Siguiente
 
-1. Add the real Docker smoke for dependency persistence and transactional audit delivery.
-2. Validate the final Slice 10 head with lint, typecheck, tests, build and all existing regression workflows.
-3. Correct any dependency/runtime regression directly on this slice.
-4. Merge the exact validated head and revalidate resulting `main`.
-5. Only then open dependency-chain scoring as an isolated next slice.
-6. Keep dependency UI, arbitrary DSL, external automation actions, AI changes, OAuth and additional providers as separate fronts.
-7. When commercial publication is scheduled, create the Kairoseth Software catalog entry as **Gestor de Trabajo / Work Manager**.
+1. Validate Slice 11 final head with lint, typecheck, tests, build and all existing regression workflows.
+2. Correct any regression directly on this slice.
+3. Merge the exact validated head and revalidate resulting `main`.
+4. Select the next isolated Phase 5 slice from the resulting green repository state.
+5. Keep dependency UI, automatic status behavior, arbitrary DSL, AI changes, OAuth and additional providers as separate fronts.
+6. When commercial publication is scheduled, create the Kairoseth Software catalog entry as **Gestor de Trabajo / Work Manager**.
 
 ## Current blockers / Bloqueos actuales
 
-No known product blocker. Slice 10 still needs the real Docker audit smoke before final regression validation.
+No known product blocker. Slice 11 is ready for regression validation.
 
 ## Operating rule
 
