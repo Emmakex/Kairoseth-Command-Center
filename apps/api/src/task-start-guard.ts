@@ -34,7 +34,8 @@ export function registerTaskStartGuard(
   app: FastifyInstance,
   options: { authProvider?: AuthProvider; operationalStore?: OperationalStore },
 ): void {
-  if (!options.operationalStore) return;
+  const operationalStore = options.operationalStore;
+  if (!operationalStore) return;
 
   app.addHook('preHandler', async (request, reply) => {
     if (request.method !== 'PATCH' || request.routeOptions.url !== '/v1/tasks/:id/status') return;
@@ -60,7 +61,7 @@ export function registerTaskStartGuard(
       return reply.code(403).send({ error: 'forbidden' });
     }
 
-    const tasks = await options.operationalStore.listTasks(scope);
+    const tasks = await operationalStore.listTasks(scope);
     const task = tasks.find((candidate) => candidate.id === id);
     if (!task) return;
 
