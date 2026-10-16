@@ -86,18 +86,20 @@ type LocalDateTime = {
   day: number;
   hour: number;
   minute: number;
+  second: number;
 };
 
 function parseLocalDateTime(value: string): LocalDateTime | null {
-  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(value);
   if (!match) return null;
-  const [, yearText, monthText, dayText, hourText, minuteText] = match;
+  const [, yearText, monthText, dayText, hourText, minuteText, secondText] = match;
   const local = {
     year: Number(yearText),
     month: Number(monthText),
     day: Number(dayText),
     hour: Number(hourText),
     minute: Number(minuteText),
+    second: Number(secondText ?? '0'),
   };
   if (
     local.month < 1 ||
@@ -107,17 +109,22 @@ function parseLocalDateTime(value: string): LocalDateTime | null {
     local.hour < 0 ||
     local.hour > 23 ||
     local.minute < 0 ||
-    local.minute > 59
+    local.minute > 59 ||
+    local.second < 0 ||
+    local.second > 59
   ) {
     return null;
   }
-  const check = new Date(Date.UTC(local.year, local.month - 1, local.day, local.hour, local.minute));
+  const check = new Date(
+    Date.UTC(local.year, local.month - 1, local.day, local.hour, local.minute, local.second),
+  );
   if (
     check.getUTCFullYear() !== local.year ||
     check.getUTCMonth() + 1 !== local.month ||
     check.getUTCDate() !== local.day ||
     check.getUTCHours() !== local.hour ||
-    check.getUTCMinutes() !== local.minute
+    check.getUTCMinutes() !== local.minute ||
+    check.getUTCSeconds() !== local.second
   ) {
     return null;
   }
@@ -133,6 +140,7 @@ function partsInZone(date: Date, timeZone: string): LocalDateTime | null {
       day: '2-digit',
       hour: '2-digit',
       minute: '2-digit',
+      second: '2-digit',
       hourCycle: 'h23',
     }).formatToParts(date);
     const value = (type: Intl.DateTimeFormatPartTypes) =>
@@ -143,6 +151,7 @@ function partsInZone(date: Date, timeZone: string): LocalDateTime | null {
       day: value('day'),
       hour: value('hour'),
       minute: value('minute'),
+      second: value('second'),
     };
     return Object.values(local).every(Number.isFinite) ? local : null;
   } catch {
@@ -153,7 +162,14 @@ function partsInZone(date: Date, timeZone: string): LocalDateTime | null {
 export function localDateTimeToIso(value: string, timeZone: string): string | null {
   const local = parseLocalDateTime(value.trim());
   if (!local || !timeZone.trim()) return null;
-  const target = Date.UTC(local.year, local.month - 1, local.day, local.hour, local.minute);
+  const target = Date.UTC(
+    local.year,
+    local.month - 1,
+    local.day,
+    local.hour,
+    local.minute,
+    local.second,
+  );
   let guess = new Date(target);
 
   for (let attempt = 0; attempt < 4; attempt += 1) {
@@ -165,6 +181,7 @@ export function localDateTimeToIso(value: string, timeZone: string): string | nu
       actual.day,
       actual.hour,
       actual.minute,
+      actual.second,
     );
     guess = new Date(guess.getTime() + (target - actualAsUtc));
   }
@@ -176,7 +193,8 @@ export function localDateTimeToIso(value: string, timeZone: string): string | nu
     roundTrip.month !== local.month ||
     roundTrip.day !== local.day ||
     roundTrip.hour !== local.hour ||
-    roundTrip.minute !== local.minute
+    roundTrip.minute !== local.minute ||
+    roundTrip.second !== local.second
   ) {
     return null;
   }
@@ -189,11 +207,9 @@ function taskReminderRules(form: FormData, timeZone: string | undefined): Remind
   }
   if (!timeZone) return null;
 
-  const values = form
-    .getAll('remindAtLocal')
-    .filter((value): value is string => typeof value === 'string')
-    .map((value) => value.trim())
-    .filter(Boolean);
+  const rawValues = form.getAll('remindAtLocal');
+  if (rawValues.some((value) => typeof value !== 'string')) return null;
+  const values = (rawValues as string[]).map((value) => value.trim()).filter(Boolean);
   if (values.length > MAX_TASK_REMINDERS) return null;
 
   const rules: ReminderRuleBody[] = [];
