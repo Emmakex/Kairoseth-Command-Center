@@ -1,6 +1,8 @@
 import type { AutomationRulePolicySummary } from '../lib/api';
 import type { Locale } from '../lib/i18n';
 
+type ThresholdAwareRule = AutomationRulePolicySummary & { staleAfterDays?: number };
+
 const copy = {
   es: {
     title: 'Reglas de automatización',
@@ -11,6 +13,8 @@ const copy = {
     enabledYes: 'Activa',
     enabledNo: 'Desactivada',
     severity: 'Severidad',
+    staleAfterDays: 'Días sin actividad',
+    staleAfterDaysHelp: 'Entre 1 y 365 días. Si nunca se personaliza, el valor predeterminado es 7.',
     save: 'Guardar regla',
     defaultPolicy: 'Configuración predeterminada',
     overriddenPolicy: 'Configuración personalizada',
@@ -19,9 +23,9 @@ const copy = {
     actionRequiredTitle: 'CI requiere acción',
     actionRequiredHelp: 'Genera una alerta cuando CI devuelve un estado que requiere intervención humana.',
     stalePullRequestTitle: 'PR sin actividad',
-    stalePullRequestHelp: 'Genera una alerta cuando una pull request abierta lleva 7 días sin actividad.',
+    stalePullRequestHelp: 'Genera una alerta cuando una pull request abierta supera el umbral de inactividad configurado.',
     staleIssueTitle: 'Issue sin actividad',
-    staleIssueHelp: 'Genera una alerta cuando una issue abierta lleva 7 días sin actividad.',
+    staleIssueHelp: 'Genera una alerta cuando una issue abierta supera el umbral de inactividad configurado.',
     info: 'Informativa',
     warning: 'Advertencia',
     urgent: 'Urgente',
@@ -36,6 +40,8 @@ const copy = {
     enabledYes: 'Enabled',
     enabledNo: 'Disabled',
     severity: 'Severity',
+    staleAfterDays: 'Days without activity',
+    staleAfterDaysHelp: 'Between 1 and 365 days. The default remains 7 until explicitly customized.',
     save: 'Save rule',
     defaultPolicy: 'Default configuration',
     overriddenPolicy: 'Custom configuration',
@@ -44,9 +50,9 @@ const copy = {
     actionRequiredTitle: 'CI action required',
     actionRequiredHelp: 'Creates an alert when CI reports a state that requires human intervention.',
     stalePullRequestTitle: 'Stale pull request',
-    stalePullRequestHelp: 'Creates an alert when an open pull request has had no activity for 7 days.',
+    stalePullRequestHelp: 'Creates an alert when an open pull request exceeds its configured inactivity threshold.',
     staleIssueTitle: 'Stale issue',
-    staleIssueHelp: 'Creates an alert when an open issue has had no activity for 7 days.',
+    staleIssueHelp: 'Creates an alert when an open issue exceeds its configured inactivity threshold.',
     info: 'Info',
     warning: 'Warning',
     urgent: 'Urgent',
@@ -69,6 +75,10 @@ function ruleCopy(ruleId: string, locale: Locale) {
     return { title: t.staleIssueTitle, help: t.staleIssueHelp };
   }
   return { title: ruleId, help: ruleId };
+}
+
+function isStaleRule(ruleId: string) {
+  return ruleId === 'repository.pull_request.stale.v1' || ruleId === 'repository.issue.stale.v1';
 }
 
 export function AutomationRulePolicyPanel({
@@ -96,6 +106,8 @@ export function AutomationRulePolicyPanel({
         <div className="github-setup-list">
           {rules.map((rule) => {
             const labels = ruleCopy(rule.ruleId, locale);
+            const staleRule = isStaleRule(rule.ruleId);
+            const thresholdAwareRule = rule as ThresholdAwareRule;
             return (
               <form
                 className="github-setup-card github-connection-form"
@@ -135,6 +147,22 @@ export function AutomationRulePolicyPanel({
                     <option value="critical">{t.critical}</option>
                   </select>
                 </label>
+
+                {staleRule ? (
+                  <label>
+                    <span>{t.staleAfterDays}</span>
+                    <input
+                      name="staleAfterDays"
+                      type="number"
+                      min="1"
+                      max="365"
+                      step="1"
+                      required
+                      defaultValue={thresholdAwareRule.staleAfterDays ?? 7}
+                    />
+                    <small>{t.staleAfterDaysHelp}</small>
+                  </label>
+                ) : null}
 
                 <button className="primary-button" type="submit">
                   {t.save}
