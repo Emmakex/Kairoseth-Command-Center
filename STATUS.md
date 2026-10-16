@@ -4,7 +4,7 @@
 **Technical/internal project:** Kairoseth Command Center  
 **Commercial names:** Gestor de Trabajo (ES) / Work Manager (EN)  
 **Category:** Kairoseth Software  
-**Status:** Phase 5 Slice 7 is merged as `76e59d11c7471682d80ce9b0c65fb571b9e50acd` and post-merge validated 9/9. Phase 5 Slice 8 — Stale threshold policies / Políticas de umbral de inactividad — is active.
+**Status:** Phase 5 Slice 8 is merged as `720f06ddd78d7a9c615621f6301357993338004e` and post-merge validated 9/9. Phase 5 Slice 9 — Stale threshold UI / UI de umbral de inactividad — is active.
 
 ## Naming rule / Regla de naming
 
@@ -68,47 +68,52 @@
 - [x] Workspace ranking applies effective weights; private ranking intentionally keeps product defaults.
 - [x] PR #38 merged as `f4ef6e27f50b35c88f7c39e298c63035fe7ee684`; `main` 9/9 green.
 
-**Phase 5 Slice 6: CLOSED / CERRADA.**
-
-### Phase 5 Slice 7 — Prioritization weight UI / UI de pesos de priorización
+### Phase 5 Slice 7 — Prioritization weight UI
 
 - [x] ES/EN workspace editor for all 15 deterministic prioritization weights.
-- [x] Workspace-only + `automation.manage` loading/rendering; private scope remains on defaults and does not load the editor.
-- [x] Same-origin guarded proxy and exact allow-list parser with integer `0..100` validation.
-- [x] Priority UI capability loading aligned with the authoritative task/alert/project/milestone read boundary.
-- [x] Parser coverage and `docs/31-prioritization-weight-ui.md`.
-- [x] PR #39 merged as `76e59d11c7471682d80ce9b0c65fb571b9e50acd`.
-- [x] Resulting `main` validated with all nine workflows green.
-
-**Phase 5 Slice 7: CLOSED / CERRADA.**
-
-## Active / Activo
+- [x] Workspace-only + `automation.manage` loading/rendering and strict same-origin mutation boundary.
+- [x] PR #39 merged as `76e59d11c7471682d80ce9b0c65fb571b9e50acd`; `main` 9/9 green.
 
 ### Phase 5 Slice 8 — Stale threshold policies / Políticas de umbral de inactividad
 
-Implemented on `feat/phase-5-stale-threshold-policies` so far:
+- [x] Historical default remains exactly seven days when no threshold override exists.
+- [x] Only stale PR/issue rules support `staleAfterDays`, bounded to whole days `1..365`.
+- [x] Provider-neutral reconciliation applies the effective workspace threshold without changing rule IDs or alert fingerprints.
+- [x] Raising/lowering thresholds uses the existing resolve/reopen lifecycle with stable history.
+- [x] Legacy stored stale policies without the field read as seven days.
+- [x] Existing policy persistence, guarded API and transactional audit include current/previous thresholds.
+- [x] Partial enable/severity updates preserve the effective threshold and CI rules reject threshold fields.
+- [x] Unit/API coverage and `docs/32-stale-threshold-policies.md`.
+- [x] PR #40 merged as `720f06ddd78d7a9c615621f6301357993338004e`.
+- [x] Resulting `main` validated with all nine workflows green.
 
-- [x] Historical stale default remains exactly `7` days when no threshold override exists.
-- [x] Only `repository.pull_request.stale.v1` and `repository.issue.stale.v1` support `staleAfterDays`.
-- [x] Thresholds are whole days constrained to `1..365`; CI rules reject stale thresholds.
-- [x] Provider-neutral stale evaluation uses the effective per-rule workspace threshold.
-- [x] Alert rule IDs and fingerprints remain unchanged when the threshold changes.
-- [x] Raising the threshold can resolve the existing stable alert; lowering it can activate/reopen the same fingerprint on later reconciliation.
-- [x] Existing stored stale policies without `staleAfterDays` are interpreted as the historical 7-day default.
-- [x] Durable workspace policy persistence and transactional `automation.rule_policy_changed` audit include current/previous thresholds.
-- [x] `GET /v1/automation/rules` exposes effective thresholds for stale rules.
-- [x] Guarded partial `PATCH /v1/automation/rules/:ruleId` accepts stale thresholds and preserves them when later mutations change only state/severity.
-- [x] Workspace/actor remain server-derived and administration still requires `automation.manage` plus `command-center` entitlement.
-- [x] Unit/API coverage for defaults, custom thresholds, stable fingerprints, raised-threshold resolution, 1/365 bounds, invalid values, CI rejection, partial-update preservation and workspace isolation.
-- [x] Architecture/product documentation updated in `docs/27-stale-work-rules.md` and `docs/32-stale-threshold-policies.md`.
+**Phase 5 Slice 8: CLOSED / CERRADA.**
+
+## Active / Activo
+
+### Phase 5 Slice 9 — Stale threshold UI / UI de umbral de inactividad
+
+Implemented on `feat/phase-5-stale-threshold-ui` so far:
+
+- [x] Existing ES/EN automation-rule cards expose **Days without activity / Días sin actividad** only for stale PR/issue rules.
+- [x] Numeric browser input is required and bounded to whole days `1..365`.
+- [x] Effective API threshold is displayed; defensive fallback remains the historical seven-day default.
+- [x] CI rule cards do not render a threshold field.
+- [x] Stale-rule help copy no longer claims a fixed seven-day window and explains the configurable threshold.
+- [x] Existing same-origin `/api/automation/rules` route is reused; no new backend or browser API route is introduced.
+- [x] Web parser allow-lists form fields and rule IDs, parses only whole-day `1..365` thresholds and rejects thresholds on CI rules.
+- [x] Parser rejects unexpected authority fields such as client-supplied workspace identity.
+- [x] Existing workspace-only + `automation.manage` loading/rendering boundary remains unchanged; private scope never loads the editor.
+- [x] Compatibility remains for older stale-rule mutations that omit the threshold.
+- [x] Parser tests cover valid thresholds, lower/upper bounds, invalid values, CI rejection, unexpected fields and existing rule validation.
+- [x] Product/security documentation in `docs/33-stale-threshold-ui.md`.
 - [ ] Final-head regression validation.
 - [ ] Merge and post-merge `main` validation.
 
-**Phase 5 Slice 8: VALIDATION PENDING / VALIDACIÓN PENDIENTE.**
+**Phase 5 Slice 9: VALIDATION PENDING / VALIDACIÓN PENDIENTE.**
 
 ## Deliberately deferred / Diferido expresamente
 
-- [ ] Customer-facing ES/EN stale-threshold editor UI.
 - [ ] Dependency-chain scoring and dependency data-model/mutation work; no dependency model exists yet.
 - [ ] Arbitrary user-authored conditions or rule DSL.
 - [ ] Automation actions beyond current derived-alert behavior.
@@ -127,26 +132,27 @@ Implemented on `feat/phase-5-stale-threshold-policies` so far:
 8. Priority ranking remains deterministic, explainable and AI-independent.
 9. Missing prioritization policy preserves exact product defaults.
 10. Missing stale threshold preserves the historical seven-day default exactly.
-11. Stale thresholds are integer whole days from 1 through 365 and are accepted only for the two stale-work rules.
-12. CI automation rules reject stale-threshold fields.
+11. Stale thresholds are whole days `1..365` and accepted only for the two stale-work rules.
+12. CI automation rules reject stale-threshold fields at browser/parser and API boundaries.
 13. Partial enable/severity changes preserve the effective stale threshold.
-14. Threshold changes preserve alert identity and history; qualification changes are handled through the existing resolve/reopen lifecycle.
+14. Threshold changes preserve alert identity and history through the existing resolve/reopen lifecycle.
 15. Workspace policy changes remain transactionally audited and isolated by workspace.
 16. Browser/API clients cannot choose tenant or actor identity; those are derived from session context.
-17. Dependency-chain scoring stays separate until dependency data is explicitly modelled and authorized.
+17. The threshold editor reuses the same-origin authenticated mutation route and never exposes provider credentials.
+18. Dependency-chain scoring stays separate until dependency data is explicitly modelled and authorized.
 
 ## Next / Siguiente
 
-1. Validate the final Slice 8 head with lint, typecheck, tests, build and all existing regression workflows.
-2. Correct any threshold policy/runtime regression directly on this slice.
+1. Validate the final Slice 9 head with lint, typecheck, tests, build and all existing regression workflows.
+2. Correct any UI/parser regression directly on this slice.
 3. Merge the exact validated head and revalidate resulting `main`.
-4. Then implement the ES/EN stale-threshold editor as its own isolated Slice 9.
+4. Select the next Phase 5 micro-slice only from the resulting green repository state and documented model boundaries.
 5. Keep dependency modelling, arbitrary DSL, external automation actions, AI changes, OAuth and additional providers as separate fronts.
 6. When commercial publication is scheduled, create the Kairoseth Software catalog entry as **Gestor de Trabajo / Work Manager**.
 
 ## Current blockers / Bloqueos actuales
 
-No known product blocker. Slice 8 is ready for regression validation.
+No known product blocker. Slice 9 is ready for regression validation.
 
 ## Operating rule
 
