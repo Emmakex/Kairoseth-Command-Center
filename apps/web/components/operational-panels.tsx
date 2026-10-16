@@ -1,5 +1,6 @@
 import type { TaskSummary, TodayResponse } from '../lib/api';
 import type { DictionaryCopy, Locale } from '../lib/i18n';
+import { TaskReminderEditor } from './task-reminder-editor';
 
 const dependencyCopy = {
   es: {
@@ -48,18 +49,50 @@ function severityLabels(copy: DictionaryCopy): Record<string, string> {
   };
 }
 
+function reminderLocalValue(instant: string, timeZone: string): string | null {
+  const date = new Date(instant);
+  if (!Number.isFinite(date.getTime())) return null;
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(date);
+    const value = (type: Intl.DateTimeFormatPartTypes) =>
+      parts.find((part) => part.type === type)?.value;
+    const year = value('year');
+    const month = value('month');
+    const day = value('day');
+    const hour = value('hour');
+    const minute = value('minute');
+    const second = value('second');
+    return year && month && day && hour && minute && second
+      ? `${year}-${month}-${day}T${hour}:${minute}:${second}`
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 export function OperationalPanels({
   locale,
   scope,
   copy,
   today,
   taskCatalog,
+  timeZone,
 }: {
   locale: Locale;
   scope: 'workspace' | 'private';
   copy: DictionaryCopy;
   today: TodayResponse | null;
   taskCatalog: TaskSummary[];
+  timeZone: string;
 }) {
   const statuses = statusLabels(copy);
   const severities = severityLabels(copy);
@@ -121,7 +154,8 @@ export function OperationalPanels({
           {today?.tasks.length ? (
             today.tasks.map((task) => {
               const dependencyCandidates = taskCatalog.filter((candidate) => candidate.id !== task.id);
-              const selectedDependencyIds = task.dependencyIds ?? [];
+              const catalogTask = taskById.get(task.id) ?? task;
+              const selectedDependencyIds = catalogTask.dependencyIds ?? [];
               const selectedDependencyNames = selectedDependencyIds.map(
                 (dependencyId) => taskById.get(dependencyId)?.title ?? dependencyId,
               );
@@ -131,6 +165,9 @@ export function OperationalPanels({
               const pendingDependencyNames = pendingDependencyIds.map(
                 (dependencyId) => taskById.get(dependencyId)?.title ?? dependencyId,
               );
+              const reminderValues = (catalogTask.reminderRules ?? [])
+                .map((rule) => reminderLocalValue(rule.remindAt, timeZone))
+                .filter((value): value is string => value !== null);
 
               return (
                 <div className="item-row item-row-manage" key={task.id}>
@@ -207,6 +244,14 @@ export function OperationalPanels({
                         {dependencyText.save}
                       </button>
                     </form>
+
+                    <TaskReminderEditor
+                      locale={locale}
+                      scope={scope}
+                      taskId={task.id}
+                      timeZone={timeZone}
+                      initialValues={reminderValues}
+                    />
                   </div>
                 </div>
               );
