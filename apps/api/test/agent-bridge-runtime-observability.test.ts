@@ -189,10 +189,31 @@ describe('Agent Bridge runtime observability', () => {
     await app.close();
   });
 
+  it('reports a missing runtime identity resolver as an unavailable Platform dependency', async () => {
+    const store = new MemoryRuntimeStore();
+    const app = buildApp({
+      authProvider: operatorProvider,
+      agentBridgeRuntimeObservabilityStore: store,
+    });
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/products/agent-bridge/runtime-snapshot',
+      headers: { authorization: 'Bearer runtime-token' },
+      payload: { snapshot: snapshot() },
+    });
+    expect(response.statusCode).toBe(503);
+    expect(response.json()).toEqual({ code: 'runtime_identity_provider_unavailable' });
+    await app.close();
+  });
+
   it('rejects inventory-health mismatches instead of persisting ambiguous state', async () => {
     const { app, store } = appFor();
     const invalid = snapshot();
-    invalid.health[0].tools[0].runtimeToolId = 'other.runtime.tool';
+    const firstHealth = invalid.health[0];
+    const firstTool = firstHealth?.tools[0];
+    expect(firstTool).toBeDefined();
+    if (!firstTool) throw new Error('test fixture missing health tool');
+    firstTool.runtimeToolId = 'other.runtime.tool';
 
     const response = await app.inject({
       method: 'POST',
