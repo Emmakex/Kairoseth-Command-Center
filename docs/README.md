@@ -38,6 +38,7 @@ Esta carpeta es la fuente de verdad para las decisiones de producto, arquitectur
 31. [`26-automation-rule-policy-ui.md`](26-automation-rule-policy-ui.md) — ES/EN workspace administration surface for the proven built-in automation policies.
 32. [`27-stale-work-rules.md`](27-stale-work-rules.md) — provider-neutral seven-day stale pull-request/issue rules and lifecycle semantics.
 33. [`28-explainable-prioritization.md`](28-explainable-prioritization.md) — deterministic cross-source task/alert ranking with explicit score reasons.
+34. [`29-project-milestone-priority-risk.md`](29-project-milestone-priority-risk.md) — deterministic project/milestone delivery-risk contributions in the explainable ranking.
 
 ## Living documents / Documentos vivos
 

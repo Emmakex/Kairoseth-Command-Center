@@ -13,12 +13,21 @@ const copy = {
     empty: 'No hay trabajo activo que priorizar.',
     task: 'Tarea',
     alert: 'Alerta',
+    project: 'Proyecto',
+    milestone: 'Hito',
     score: 'Puntuación',
     manualPriority: 'Prioridad manual',
     blocked: 'Tarea bloqueada',
     overdue: 'Tarea vencida',
     dueToday: 'Vence hoy',
     severity: 'Severidad',
+    projectBlocked: 'Proyecto bloqueado',
+    projectOverdue: 'Proyecto vencido',
+    projectDueToday: 'Proyecto vence hoy',
+    projectRemainingProgress: 'Progreso restante',
+    milestoneOverdue: 'Hito vencido',
+    milestoneDueToday: 'Hito vence hoy',
+    milestoneWeight: 'Peso del hito',
     severityInfo: 'informativa',
     severityWarning: 'advertencia',
     severityUrgent: 'urgente',
@@ -31,12 +40,21 @@ const copy = {
     empty: 'There is no active work to prioritize.',
     task: 'Task',
     alert: 'Alert',
+    project: 'Project',
+    milestone: 'Milestone',
     score: 'Score',
     manualPriority: 'Manual priority',
     blocked: 'Task blocked',
     overdue: 'Task overdue',
     dueToday: 'Due today',
     severity: 'Severity',
+    projectBlocked: 'Project blocked',
+    projectOverdue: 'Project overdue',
+    projectDueToday: 'Project due today',
+    projectRemainingProgress: 'Remaining progress',
+    milestoneOverdue: 'Milestone overdue',
+    milestoneDueToday: 'Milestone due today',
+    milestoneWeight: 'Milestone weight',
     severityInfo: 'info',
     severityWarning: 'warning',
     severityUrgent: 'urgent',
@@ -50,6 +68,14 @@ function severityLabel(locale: Locale, severity: AutomationRuleSeverity | undefi
   if (severity === 'urgent') return t.severityUrgent;
   if (severity === 'warning') return t.severityWarning;
   return t.severityInfo;
+}
+
+function kindLabel(locale: Locale, kind: OperationalPrioritySummary['kind']): string {
+  const t = copy[locale];
+  if (kind === 'task') return t.task;
+  if (kind === 'alert') return t.alert;
+  if (kind === 'project') return t.project;
+  return t.milestone;
 }
 
 function reasonLabel(locale: Locale, reason: OperationalPriorityReasonSummary): string {
@@ -66,6 +92,20 @@ function reasonLabel(locale: Locale, reason: OperationalPriorityReasonSummary): 
       return `${t.dueToday} (${suffix})`;
     case 'alert.severity':
       return `${t.severity}: ${severityLabel(locale, String(reason.value ?? 'info') as AutomationRuleSeverity)} (${suffix})`;
+    case 'project.blocked':
+      return `${t.projectBlocked} (${suffix})`;
+    case 'project.overdue':
+      return `${t.projectOverdue} (${suffix})`;
+    case 'project.due_today':
+      return `${t.projectDueToday} (${suffix})`;
+    case 'project.remaining_progress':
+      return `${t.projectRemainingProgress}: ${100 - Number(reason.value ?? 100)}% (${suffix})`;
+    case 'milestone.overdue':
+      return `${t.milestoneOverdue} (${suffix})`;
+    case 'milestone.due_today':
+      return `${t.milestoneDueToday} (${suffix})`;
+    case 'milestone.weight':
+      return `${t.milestoneWeight}: ${reason.value ?? '—'}/100 (${suffix})`;
   }
 }
 
@@ -101,7 +141,7 @@ export function PriorityPanel({
                     {index + 1}. {item.title}
                   </strong>
                   <span className="github-connection-status">
-                    {item.kind === 'task' ? t.task : t.alert} · {t.score} {item.score}
+                    {kindLabel(locale, item.kind)} · {t.score} {item.score}
                   </span>
                 </div>
                 <span>{item.reasons.map((reason) => reasonLabel(locale, reason)).join(' · ')}</span>

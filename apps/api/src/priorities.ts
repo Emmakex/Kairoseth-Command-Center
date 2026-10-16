@@ -3,7 +3,7 @@ import { authorize } from '@kcc/auth';
 import type { AuthProvider, SessionContext } from '@kcc/auth';
 import { rankOperationalPriorities } from '@kcc/domain';
 import type { Scope } from '@kcc/domain';
-import type { OperationalStore } from '@kcc/persistence';
+import type { MilestoneStore, OperationalStore } from '@kcc/persistence';
 
 async function resolveSession(
   request: FastifyRequest,
@@ -106,7 +106,11 @@ function todayRange(timeZone: string, now = new Date()): { start: string; end: s
 
 export function registerPriorityRoutes(
   app: FastifyInstance,
-  options: { authProvider?: AuthProvider; operationalStore?: OperationalStore },
+  options: {
+    authProvider?: AuthProvider;
+    operationalStore?: OperationalStore;
+    milestoneStore?: MilestoneStore;
+  },
 ): void {
   app.get('/v1/priorities', async (request, reply) => {
     reply.header('cache-control', 'no-store');
@@ -115,6 +119,9 @@ export function registerPriorityRoutes(
     if (!options.operationalStore) {
       return reply.code(503).send({ error: 'operational_store_unavailable' });
     }
+    if (!options.milestoneStore) {
+      return reply.code(503).send({ error: 'milestone_store_unavailable' });
+    }
 
     const query = request.query as { scope?: string; limit?: string };
     const scope = resolveManualScope(session, query.scope);
@@ -122,7 +129,9 @@ export function registerPriorityRoutes(
 
     const canRead =
       authorize(session, { scope, capability: 'tasks.read', product: 'command-center' }) &&
-      authorize(session, { scope, capability: 'alerts.read', product: 'command-center' });
+      authorize(session, { scope, capability: 'alerts.read', product: 'command-center' }) &&
+      authorize(session, { scope, capability: 'projects.read', product: 'command-center' }) &&
+      authorize(session, { scope, capability: 'milestones.read', product: 'command-center' });
     if (!canRead) return reply.code(403).send({ error: 'forbidden' });
 
     const requestedLimit = query.limit === undefined ? 8 : Number(query.limit);
@@ -130,16 +139,25 @@ export function registerPriorityRoutes(
       return reply.code(400).send({ error: 'invalid_limit' });
     }
 
-    const [tasks, alerts] = await Promise.all([
+    const [tasks, alerts, projects, milestones] = await Promise.all([
       options.operationalStore.listTasks(scope),
       options.operationalStore.listAlerts(scope),
+      options.operationalStore.listProjects(scope),
+      options.milestoneStore.listMilestones(scope),
     ]);
     const range = todayRange(session.user.timezone);
 
     return {
       scope: scope.kind,
       range,
-      priorities: rankOperationalPriorities({ tasks, alerts, range, limit: requestedLimit }),
+      priorities: rankOperationalPriorities({
+        tasks,
+        alerts,
+        projects,
+        milestones,
+        range,
+        limit: requestedLimit,
+      }),
     };
   });
 }
