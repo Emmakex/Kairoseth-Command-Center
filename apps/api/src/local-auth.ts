@@ -117,7 +117,7 @@ export class StandaloneLocalAuthProvider implements LocalLoginProvider {
       user,
       workspace,
       membership,
-      productEntitlements: ['command-center'],
+      productEntitlements: ['command-center', 'agent-bridge'],
     });
     if (!session) throw new Error('Invalid standalone local auth bootstrap configuration');
     this.session = session;
