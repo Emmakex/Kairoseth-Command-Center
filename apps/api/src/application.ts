@@ -26,6 +26,7 @@ import type { PersistentLocalAuthProvider } from './persistent-local-auth';
 import { registerMilestoneRoutes } from './milestones';
 import { registerOperationalAuditRoutes } from './operational-audit-routes';
 import type { OperationalAuditStore } from './operational-audit-store';
+import { registerPriorityRoutes } from './priorities';
 
 type ApplicationOptions = {
   readinessCheck?: ReadinessCheck;
@@ -80,6 +81,11 @@ export function buildApp(options: ApplicationOptions = {}) {
     ...(options.decisionLifecycleStore
       ? { decisionLifecycleStore: options.decisionLifecycleStore }
       : {}),
+  });
+
+  registerPriorityRoutes(app, {
+    ...(options.authProvider ? { authProvider: options.authProvider } : {}),
+    ...(options.operationalStore ? { operationalStore: options.operationalStore } : {}),
   });
 
   registerIntegrationSignalRoutes(app, {

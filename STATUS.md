@@ -4,7 +4,7 @@
 **Technical/internal project:** Kairoseth Command Center  
 **Commercial names:** Gestor de Trabajo (ES) / Work Manager (EN)  
 **Category:** Kairoseth Software  
-**Status:** Phase 5 Slice 2 is merged as `37755e580fef985dfda96645f7ccc86704a84e08` and post-merge validated 9/9. Phase 5 Slice 3 — stale pull-request/issue rules — is active.
+**Status:** Phase 5 Slice 3 is merged as `1a88ae5280d0115fbdf2e61834859d6847bcc77e` and post-merge validated 9/9. Phase 5 Slice 4 — Explainable prioritization / Priorización explicable — is active.
 
 ## Naming rule / Regla de naming
 
@@ -40,111 +40,99 @@
 
 **Phase 4 token-backed GitHub boundary: CLOSED / CERRADA.**
 
-Deferred GitHub enhancements are not Phase 4 blockers:
-
-- [ ] GitHub App/OAuth authorization and automatic webhook registration/removal.
-- [ ] Additional integration providers.
-
 ### Phase 5 Slice 1 — Automation rule policies / Políticas de reglas de automatización
 
-- [x] Versioned built-in CI rule definitions with unchanged Phase 4 defaults.
-- [x] Workspace-scoped durable policy overrides for `enabled` and `severity`.
-- [x] Dedicated `automation.manage` capability for owner/admin presets.
-- [x] `GET /v1/automation/rules` and guarded `PATCH /v1/automation/rules/:ruleId`.
-- [x] Transactional policy-change and alert-policy audit events.
-- [x] Worker reconciliation applies effective policies without changing deterministic alert identities.
-- [x] Severity changes update eligible active alerts in place.
-- [x] Disabling a built-in rule resolves matching active derived alerts without deleting history.
-- [x] Unit/API/background-refresh acceptance coverage.
-- [x] PR #33 merged as `3bda1db529e46e9f52ce1cf4cf4726495fa6a0e4`.
-- [x] Resulting `main` validated with all nine workflows green.
+- [x] Workspace-scoped enable/severity policies for versioned deterministic built-in CI rules.
+- [x] `automation.manage`, guarded API, worker reconciliation and transactional audit lifecycle.
+- [x] PR #33 merged as `3bda1db529e46e9f52ce1cf4cf4726495fa6a0e4`; resulting `main` validated 9/9.
 
 **Phase 5 Slice 1: CLOSED / CERRADA.**
 
 ### Phase 5 Slice 2 — Automation rule policy UI / UI de políticas de reglas de automatización
 
-- [x] ES/EN workspace administration panel for proven built-in automation rules.
-- [x] Friendly ES/EN rule labels while retaining versioned rule IDs as technical context.
-- [x] Enable/disable and severity controls for `info`, `warning`, `urgent`, `critical`.
-- [x] Default-vs-custom effective policy indicator.
-- [x] Dashboard loads rule policies only in workspace scope with `automation.manage`.
-- [x] Private scope does not load or render rule administration.
-- [x] Same-origin web mutation boundary forwards only allow-listed policy changes to the authenticated API.
-- [x] Mutation parser rejects arbitrary rule IDs, invalid booleans and invalid severities.
-- [x] Unit coverage and architecture documentation in `docs/26-automation-rule-policy-ui.md`.
-- [x] PR #34 merged as `37755e580fef985dfda96645f7ccc86704a84e08`.
-- [x] Resulting `main` validated with all nine workflows green.
+- [x] ES/EN workspace administration surface for built-in automation rules.
+- [x] Workspace-only `automation.manage` loading, safe same-origin mutation boundary and parser tests.
+- [x] PR #34 merged as `37755e580fef985dfda96645f7ccc86704a84e08`; resulting `main` validated 9/9.
 
 **Phase 5 Slice 2: CLOSED / CERRADA.**
 
-## Active / Activo
-
 ### Phase 5 Slice 3 — Stale work rules / Reglas de trabajo sin actividad
 
-Implemented on `feat/phase-5-stale-work-rules` so far:
+- [x] `repository.pull_request.stale.v1` and `repository.issue.stale.v1`.
+- [x] Fixed seven-day v1 inactivity threshold.
+- [x] Both rules default disabled / warning to preserve behavior until explicit workspace opt-in.
+- [x] Open-only evaluation; recent, closed, merged or disabled conditions resolve the stable fingerprint.
+- [x] Evaluation-time occurrence semantics support later reopen without changing alert identity.
+- [x] Worker reconciliation covers durable CI, PR and issue signals.
+- [x] Existing policy API/web UI manages the new rules in ES/EN.
+- [x] Unit/API/web parser coverage plus `docs/27-stale-work-rules.md`.
+- [x] PR #35 merged as `1a88ae5280d0115fbdf2e61834859d6847bcc77e`.
+- [x] Resulting `main` validated with all nine workflows green.
 
-- [x] Provider-neutral `repository.pull_request.stale.v1` rule.
-- [x] Provider-neutral `repository.issue.stale.v1` rule.
-- [x] Fixed v1 inactivity threshold of seven days.
-- [x] Both new rules default disabled with `warning` severity to preserve existing customer behavior until opt-in.
-- [x] Open-only evaluation; merged PRs and closed work do not produce stale candidates.
-- [x] Stable versioned fingerprints based on rule ID + normalized signal ID.
-- [x] Evaluation-time occurrence semantics so a resolved stale alert can reopen during a later stale period.
-- [x] Recent/closed/merged/disabled conditions emit lifecycle resolution candidates without deleting history.
-- [x] Worker reconciliation now includes durable CI, pull-request and issue signals.
-- [x] Existing workspace policy API recognizes and configures the new rules.
-- [x] Existing same-origin web policy boundary allow-lists the new rule IDs.
-- [x] ES/EN administration labels and seven-day descriptions for stale PRs/issues.
-- [x] Unit/API coverage for defaults, threshold, lifecycle, policy updates and web mutation parsing.
-- [x] Architecture/lifecycle documentation in `docs/27-stale-work-rules.md`.
+**Phase 5 Slice 3: CLOSED / CERRADA.**
+
+## Active / Activo
+
+### Phase 5 Slice 4 — Explainable prioritization / Priorización explicable
+
+Implemented on `feat/phase-5-explainable-priorities` so far:
+
+- [x] Deterministic domain ranking for active tasks and alerts.
+- [x] Explicit stable reason codes and exact score contributions.
+- [x] Task contributions: manual priority, blocked, overdue and due today.
+- [x] Alert severity scoring: critical 100, urgent 90, warning 60, info 30.
+- [x] Scores capped at 100 with deterministic tie-breaking.
+- [x] Completed/cancelled tasks and resolved/dismissed alerts excluded.
+- [x] Authenticated `GET /v1/priorities` with server-derived workspace/private scope.
+- [x] API requires `tasks.read`, `alerts.read` and `command-center` entitlement.
+- [x] User-timezone local day boundary for due-today/overdue reasoning.
+- [x] ES/EN Today panel showing top 8 priorities and translated reasons.
+- [x] Cross-source ranking naturally combines manual tasks/alerts with integration-derived alerts already materialized by the platform.
+- [x] Unit/API coverage for scoring, filtering, ranking, scope and invalid limits.
+- [x] Architecture/product documentation in `docs/28-explainable-prioritization.md`.
 - [ ] Final-head regression validation.
 - [ ] Merge and post-merge `main` validation.
 
-**Phase 5 Slice 3: VALIDATION PENDING / VALIDACIÓN PENDIENTE.**
+**Phase 5 Slice 4: VALIDATION PENDING / VALIDACIÓN PENDIENTE.**
 
 ## Deliberately deferred / Diferido expresamente
 
+- [ ] Customer-configurable prioritization weights.
+- [ ] Project/milestone risk contributions and dependency-chain scoring.
 - [ ] Customer-configurable stale thresholds.
 - [ ] Arbitrary user-authored conditions or rule DSL.
 - [ ] Automation actions beyond current derived-alert behavior.
-- [ ] AI-generated automation rules.
+- [ ] AI-generated automation rules or priority changes.
 - [ ] GitHub App/OAuth and additional providers.
 
 ## Security and correctness invariants
 
 1. Workspace/private scope is server-derived from authenticated context.
 2. Product entitlement and capability checks are server-enforced.
-3. Integration administration requires `integrations.manage`; automation policy administration requires `automation.manage`.
-4. GitHub repository links, connections and webhook management are workspace-only.
-5. Standalone passwords and provider credentials are never persisted in plaintext.
-6. Provider credentials never enter durable jobs, schedules, signals, alerts, automation policies or audit events.
-7. Provider responses are normalized before persistence or client exposure.
-8. Webhook HMAC secrets remain independent from provider credentials and encrypted at rest.
-9. Derived alert rules consume normalized durable signals and remain provider-neutral.
-10. Built-in rule IDs and deterministic alert fingerprints remain versioned and stable across workspace policy changes.
-11. Existing CI rules preserve their historical defaults; newly introduced stale-work rules are opt-in by default.
-12. Workspace policy storage is unique by workspace + built-in rule ID; arbitrary rule IDs are rejected.
-13. Disabling a built-in rule resolves active derived conditions instead of deleting alerts or audit history.
-14. Severity policy changes update only eligible open/acknowledged derived alerts and do not override dismissed human decisions.
-15. Every stored policy change and derived-alert policy mutation is delivered through the transactional audit outbox.
-16. The customer-facing rule-policy UI never widens the executable rule allow-list defined by the API/runtime.
-17. Private scope never loads or renders workspace automation administration.
-18. Stale-work rules use durable normalized update timestamps for age and evaluation time for derived-alert lifecycle occurrence.
-19. Closed/merged/recent work resolves the matching stale fingerprint without replacing provider systems or deleting external data.
+3. Provider credentials never enter durable jobs, signals, alerts, policies, prioritization or audit events.
+4. Derived automation consumes normalized durable signals and remains provider-neutral.
+5. Versioned rule IDs and deterministic alert fingerprints remain stable.
+6. Private scope never loads workspace automation administration.
+7. Existing CI rule defaults remain unchanged; stale-work rules remain opt-in by default.
+8. Human dismissed decisions remain authoritative under the alert lifecycle.
+9. Priority ranking is deterministic, explainable and does not require AI.
+10. Every priority score contribution is returned as a stable reason code; the ES/EN UI translates reasons without changing scoring.
+11. Priority API derives tenant/private scope from the authenticated session and requires both task/alert read capability.
+12. Priority scoring does not mutate tasks, alerts or external systems.
 
 ## Next / Siguiente
 
-1. Validate the final Slice 3 head with lint, typecheck, tests, build and all existing regression workflows.
-2. Correct any stale-work/runtime/UI regression directly on this slice.
+1. Validate the final Slice 4 head with lint, typecheck, tests, build and all existing regression workflows.
+2. Correct any prioritization/API/UI regression directly on this slice.
 3. Merge the exact validated head and revalidate resulting `main`.
-4. Only then select the next isolated Phase 5 automation/intelligence slice from the green repository state.
-5. Keep threshold customization, arbitrary DSL, automation actions, AI rules, OAuth and additional providers as separate fronts.
+4. Continue Phase 5 only from the resulting green repository state.
+5. Keep configurable weights, AI suggestions, external automation actions, OAuth and additional providers as separate fronts.
 6. When commercial publication is scheduled, create the Kairoseth Software catalog entry as **Gestor de Trabajo / Work Manager**.
 
 ## Current blockers / Bloqueos actuales
 
-No known product blocker. Slice 3 is ready for regression validation.
+No known product blocker. Slice 4 is ready for regression validation.
 
 ## Operating rule
 
-Update this file at meaningful milestones. Keep Phase 5 slices deterministic, auditable, workspace-isolated and independently releasable; never introduce arbitrary executable user logic into a red validation boundary.
+Update this file at meaningful milestones. Keep Phase 5 deterministic, explainable, auditable, workspace-isolated and independently releasable; AI may assist but must not become required for core correctness.

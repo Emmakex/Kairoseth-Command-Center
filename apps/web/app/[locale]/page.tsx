@@ -9,6 +9,7 @@ import { IntegrationActivityPanel } from '../../components/integration-activity-
 import { MemberPanel } from '../../components/member-panel';
 import { MilestonePanel } from '../../components/milestone-panel';
 import { OperationalPanels } from '../../components/operational-panels';
+import { PriorityPanel } from '../../components/priority-panel';
 import { QuickCapturePanel } from '../../components/quick-capture-panel';
 import { TimelinePanel } from '../../components/timeline-panel';
 import {
@@ -19,6 +20,7 @@ import {
   getGitHubWebhookState,
   getIntegrationSignals,
   getMilestones,
+  getPriorities,
   getProjects,
   getSession,
   getTimeline,
@@ -55,8 +57,11 @@ export default async function CommandCenterPage({
   const canManageMembers = session.capabilities.includes('members.manage');
   const canManageIntegrations = session.capabilities.includes('integrations.manage');
   const canManageAutomation = session.capabilities.includes('automation.manage');
+  const canReadPriorities =
+    session.capabilities.includes('tasks.read') && session.capabilities.includes('alerts.read');
   const [
     today,
+    priorities,
     projects,
     milestones,
     decisions,
@@ -68,6 +73,7 @@ export default async function CommandCenterPage({
     members,
   ] = await Promise.all([
     getToday(token, scope),
+    canReadPriorities ? getPriorities(token, scope, 8) : Promise.resolve(null),
     getProjects(token, scope),
     getMilestones(token, scope),
     scope === 'workspace' ? getDecisions(token) : Promise.resolve(null),
@@ -172,6 +178,8 @@ export default async function CommandCenterPage({
       </section>
 
       {!today ? <div className="notice">{copy.apiUnavailable}</div> : null}
+
+      {canReadPriorities ? <PriorityPanel locale={locale} priorities={priorities} /> : null}
 
       <OperationalPanels locale={locale} scope={scope} copy={copy} today={today} />
 
