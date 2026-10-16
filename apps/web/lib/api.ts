@@ -146,6 +146,35 @@ export type AutomationRulePolicySummary = {
   updatedAt?: string;
 };
 
+export type OperationalPriorityReasonSummary = {
+  code:
+    | 'task.manual_priority'
+    | 'task.blocked'
+    | 'task.overdue'
+    | 'task.due_today'
+    | 'alert.severity';
+  contribution: number;
+  value?: string | number;
+};
+
+export type OperationalPrioritySummary = {
+  kind: 'task' | 'alert';
+  id: string;
+  title: string;
+  score: number;
+  status: string;
+  reasons: OperationalPriorityReasonSummary[];
+  projectId?: string;
+  dueAt?: string;
+  severity?: AutomationRuleSeverity;
+};
+
+export type PrioritiesResponse = {
+  scope: 'workspace' | 'private';
+  range: { start: string; end: string };
+  priorities: OperationalPrioritySummary[];
+};
+
 export type TodayResponse = {
   scope: 'workspace' | 'private';
   range: { start: string; end: string };
@@ -207,6 +236,19 @@ export function getToday(
   scope: 'workspace' | 'private',
 ): Promise<TodayResponse | null> {
   return authenticatedGet<TodayResponse>(`/v1/today?scope=${scope}`, token);
+}
+
+export async function getPriorities(
+  token: string,
+  scope: 'workspace' | 'private',
+  limit = 8,
+): Promise<OperationalPrioritySummary[] | null> {
+  const safeLimit = Math.max(1, Math.min(20, Math.floor(limit)));
+  const response = await authenticatedGet<PrioritiesResponse>(
+    `/v1/priorities?scope=${scope}&limit=${safeLimit}`,
+    token,
+  );
+  return response?.priorities ?? null;
 }
 
 export async function getProjects(
