@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { apiBaseUrl, SESSION_COOKIE } from '../../../lib/api';
+import { apiBaseUrl, getSession, SESSION_COOKIE } from '../../../lib/api';
 import { parseOperationalMutation } from '../../../lib/operations';
 
 function localeValue(value: FormDataEntryValue | null): 'es' | 'en' {
@@ -44,7 +44,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.redirect(new URL(`/${locale}/login`, request.url), 303);
   }
 
-  const mutation = parseOperationalMutation(form);
+  let timeZone: string | undefined;
+  if (form.get('operation') === 'task-reminders') {
+    const session = await getSession(token);
+    if (!session) {
+      return NextResponse.redirect(dashboardUrl(request, locale, scope, 'error'), 303);
+    }
+    timeZone = session.user.timezone;
+  }
+
+  const mutation = parseOperationalMutation(form, { ...(timeZone ? { timeZone } : {}) });
   if (!mutation) {
     return NextResponse.redirect(dashboardUrl(request, locale, scope, 'invalid'), 303);
   }
