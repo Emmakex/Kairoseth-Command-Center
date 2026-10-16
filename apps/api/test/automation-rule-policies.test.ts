@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { AuthProvider, SessionContext } from '@kcc/auth';
 import {
+  STALE_WORK_AFTER_DAYS,
   defaultSignalAlertRulePolicies,
+  isStaleWorkRuleId,
   type BuiltInSignalAlertRuleId,
   type DerivedAlertSeverity,
 } from '@kcc/integrations/signal-alert-rules';
@@ -45,15 +47,17 @@ class MemoryPolicyStore implements SignalAlertRulePolicyStore {
   async listEffective(workspaceId: string): Promise<EffectiveSignalAlertRulePolicy[]> {
     return defaultSignalAlertRulePolicies().map((defaults) => {
       const stored = this.policies.get(`${workspaceId}:${defaults.ruleId}`);
-      return stored
-        ? {
-            ruleId: stored.ruleId,
-            enabled: stored.enabled,
-            severity: stored.severity,
-            overridden: true,
-            updatedAt: stored.updatedAt,
-          }
-        : { ...defaults, overridden: false };
+      if (!stored) return { ...defaults, overridden: false };
+      return {
+        ruleId: stored.ruleId,
+        enabled: stored.enabled,
+        severity: stored.severity,
+        ...(isStaleWorkRuleId(stored.ruleId)
+          ? { staleAfterDays: stored.staleAfterDays ?? defaults.staleAfterDays ?? STALE_WORK_AFTER_DAYS }
+          : {}),
+        overridden: true,
+        updatedAt: stored.updatedAt,
+      };
     });
   }
 
@@ -67,6 +71,7 @@ class MemoryPolicyStore implements SignalAlertRulePolicyStore {
     ruleId: BuiltInSignalAlertRuleId;
     enabled: boolean;
     severity: DerivedAlertSeverity;
+    staleAfterDays?: number;
   }): Promise<StoredSignalAlertRulePolicy> {
     const key = `${input.workspaceId}:${input.ruleId}`;
     const existing = this.policies.get(key);
@@ -77,6 +82,7 @@ class MemoryPolicyStore implements SignalAlertRulePolicyStore {
       ruleId: input.ruleId,
       enabled: input.enabled,
       severity: input.severity,
+      ...(input.staleAfterDays !== undefined ? { staleAfterDays: input.staleAfterDays } : {}),
       updatedByUserId: input.actorUserId,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
@@ -103,7 +109,7 @@ function app() {
 }
 
 describe('automation rule policy routes', () => {
-  it('returns CI defaults plus safely-disabled stale-work defaults before workspace overrides', async () => {
+  it('returns CI defaults plus safely-disabled seven-day stale-work defaults before workspace overrides', async () => {
     const response = await app().inject({
       method: 'GET',
       url: '/v1/automation/rules',
@@ -129,12 +135,14 @@ describe('automation rule policy routes', () => {
           ruleId: 'repository.pull_request.stale.v1',
           enabled: false,
           severity: 'warning',
+          staleAfterDays: 7,
           overridden: false,
         },
         {
           ruleId: 'repository.issue.stale.v1',
           enabled: false,
           severity: 'warning',
+          staleAfterDays: 7,
           overridden: false,
         },
       ],
@@ -166,12 +174,13 @@ describe('automation rule policy routes', () => {
     expect(read.json().rules[0]).toMatchObject({ enabled: true, severity: 'critical' });
   });
 
-  it('enables a stale pull-request rule through the same guarded policy API', async () => {
-    const response = await app().inject({
+  it('configures a stale pull-request threshold and preserves it across later partial updates', async () => {
+    const instance = app();
+    const response = await instance.inject({
       method: 'PATCH',
       url: '/v1/automation/rules/repository.pull_request.stale.v1',
       headers: { authorization: 'Bearer admin', 'content-type': 'application/json' },
-      payload: { enabled: true, severity: 'urgent' },
+      payload: { enabled: true, severity: 'urgent', staleAfterDays: 14 },
     });
 
     expect(response.statusCode).toBe(200);
@@ -179,17 +188,31 @@ describe('automation rule policy routes', () => {
       ruleId: 'repository.pull_request.stale.v1',
       enabled: true,
       severity: 'urgent',
+      staleAfterDays: 14,
       overridden: true,
+    });
+
+    const severityOnly = await instance.inject({
+      method: 'PATCH',
+      url: '/v1/automation/rules/repository.pull_request.stale.v1',
+      headers: { authorization: 'Bearer admin', 'content-type': 'application/json' },
+      payload: { severity: 'critical' },
+    });
+    expect(severityOnly.statusCode).toBe(200);
+    expect(severityOnly.json().rule).toMatchObject({
+      enabled: true,
+      severity: 'critical',
+      staleAfterDays: 14,
     });
   });
 
-  it('keeps workspace rule policies isolated', async () => {
+  it('keeps workspace rule policies and stale thresholds isolated', async () => {
     const instance = app();
     await instance.inject({
       method: 'PATCH',
       url: '/v1/automation/rules/repository.issue.stale.v1',
       headers: { authorization: 'Bearer admin', 'content-type': 'application/json' },
-      payload: { enabled: true },
+      payload: { enabled: true, staleAfterDays: 30 },
     });
 
     const otherWorkspace = await instance.inject({
@@ -197,7 +220,11 @@ describe('automation rule policy routes', () => {
       url: '/v1/automation/rules',
       headers: { authorization: 'Bearer workspace-b' },
     });
-    expect(otherWorkspace.json().rules[3]).toMatchObject({ enabled: false, severity: 'warning' });
+    expect(otherWorkspace.json().rules[3]).toMatchObject({
+      enabled: false,
+      severity: 'warning',
+      staleAfterDays: 7,
+    });
   });
 
   it('requires automation.manage and rejects unknown rules or invalid policy values', async () => {
@@ -233,5 +260,39 @@ describe('automation rule policy routes', () => {
         })
       ).statusCode,
     ).toBe(400);
+  });
+
+  it('accepts only whole-day stale thresholds from 1 through 365 and rejects them for CI rules', async () => {
+    const instance = app();
+    for (const staleAfterDays of [0, 366, 1.5]) {
+      const response = await instance.inject({
+        method: 'PATCH',
+        url: '/v1/automation/rules/repository.issue.stale.v1',
+        headers: { authorization: 'Bearer admin', 'content-type': 'application/json' },
+        payload: { staleAfterDays },
+      });
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toEqual({ error: 'invalid_stale_after_days' });
+    }
+
+    for (const staleAfterDays of [1, 365]) {
+      const response = await instance.inject({
+        method: 'PATCH',
+        url: '/v1/automation/rules/repository.issue.stale.v1',
+        headers: { authorization: 'Bearer admin', 'content-type': 'application/json' },
+        payload: { staleAfterDays },
+      });
+      expect(response.statusCode).toBe(200);
+      expect(response.json().rule.staleAfterDays).toBe(staleAfterDays);
+    }
+
+    const ciResponse = await instance.inject({
+      method: 'PATCH',
+      url: '/v1/automation/rules/repository.ci.failed.v1',
+      headers: { authorization: 'Bearer admin', 'content-type': 'application/json' },
+      payload: { staleAfterDays: 14 },
+    });
+    expect(ciResponse.statusCode).toBe(400);
+    expect(ciResponse.json()).toEqual({ error: 'stale_threshold_not_supported' });
   });
 });
