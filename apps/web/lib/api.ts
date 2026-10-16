@@ -135,7 +135,11 @@ export type GitHubWebhookState =
 export type AutomationRuleSeverity = 'info' | 'warning' | 'urgent' | 'critical';
 
 export type AutomationRulePolicySummary = {
-  ruleId: 'repository.ci.failed.v1' | 'repository.ci.action_required.v1';
+  ruleId:
+    | 'repository.ci.failed.v1'
+    | 'repository.ci.action_required.v1'
+    | 'repository.pull_request.stale.v1'
+    | 'repository.issue.stale.v1';
   enabled: boolean;
   severity: AutomationRuleSeverity;
   overridden: boolean;
