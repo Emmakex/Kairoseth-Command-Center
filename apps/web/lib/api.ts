@@ -149,6 +149,7 @@ export type AutomationRulePolicySummary = {
 export type PrioritizationWeightsSummary = {
   taskManualPriorityMax: number;
   taskBlocked: number;
+  taskDependencyImpactPerDependent: number;
   taskOverdue: number;
   taskDueToday: number;
   alertInfo: number;
@@ -174,6 +175,7 @@ export type OperationalPriorityReasonSummary = {
   code:
     | 'task.manual_priority'
     | 'task.blocked'
+    | 'task.dependency_impact'
     | 'task.overdue'
     | 'task.due_today'
     | 'alert.severity'
