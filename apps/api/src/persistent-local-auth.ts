@@ -290,7 +290,7 @@ export class PersistentLocalAuthProvider implements AuthProvider {
       user: record.user,
       workspace: record.workspace,
       membership: record.membership,
-      productEntitlements: ['command-center'],
+      productEntitlements: ['command-center', 'agent-bridge'],
     });
   }
 
