@@ -4,6 +4,7 @@ import type { AuthProvider, SessionContext } from '@kcc/auth';
 import { rankOperationalPriorities } from '@kcc/domain';
 import type { Scope } from '@kcc/domain';
 import type { MilestoneStore, OperationalStore } from '@kcc/persistence';
+import type { PrioritizationWeightPolicyStore } from '@kcc/persistence/prioritization-weight-policies';
 
 async function resolveSession(
   request: FastifyRequest,
@@ -110,6 +111,7 @@ export function registerPriorityRoutes(
     authProvider?: AuthProvider;
     operationalStore?: OperationalStore;
     milestoneStore?: MilestoneStore;
+    prioritizationWeightPolicyStore?: PrioritizationWeightPolicyStore;
   },
 ): void {
   app.get('/v1/priorities', async (request, reply) => {
@@ -139,11 +141,14 @@ export function registerPriorityRoutes(
       return reply.code(400).send({ error: 'invalid_limit' });
     }
 
-    const [tasks, alerts, projects, milestones] = await Promise.all([
+    const [tasks, alerts, projects, milestones, weightPolicy] = await Promise.all([
       options.operationalStore.listTasks(scope),
       options.operationalStore.listAlerts(scope),
       options.operationalStore.listProjects(scope),
       options.milestoneStore.listMilestones(scope),
+      scope.kind === 'workspace' && options.prioritizationWeightPolicyStore
+        ? options.prioritizationWeightPolicyStore.getEffective(scope.workspaceId)
+        : Promise.resolve(null),
     ]);
     const range = todayRange(session.user.timezone);
 
@@ -157,6 +162,7 @@ export function registerPriorityRoutes(
         milestones,
         range,
         limit: requestedLimit,
+        ...(weightPolicy ? { weights: weightPolicy.weights } : {}),
       }),
     };
   });
