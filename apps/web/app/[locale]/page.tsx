@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { Card } from '@kcc/ui';
 import { AccountPanel } from '../../components/account-panel';
+import { AgentBridgeRuntimePanel } from '../../components/agent-bridge-runtime-panel';
 import { AutomationRulePolicyPanel } from '../../components/automation-rule-policy-panel';
 import { DecisionPanel } from '../../components/decision-panel';
 import { GitHubSetupPanel } from '../../components/github-setup-panel';
@@ -13,6 +14,7 @@ import { PrioritizationWeightPolicyPanel } from '../../components/prioritization
 import { PriorityPanel } from '../../components/priority-panel';
 import { QuickCapturePanel } from '../../components/quick-capture-panel';
 import { TimelinePanel } from '../../components/timeline-panel';
+import { getAgentBridgeRuntimes } from '../../lib/agent-bridge-api';
 import {
   getAutomationRules,
   getDecisions,
@@ -60,6 +62,8 @@ export default async function CommandCenterPage({
   const canManageMembers = session.capabilities.includes('members.manage');
   const canManageIntegrations = session.capabilities.includes('integrations.manage');
   const canManageAutomation = session.capabilities.includes('automation.manage');
+  const canManageAgentBridge =
+    canManageIntegrations && session.productEntitlements.includes('agent-bridge');
   const canReadPriorities =
     session.capabilities.includes('tasks.read') &&
     session.capabilities.includes('alerts.read') &&
@@ -77,6 +81,7 @@ export default async function CommandCenterPage({
     integrationSignals,
     automationRules,
     prioritizationWeightPolicy,
+    agentBridgeRuntimes,
     timeline,
     members,
   ] = await Promise.all([
@@ -98,6 +103,9 @@ export default async function CommandCenterPage({
       : Promise.resolve(null),
     scope === 'workspace' && canManageAutomation
       ? getPrioritizationWeightPolicy(token)
+      : Promise.resolve(null),
+    scope === 'workspace' && canManageAgentBridge
+      ? getAgentBridgeRuntimes(token)
       : Promise.resolve(null),
     getTimeline(token, scope),
     scope === 'workspace' && canManageMembers ? getLocalMembers(token) : Promise.resolve(null),
@@ -230,6 +238,13 @@ export default async function CommandCenterPage({
             connections={githubConnections}
             repositories={githubRepositories}
             webhooks={githubWebhooks}
+          />
+        ) : null}
+        {scope === 'workspace' && canManageAgentBridge ? (
+          <AgentBridgeRuntimePanel
+            locale={locale}
+            timeZone={session.user.timezone}
+            runtimes={agentBridgeRuntimes}
           />
         ) : null}
         {scope === 'workspace' ? (
