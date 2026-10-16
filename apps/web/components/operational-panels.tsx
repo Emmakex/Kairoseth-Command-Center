@@ -1,6 +1,23 @@
 import type { TodayResponse } from '../lib/api';
 import type { DictionaryCopy, Locale } from '../lib/i18n';
 
+const dependencyCopy = {
+  es: {
+    dependencies: 'Dependencias',
+    help: 'Selecciona las tareas que deben completarse antes de esta tarea.',
+    noneAvailable: 'No hay otras tareas disponibles en este ámbito.',
+    selectedNone: 'Sin dependencias',
+    save: 'Guardar dependencias',
+  },
+  en: {
+    dependencies: 'Dependencies',
+    help: 'Select the tasks that must be completed before this task.',
+    noneAvailable: 'There are no other tasks available in this scope.',
+    selectedNone: 'No dependencies',
+    save: 'Save dependencies',
+  },
+} as const;
+
 function statusLabels(copy: DictionaryCopy): Record<string, string> {
   return {
     planned: copy.statusPlanned,
@@ -40,6 +57,7 @@ export function OperationalPanels({
 }) {
   const statuses = statusLabels(copy);
   const severities = severityLabels(copy);
+  const dependencyText = dependencyCopy[locale];
 
   return (
     <section className="operational-grid">
@@ -94,43 +112,88 @@ export function OperationalPanels({
         </div>
         <div className="item-list">
           {today?.tasks.length ? (
-            today.tasks.map((task) => (
-              <div className="item-row item-row-manage" key={task.id}>
-                <div className="item-copy">
-                  <strong>{task.title}</strong>
-                  <span>
-                    {statuses[task.status] ?? task.status} · {copy.priority} {task.priority}
-                  </span>
+            today.tasks.map((task) => {
+              const dependencyCandidates = today.tasks.filter((candidate) => candidate.id !== task.id);
+              const selectedDependencyIds = task.dependencyIds ?? [];
+              const selectedDependencyNames = selectedDependencyIds
+                .map((dependencyId) => today.tasks.find((candidate) => candidate.id === dependencyId)?.title)
+                .filter((title): title is string => Boolean(title));
+
+              return (
+                <div className="item-row item-row-manage" key={task.id}>
+                  <div className="item-copy">
+                    <strong>{task.title}</strong>
+                    <span>
+                      {statuses[task.status] ?? task.status} · {copy.priority} {task.priority}
+                    </span>
+                    <span>
+                      {dependencyText.dependencies}: {' '}
+                      {selectedDependencyNames.length
+                        ? selectedDependencyNames.join(', ')
+                        : dependencyText.selectedNone}
+                    </span>
+                  </div>
+                  <div className="task-operation-stack">
+                    <form className="action-buttons" action="/api/operations" method="post">
+                      <input type="hidden" name="locale" value={locale} />
+                      <input type="hidden" name="scope" value={scope} />
+                      <input type="hidden" name="operation" value="task-status" />
+                      <input type="hidden" name="id" value={task.id} />
+                      <button
+                        className="secondary-button"
+                        type="submit"
+                        name="status"
+                        value="in_progress"
+                        disabled={task.status === 'in_progress'}
+                      >
+                        {copy.start}
+                      </button>
+                      <button
+                        className="secondary-button"
+                        type="submit"
+                        name="status"
+                        value="blocked"
+                        disabled={task.status === 'blocked'}
+                      >
+                        {copy.block}
+                      </button>
+                      <button className="primary-button small-primary" type="submit" name="status" value="done">
+                        {copy.done}
+                      </button>
+                    </form>
+
+                    <form className="inline-operation task-dependency-operation" action="/api/operations" method="post">
+                      <input type="hidden" name="locale" value={locale} />
+                      <input type="hidden" name="scope" value={scope} />
+                      <input type="hidden" name="operation" value="task-dependencies" />
+                      <input type="hidden" name="id" value={task.id} />
+                      <label>
+                        <span>{dependencyText.dependencies}</span>
+                        <select
+                          name="dependencyIds"
+                          multiple
+                          size={Math.min(6, Math.max(2, dependencyCandidates.length))}
+                          defaultValue={selectedDependencyIds}
+                          disabled={dependencyCandidates.length === 0}
+                        >
+                          {dependencyCandidates.map((candidate) => (
+                            <option key={candidate.id} value={candidate.id}>
+                              {candidate.title}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <span className="empty-state">
+                        {dependencyCandidates.length ? dependencyText.help : dependencyText.noneAvailable}
+                      </span>
+                      <button className="secondary-button" type="submit">
+                        {dependencyText.save}
+                      </button>
+                    </form>
+                  </div>
                 </div>
-                <form className="action-buttons" action="/api/operations" method="post">
-                  <input type="hidden" name="locale" value={locale} />
-                  <input type="hidden" name="scope" value={scope} />
-                  <input type="hidden" name="operation" value="task-status" />
-                  <input type="hidden" name="id" value={task.id} />
-                  <button
-                    className="secondary-button"
-                    type="submit"
-                    name="status"
-                    value="in_progress"
-                    disabled={task.status === 'in_progress'}
-                  >
-                    {copy.start}
-                  </button>
-                  <button
-                    className="secondary-button"
-                    type="submit"
-                    name="status"
-                    value="blocked"
-                    disabled={task.status === 'blocked'}
-                  >
-                    {copy.block}
-                  </button>
-                  <button className="primary-button small-primary" type="submit" name="status" value="done">
-                    {copy.done}
-                  </button>
-                </form>
-              </div>
-            ))
+              );
+            })
           ) : (
             <p className="empty-state">{copy.noTasks}</p>
           )}
