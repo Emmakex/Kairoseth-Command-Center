@@ -4,7 +4,7 @@
 **Technical/internal project:** Kairoseth Command Center  
 **Commercial names:** Gestor de Trabajo (ES) / Work Manager (EN)  
 **Category:** Kairoseth Software  
-**Status:** Phase 5 Slice 8 is merged as `720f06ddd78d7a9c615621f6301357993338004e` and post-merge validated 9/9. Phase 5 Slice 9 — Stale threshold UI / UI de umbral de inactividad — is active.
+**Status:** Phase 5 Slice 9 is merged as `74cbf3b8462b2c4720a6d7d9bd369ec63bc156ce` and post-merge validated 9/9. Phase 5 Slice 10 — Task dependencies / Dependencias entre tareas — is active.
 
 ## Naming rule / Regla de naming
 
@@ -89,35 +89,48 @@
 
 **Phase 5 Slice 8: CLOSED / CERRADA.**
 
-## Active / Activo
-
 ### Phase 5 Slice 9 — Stale threshold UI / UI de umbral de inactividad
 
-Implemented on `feat/phase-5-stale-threshold-ui` so far:
+- [x] ES/EN automation-rule cards expose the stale inactivity threshold only for stale PR/issue rules.
+- [x] Whole-day bounds `1..365`, historical seven-day fallback and strict same-origin parser boundary.
+- [x] CI rules reject threshold input and private scope never loads the editor.
+- [x] Parser coverage and `docs/33-stale-threshold-ui.md`.
+- [x] PR #41 merged as `74cbf3b8462b2c4720a6d7d9bd369ec63bc156ce`.
+- [x] Resulting `main` validated with all nine workflows green.
 
-- [x] Existing ES/EN automation-rule cards expose **Days without activity / Días sin actividad** only for stale PR/issue rules.
-- [x] Numeric browser input is required and bounded to whole days `1..365`.
-- [x] Effective API threshold is displayed; defensive fallback remains the historical seven-day default.
-- [x] CI rule cards do not render a threshold field.
-- [x] Stale-rule help copy no longer claims a fixed seven-day window and explains the configurable threshold.
-- [x] Existing same-origin `/api/automation/rules` route is reused; no new backend or browser API route is introduced.
-- [x] Web parser allow-lists form fields and rule IDs, parses only whole-day `1..365` thresholds and rejects thresholds on CI rules.
-- [x] Parser rejects unexpected authority fields such as client-supplied workspace identity.
-- [x] Existing workspace-only + `automation.manage` loading/rendering boundary remains unchanged; private scope never loads the editor.
-- [x] Compatibility remains for older stale-rule mutations that omit the threshold.
-- [x] Parser tests cover valid thresholds, lower/upper bounds, invalid values, CI rejection, unexpected fields and existing rule validation.
-- [x] Product/security documentation in `docs/33-stale-threshold-ui.md`.
+**Phase 5 Slice 9: CLOSED / CERRADA.**
+
+## Active / Activo
+
+### Phase 5 Slice 10 — Task dependencies / Dependencias entre tareas
+
+Implemented on `feat/phase-5-task-dependencies` so far:
+
+- [x] `Task.dependencyIds` introduces an explicit local dependency graph while legacy tasks without the field remain compatible.
+- [x] `PUT /v1/tasks/:id/dependencies` replaces the direct dependency set.
+- [x] Workspace/private scope and actor are derived from the authenticated session; administration requires `tasks.write` plus `command-center` entitlement.
+- [x] Maximum 50 unique dependency IDs with strict ID validation.
+- [x] Self-dependencies are rejected.
+- [x] Every dependency must resolve in the exact same server-derived scope; foreign workspace/private references are treated as missing.
+- [x] Direct and transitive cycles are rejected before persistence.
+- [x] Dependency mutations commit transactionally with `task.dependencies_changed` audit outbox events containing previous/resulting IDs.
+- [x] Per-scope graph-version locking serializes concurrent dependency mutations so write-skew cannot create cycles from stale snapshots.
+- [x] API/unit coverage for actor/scope derivation, private isolation, capabilities, invalid arrays, missing references, self-dependencies and cycles.
+- [x] Domain/security documentation in `docs/03-domain-data-model.md` and `docs/34-task-dependencies.md`.
+- [ ] Docker smoke for real Mongo mutation + delivered audit event.
 - [ ] Final-head regression validation.
 - [ ] Merge and post-merge `main` validation.
 
-**Phase 5 Slice 9: VALIDATION PENDING / VALIDACIÓN PENDIENTE.**
+**Phase 5 Slice 10: IMPLEMENTATION ACTIVE / IMPLEMENTACIÓN ACTIVA.**
 
 ## Deliberately deferred / Diferido expresamente
 
-- [ ] Dependency-chain scoring and dependency data-model/mutation work; no dependency model exists yet.
+- [ ] Dependency-chain scoring; it starts only after the graph model/mutation boundary is green.
+- [ ] Customer-facing task dependency editor/graph UI.
+- [ ] Automatic task status mutations driven by dependencies.
 - [ ] Arbitrary user-authored conditions or rule DSL.
 - [ ] Automation actions beyond current derived-alert behavior.
-- [ ] AI-generated automation rules, weights, thresholds or silent priority changes.
+- [ ] AI-generated automation rules, weights, thresholds, dependencies or silent priority changes.
 - [ ] GitHub App/OAuth and additional providers.
 
 ## Security and correctness invariants
@@ -133,26 +146,26 @@ Implemented on `feat/phase-5-stale-threshold-ui` so far:
 9. Missing prioritization policy preserves exact product defaults.
 10. Missing stale threshold preserves the historical seven-day default exactly.
 11. Stale thresholds are whole days `1..365` and accepted only for the two stale-work rules.
-12. CI automation rules reject stale-threshold fields at browser/parser and API boundaries.
-13. Partial enable/severity changes preserve the effective stale threshold.
-14. Threshold changes preserve alert identity and history through the existing resolve/reopen lifecycle.
-15. Workspace policy changes remain transactionally audited and isolated by workspace.
-16. Browser/API clients cannot choose tenant or actor identity; those are derived from session context.
-17. The threshold editor reuses the same-origin authenticated mutation route and never exposes provider credentials.
-18. Dependency-chain scoring stays separate until dependency data is explicitly modelled and authorized.
+12. Browser/API clients cannot choose tenant or actor identity; those are derived from session context.
+13. Task dependencies reference local task IDs only and cannot cross the resolved scope boundary.
+14. Task dependency graphs are acyclic; self-dependencies, missing references and cycles are rejected before commit.
+15. Dependency graph mutations are transactionally audited and serialized per scope against concurrent write-skew.
+16. Legacy tasks without `dependencyIds` are interpreted as having no dependencies.
+17. Dependency data does not affect priority scores until the dedicated later scoring slice.
 
 ## Next / Siguiente
 
-1. Validate the final Slice 9 head with lint, typecheck, tests, build and all existing regression workflows.
-2. Correct any UI/parser regression directly on this slice.
-3. Merge the exact validated head and revalidate resulting `main`.
-4. Select the next Phase 5 micro-slice only from the resulting green repository state and documented model boundaries.
-5. Keep dependency modelling, arbitrary DSL, external automation actions, AI changes, OAuth and additional providers as separate fronts.
-6. When commercial publication is scheduled, create the Kairoseth Software catalog entry as **Gestor de Trabajo / Work Manager**.
+1. Add the real Docker smoke for dependency persistence and transactional audit delivery.
+2. Validate the final Slice 10 head with lint, typecheck, tests, build and all existing regression workflows.
+3. Correct any dependency/runtime regression directly on this slice.
+4. Merge the exact validated head and revalidate resulting `main`.
+5. Only then open dependency-chain scoring as an isolated next slice.
+6. Keep dependency UI, arbitrary DSL, external automation actions, AI changes, OAuth and additional providers as separate fronts.
+7. When commercial publication is scheduled, create the Kairoseth Software catalog entry as **Gestor de Trabajo / Work Manager**.
 
 ## Current blockers / Bloqueos actuales
 
-No known product blocker. Slice 9 is ready for regression validation.
+No known product blocker. Slice 10 still needs the real Docker audit smoke before final regression validation.
 
 ## Operating rule
 
