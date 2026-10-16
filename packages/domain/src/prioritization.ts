@@ -3,6 +3,7 @@ import type { Alert, AlertSeverity, Milestone, Project, Task } from './index.js'
 export type OperationalPriorityReasonCode =
   | 'task.manual_priority'
   | 'task.blocked'
+  | 'task.dependency_impact'
   | 'task.overdue'
   | 'task.due_today'
   | 'alert.severity'
@@ -35,6 +36,7 @@ export type OperationalPriority = {
 export type PrioritizationWeights = {
   taskManualPriorityMax: number;
   taskBlocked: number;
+  taskDependencyImpactPerDependent: number;
   taskOverdue: number;
   taskDueToday: number;
   alertInfo: number;
@@ -53,6 +55,7 @@ export type PrioritizationWeights = {
 export const DEFAULT_PRIORITIZATION_WEIGHTS: Readonly<PrioritizationWeights> = Object.freeze({
   taskManualPriorityMax: 50,
   taskBlocked: 30,
+  taskDependencyImpactPerDependent: 10,
   taskOverdue: 35,
   taskDueToday: 20,
   alertInfo: 30,
@@ -104,12 +107,54 @@ function deadlineState(
   return 'future';
 }
 
+function activeTask(task: Task): boolean {
+  return task.status !== 'done' && task.status !== 'cancelled';
+}
+
+export function activeDependencyImpactCounts(tasks: Task[]): Map<string, number> {
+  const knownIds = new Set(tasks.map((task) => task.id));
+  const dependents = new Map<string, Set<string>>();
+
+  for (const task of tasks) {
+    if (!activeTask(task)) continue;
+    for (const dependencyId of task.dependencyIds ?? []) {
+      if (!knownIds.has(dependencyId) || dependencyId === task.id) continue;
+      const current = dependents.get(dependencyId) ?? new Set<string>();
+      current.add(task.id);
+      dependents.set(dependencyId, current);
+    }
+  }
+
+  const counts = new Map<string, number>();
+  for (const task of tasks) {
+    if (!activeTask(task)) {
+      counts.set(task.id, 0);
+      continue;
+    }
+
+    const visited = new Set<string>([task.id]);
+    const queue = [...(dependents.get(task.id) ?? [])];
+    while (queue.length > 0) {
+      const dependentId = queue.shift();
+      if (!dependentId || visited.has(dependentId)) continue;
+      visited.add(dependentId);
+      for (const nestedId of dependents.get(dependentId) ?? []) {
+        if (!visited.has(nestedId)) queue.push(nestedId);
+      }
+    }
+    counts.set(task.id, visited.size - 1);
+  }
+
+  return counts;
+}
+
 function taskPriority(
   task: Task,
   range: { start: string; end: string },
   weights: PrioritizationWeights,
+  activeDependentCount: number,
 ): OperationalPriority | null {
-  if (task.status === 'done' || task.status === 'cancelled') return null;
+  if (!activeTask(task)) return null;
 
   const reasons: OperationalPriorityReason[] = [];
   const normalizedPriority = Math.max(0, Math.min(100, task.priority));
@@ -124,6 +169,14 @@ function taskPriority(
 
   if (task.status === 'blocked' && weights.taskBlocked > 0) {
     reasons.push({ code: 'task.blocked', contribution: weights.taskBlocked });
+  }
+
+  if (activeDependentCount > 0 && weights.taskDependencyImpactPerDependent > 0) {
+    reasons.push({
+      code: 'task.dependency_impact',
+      contribution: Math.min(100, activeDependentCount * weights.taskDependencyImpactPerDependent),
+      value: activeDependentCount,
+    });
   }
 
   const deadline = deadlineState(task.dueAt, range);
@@ -279,8 +332,11 @@ export function rankOperationalPriorities(input: {
 }): OperationalPriority[] {
   const limit = Math.max(1, Math.min(50, Math.floor(input.limit ?? 8)));
   const weights = effectiveWeights(input.weights);
+  const dependencyImpactCounts = activeDependencyImpactCounts(input.tasks);
   const candidates = [
-    ...input.tasks.map((task) => taskPriority(task, input.range, weights)),
+    ...input.tasks.map((task) =>
+      taskPriority(task, input.range, weights, dependencyImpactCounts.get(task.id) ?? 0),
+    ),
     ...input.alerts.map((alert) => alertPriority(alert, weights)),
     ...(input.projects ?? []).map((project) => projectPriority(project, input.range, weights)),
     ...(input.milestones ?? []).map((milestone) => milestonePriority(milestone, input.range, weights)),
