@@ -9,6 +9,7 @@ export type PrioritizationWeightPolicyMutation = {
 export const prioritizationWeightKeys = [
   'taskManualPriorityMax',
   'taskBlocked',
+  'taskDependencyImpactPerDependent',
   'taskOverdue',
   'taskDueToday',
   'alertInfo',
