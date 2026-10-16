@@ -176,18 +176,48 @@ jobs:
           task_id="$(printf '%s' "$task_response" | python3 -c 'import json,sys; print(json.load(sys.stdin)["task"]["id"])')"
           test -n "$task_id"
 
+          dependency_a_response="$(curl --fail --silent \
+            -X POST http://localhost:4000/v1/tasks \
+            -H 'content-type: application/json' \
+            -H "authorization: Bearer $access_token" \
+            --data '{"scope":"workspace","title":"CI dependency task A"}')"
+          dependency_a_id="$(printf '%s' "$dependency_a_response" | python3 -c 'import json,sys; print(json.load(sys.stdin)["task"]["id"])')"
+          test -n "$dependency_a_id"
+
+          dependency_b_response="$(curl --fail --silent \
+            -X POST http://localhost:4000/v1/tasks \
+            -H 'content-type: application/json' \
+            -H "authorization: Bearer $access_token" \
+            --data '{"scope":"workspace","title":"CI dependency task B"}')"
+          dependency_b_id="$(printf '%s' "$dependency_b_response" | python3 -c 'import json,sys; print(json.load(sys.stdin)["task"]["id"])')"
+          test -n "$dependency_b_id"
+
+          dependency_response="$(curl --fail --silent \
+            -X PUT "http://localhost:4000/v1/tasks/$dependency_a_id/dependencies" \
+            -H 'content-type: application/json' \
+            -H "authorization: Bearer $access_token" \
+            --data "{\"scope\":\"workspace\",\"dependencyIds\":[\"$dependency_b_id\"]}")"
+          test "$(printf '%s' "$dependency_response" | python3 -c 'import json,sys; print(json.load(sys.stdin)["task"]["dependencyIds"][0])')" = "$dependency_b_id"
+
           for attempt in {1..20}; do
             decision_count="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
               "print(db.timeline_events.countDocuments({type:'decision.created',entityId:'$decision_id'}))")"
             task_count="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
               "print(db.timeline_events.countDocuments({type:'task.quick_captured',entityId:'$task_id','scope.kind':'private'}))")"
-            if [ "$decision_count" = "1" ] && [ "$task_count" = "1" ]; then
+            dependency_count="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
+              "print(db.timeline_events.countDocuments({type:'task.dependencies_changed',entityId:'$dependency_a_id'}))")"
+            dependency_persisted="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
+              "print(db.tasks.countDocuments({id:'$dependency_a_id',dependencyIds:'$dependency_b_id'}))")"
+            if [ "$decision_count" = "1" ] && [ "$task_count" = "1" ] && [ "$dependency_count" = "1" ] && [ "$dependency_persisted" = "1" ]; then
               decision_outbox="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
                 "print(db.audit_outbox.findOne({'event.entityId':'$decision_id'}).status)")"
               task_outbox="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
                 "print(db.audit_outbox.findOne({'event.entityId':'$task_id'}).status)")"
+              dependency_outbox="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
+                "print(db.audit_outbox.findOne({'event.type':'task.dependencies_changed','event.entityId':'$dependency_a_id'}).status)")"
               test "$decision_outbox" = "delivered"
               test "$task_outbox" = "delivered"
+              test "$dependency_outbox" = "delivered"
               exit 0
             fi
             sleep 2

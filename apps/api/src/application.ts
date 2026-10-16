@@ -29,6 +29,8 @@ import { registerOperationalAuditRoutes } from './operational-audit-routes';
 import type { OperationalAuditStore } from './operational-audit-store';
 import { registerPriorityRoutes } from './priorities';
 import { registerPrioritizationWeightPolicyRoutes } from './prioritization-weight-policies';
+import { registerTaskDependencyRoutes } from './task-dependencies';
+import type { TaskDependencyStore } from './task-dependency-store';
 
 type ApplicationOptions = {
   readinessCheck?: ReadinessCheck;
@@ -40,6 +42,7 @@ type ApplicationOptions = {
   milestoneStore?: MilestoneStore;
   decisionLifecycleStore?: DecisionLifecycleStore;
   operationalAuditStore?: OperationalAuditStore;
+  taskDependencyStore?: TaskDependencyStore;
   githubRepositoryStore?: GitHubRepositoryStore;
   githubConnectionStore?: GitHubConnectionStore;
   githubProviderClient?: GitHubProviderClient;
@@ -83,6 +86,13 @@ export function buildApp(options: ApplicationOptions = {}) {
     ...(options.authProvider ? { authProvider: options.authProvider } : {}),
     ...(options.decisionLifecycleStore
       ? { decisionLifecycleStore: options.decisionLifecycleStore }
+      : {}),
+  });
+
+  registerTaskDependencyRoutes(app, {
+    ...(options.authProvider ? { authProvider: options.authProvider } : {}),
+    ...(options.taskDependencyStore
+      ? { taskDependencyStore: options.taskDependencyStore }
       : {}),
   });
 
