@@ -25,7 +25,39 @@ describe('parseAutomationRulePolicyMutation', () => {
     });
   });
 
-  it('accepts the second proven built-in rule', () => {
+  it('accepts every versioned stale-work rule exposed by the runtime', () => {
+    expect(
+      parseAutomationRulePolicyMutation(
+        form({
+          operation: 'rule-update',
+          ruleId: 'repository.pull_request.stale.v1',
+          enabled: 'true',
+          severity: 'urgent',
+        }),
+      ),
+    ).toEqual({
+      path: '/v1/automation/rules/repository.pull_request.stale.v1',
+      method: 'PATCH',
+      body: { enabled: true, severity: 'urgent' },
+    });
+
+    expect(
+      parseAutomationRulePolicyMutation(
+        form({
+          operation: 'rule-update',
+          ruleId: 'repository.issue.stale.v1',
+          enabled: 'false',
+          severity: 'warning',
+        }),
+      ),
+    ).toEqual({
+      path: '/v1/automation/rules/repository.issue.stale.v1',
+      method: 'PATCH',
+      body: { enabled: false, severity: 'warning' },
+    });
+  });
+
+  it('accepts the second proven CI rule', () => {
     expect(
       parseAutomationRulePolicyMutation(
         form({
