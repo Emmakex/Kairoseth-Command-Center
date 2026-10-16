@@ -9,6 +9,7 @@ import { IntegrationActivityPanel } from '../../components/integration-activity-
 import { MemberPanel } from '../../components/member-panel';
 import { MilestonePanel } from '../../components/milestone-panel';
 import { OperationalPanels } from '../../components/operational-panels';
+import { PrioritizationWeightPolicyPanel } from '../../components/prioritization-weight-policy-panel';
 import { PriorityPanel } from '../../components/priority-panel';
 import { QuickCapturePanel } from '../../components/quick-capture-panel';
 import { TimelinePanel } from '../../components/timeline-panel';
@@ -21,6 +22,7 @@ import {
   getIntegrationSignals,
   getMilestones,
   getPriorities,
+  getPrioritizationWeightPolicy,
   getProjects,
   getSession,
   getTimeline,
@@ -58,7 +60,10 @@ export default async function CommandCenterPage({
   const canManageIntegrations = session.capabilities.includes('integrations.manage');
   const canManageAutomation = session.capabilities.includes('automation.manage');
   const canReadPriorities =
-    session.capabilities.includes('tasks.read') && session.capabilities.includes('alerts.read');
+    session.capabilities.includes('tasks.read') &&
+    session.capabilities.includes('alerts.read') &&
+    session.capabilities.includes('projects.read') &&
+    session.capabilities.includes('milestones.read');
   const [
     today,
     priorities,
@@ -69,6 +74,7 @@ export default async function CommandCenterPage({
     githubRepositories,
     integrationSignals,
     automationRules,
+    prioritizationWeightPolicy,
     timeline,
     members,
   ] = await Promise.all([
@@ -86,6 +92,9 @@ export default async function CommandCenterPage({
     scope === 'workspace' ? getIntegrationSignals(token, 12) : Promise.resolve(null),
     scope === 'workspace' && canManageAutomation
       ? getAutomationRules(token)
+      : Promise.resolve(null),
+    scope === 'workspace' && canManageAutomation
+      ? getPrioritizationWeightPolicy(token)
       : Promise.resolve(null),
     getTimeline(token, scope),
     scope === 'workspace' && canManageMembers ? getLocalMembers(token) : Promise.resolve(null),
@@ -206,6 +215,9 @@ export default async function CommandCenterPage({
         )}
         {scope === 'workspace' && canManageAutomation ? (
           <AutomationRulePolicyPanel locale={locale} rules={automationRules} />
+        ) : null}
+        {scope === 'workspace' && canManageAutomation ? (
+          <PrioritizationWeightPolicyPanel locale={locale} policy={prioritizationWeightPolicy} />
         ) : null}
         {scope === 'workspace' && canManageIntegrations ? (
           <GitHubSetupPanel
