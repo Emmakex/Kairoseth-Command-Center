@@ -187,3 +187,5 @@ export function normalizePriority(value: number): number {
   if (!Number.isFinite(value)) return 50;
   return Math.min(100, Math.max(0, Math.round(value)));
 }
+
+export * from './prioritization.js';
