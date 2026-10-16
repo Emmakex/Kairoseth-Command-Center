@@ -30,6 +30,7 @@ export type TaskSummary = {
   title: string;
   status: string;
   priority: number;
+  dependencyIds?: string[];
   dueAt?: string;
 };
 

@@ -68,6 +68,28 @@
   flex-basis: 300px;
 }
 
+.task-operation-stack {
+  display: grid;
+  flex: 1 1 420px;
+  gap: 10px;
+  min-width: min(100%, 320px);
+}
+
+.task-dependency-operation {
+  grid-template-columns: minmax(220px, 1fr) minmax(180px, 0.8fr) auto;
+  align-items: end;
+}
+
+.task-dependency-operation select[multiple] {
+  min-height: 76px;
+}
+
+.task-dependency-operation .empty-state {
+  align-self: center;
+  padding: 0;
+  max-width: 280px;
+}
+
 .decision-list {
   display: grid;
   gap: 10px;
@@ -269,6 +291,15 @@
   .decision-submit {
     grid-column: 2;
   }
+
+  .task-dependency-operation {
+    grid-template-columns: minmax(220px, 1fr) auto;
+  }
+
+  .task-dependency-operation .empty-state {
+    grid-column: 1 / -1;
+    max-width: none;
+  }
 }
 
 @media (max-width: 760px) {
@@ -287,8 +318,13 @@
     grid-column: 2;
   }
 
-  .decision-reverse-form {
+  .decision-reverse-form,
+  .task-dependency-operation {
     grid-template-columns: 1fr;
+  }
+
+  .task-dependency-operation .empty-state {
+    grid-column: auto;
   }
 }
 
@@ -310,7 +346,8 @@
 
   .decision-submit,
   .management-form button,
-  .decision-reverse-form button {
+  .decision-reverse-form button,
+  .task-dependency-operation button {
     width: 100%;
   }
 
