@@ -182,8 +182,15 @@ export class MongoAgentBridgeRuntimeObservabilityStore
       .sort({ receivedAt: -1, installationId: 1 })
       .limit(500)
       .toArray();
-    return records.map(({ createdAt: _createdAt, updatedAt: _updatedAt, ...record }) =>
-      clone(record),
+    return records.map((record) =>
+      clone({
+        tenantId: record.tenantId,
+        installationId: record.installationId,
+        bridgeInstanceId: record.bridgeInstanceId,
+        sessionId: record.sessionId,
+        snapshot: record.snapshot,
+        receivedAt: record.receivedAt,
+      }),
     );
   }
 }
