@@ -17,6 +17,7 @@ const copy = {
     labels: {
       taskManualPriorityMax: 'Prioridad manual máxima',
       taskBlocked: 'Tarea bloqueada',
+      taskDependencyImpactPerDependent: 'Impacto por dependiente activo',
       taskOverdue: 'Tarea vencida',
       taskDueToday: 'Tarea vence hoy',
       alertInfo: 'Alerta informativa',
@@ -47,6 +48,7 @@ const copy = {
     labels: {
       taskManualPriorityMax: 'Manual priority maximum',
       taskBlocked: 'Task blocked',
+      taskDependencyImpactPerDependent: 'Impact per active dependent',
       taskOverdue: 'Task overdue',
       taskDueToday: 'Task due today',
       alertInfo: 'Info alert',
@@ -70,7 +72,13 @@ const groups: readonly {
 }[] = [
   {
     key: 'tasks',
-    fields: ['taskManualPriorityMax', 'taskBlocked', 'taskOverdue', 'taskDueToday'],
+    fields: [
+      'taskManualPriorityMax',
+      'taskBlocked',
+      'taskDependencyImpactPerDependent',
+      'taskOverdue',
+      'taskDueToday',
+    ],
   },
   {
     key: 'alerts',
