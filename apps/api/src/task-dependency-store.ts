@@ -25,6 +25,12 @@ export interface TaskDependencyStore {
   }): Promise<TaskDependencyResult>;
 }
 
+type DependencyGraphVersion = {
+  id: string;
+  version: number;
+  updatedAt: string;
+};
+
 export function hasTaskDependencyCycle(
   tasks: Array<Pick<Task, 'id' | 'dependencyIds'>>,
   taskId: string,
@@ -65,8 +71,15 @@ function normalizeDependencyIds(dependencyIds: string[]): string[] {
   return normalized;
 }
 
+function scopeGraphId(scope: Scope): string {
+  if (scope.kind === 'workspace') return `workspace:${scope.workspaceId}`;
+  if (scope.kind === 'private') return `private:${scope.userId}`;
+  return `system:${scope.workspaceId}:${scope.source}`;
+}
+
 export class MongoTaskDependencyStore implements TaskDependencyStore {
   private readonly tasks: Collection<Task>;
+  private readonly graphVersions: Collection<DependencyGraphVersion>;
   private readonly outbox: MongoAuditOutboxStore;
 
   constructor(
@@ -74,11 +87,28 @@ export class MongoTaskDependencyStore implements TaskDependencyStore {
     db: Db,
   ) {
     this.tasks = db.collection<Task>('tasks');
+    this.graphVersions = db.collection<DependencyGraphVersion>('task_dependency_graph_versions');
     this.outbox = new MongoAuditOutboxStore(db);
   }
 
   async ensureIndexes(): Promise<void> {
-    await this.outbox.ensureIndexes();
+    await Promise.all([
+      this.graphVersions.createIndex({ id: 1 }, { unique: true }),
+      this.outbox.ensureIndexes(),
+    ]);
+  }
+
+  private async lockGraph(scope: Scope, session: ClientSession): Promise<void> {
+    const now = new Date().toISOString();
+    await this.graphVersions.updateOne(
+      { id: scopeGraphId(scope) },
+      {
+        $inc: { version: 1 },
+        $set: { updatedAt: now },
+        $setOnInsert: { id: scopeGraphId(scope) },
+      },
+      { upsert: true, session },
+    );
   }
 
   async setDependencies(input: {
@@ -93,6 +123,8 @@ export class MongoTaskDependencyStore implements TaskDependencyStore {
 
     try {
       await session.withTransaction(async () => {
+        await this.lockGraph(input.scope, session);
+
         const task = await this.tasks.findOne(
           { scope: input.scope, id: input.taskId },
           { session },
