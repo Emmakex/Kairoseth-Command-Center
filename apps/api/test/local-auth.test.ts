@@ -50,7 +50,7 @@ describe('standalone local authentication', () => {
     expect(session.json()).toMatchObject({
       activeWorkspaceId: 'local-workspace',
       role: 'owner',
-      productEntitlements: ['command-center'],
+      productEntitlements: ['command-center', 'agent-bridge'],
     });
 
     await app.close();
