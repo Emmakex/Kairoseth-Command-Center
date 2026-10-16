@@ -7,6 +7,11 @@ import type { SignalAlertRulePolicyStore } from '@kcc/persistence/signal-alert-r
 import type { GitHubWebhookStore } from '@kcc/persistence/github-webhooks';
 import { registerAgentBridgeA2ARoutes } from './agent-bridge-a2a';
 import type { AgentBridgeA2AStore } from './agent-bridge-a2a-store';
+import {
+  registerAgentBridgeRuntimeObservabilityRoutes,
+  type AgentBridgeRuntimeIdentityProvider,
+} from './agent-bridge-runtime-observability';
+import type { AgentBridgeRuntimeObservabilityStore } from './agent-bridge-runtime-observability-store';
 import { buildApp as buildBaseApp } from './app';
 import type { ReadinessCheck } from './app';
 import { registerAutomationRulePolicyRoutes } from './automation-rule-policies';
@@ -50,6 +55,8 @@ type ApplicationOptions = {
   taskDependencyStore?: TaskDependencyStore;
   taskReminderStore?: TaskReminderStore;
   agentBridgeA2AStore?: AgentBridgeA2AStore;
+  agentBridgeRuntimeIdentityProvider?: AgentBridgeRuntimeIdentityProvider;
+  agentBridgeRuntimeObservabilityStore?: AgentBridgeRuntimeObservabilityStore;
   githubRepositoryStore?: GitHubRepositoryStore;
   githubConnectionStore?: GitHubConnectionStore;
   githubProviderClient?: GitHubProviderClient;
@@ -81,6 +88,15 @@ export function buildApp(options: ApplicationOptions = {}) {
     ...(options.authProvider ? { authProvider: options.authProvider } : {}),
     ...(options.agentBridgeA2AStore
       ? { agentBridgeA2AStore: options.agentBridgeA2AStore }
+      : {}),
+  });
+  registerAgentBridgeRuntimeObservabilityRoutes(app, {
+    ...(options.authProvider ? { authProvider: options.authProvider } : {}),
+    ...(options.agentBridgeRuntimeIdentityProvider
+      ? { runtimeIdentityProvider: options.agentBridgeRuntimeIdentityProvider }
+      : {}),
+    ...(options.agentBridgeRuntimeObservabilityStore
+      ? { runtimeObservabilityStore: options.agentBridgeRuntimeObservabilityStore }
       : {}),
   });
 
