@@ -9,7 +9,7 @@ type WorkspaceScope = Extract<Scope, { kind: 'workspace' }>;
 export type StoredPrioritizationWeightPolicy = {
   id: string;
   workspaceId: string;
-  weights: Partial<PrioritizationWeights>;
+  weights: PrioritizationWeights;
   updatedByUserId: string;
   createdAt: string;
   updatedAt: string;
@@ -28,7 +28,7 @@ export interface PrioritizationWeightPolicyStore {
     workspaceId: string;
     actorUserId: string;
     weights: PrioritizationWeights;
-  }): Promise<StoredPrioritizationWeightPolicy & { weights: PrioritizationWeights }>;
+  }): Promise<StoredPrioritizationWeightPolicy>;
 }
 
 const WEIGHT_KEYS = Object.keys(defaultPrioritizationWeights()) as (keyof PrioritizationWeights)[];
@@ -111,7 +111,7 @@ export class MongoPrioritizationWeightPolicyStore implements PrioritizationWeigh
     workspaceId: string;
     actorUserId: string;
     weights: PrioritizationWeights;
-  }): Promise<StoredPrioritizationWeightPolicy & { weights: PrioritizationWeights }> {
+  }): Promise<StoredPrioritizationWeightPolicy> {
     const workspaceId = validText(input.workspaceId, 'workspace_id');
     const actorUserId = validText(input.actorUserId, 'actor_user_id');
     const weights = validatePrioritizationWeights(input.weights);
@@ -122,7 +122,7 @@ export class MongoPrioritizationWeightPolicyStore implements PrioritizationWeigh
       const now = new Date().toISOString();
 
       if (!existing) {
-        const policy: StoredPrioritizationWeightPolicy & { weights: PrioritizationWeights } = {
+        const policy: StoredPrioritizationWeightPolicy = {
           id: randomUUID(),
           workspaceId,
           weights,
@@ -159,7 +159,10 @@ export class MongoPrioritizationWeightPolicyStore implements PrioritizationWeigh
       );
       if (!updated) throw new Error('prioritization_weight_policy_update_conflict');
 
-      const effectiveUpdated = { ...updated, weights: effectivePrioritizationWeights(updated.weights) };
+      const effectiveUpdated: StoredPrioritizationWeightPolicy = {
+        ...updated,
+        weights: effectivePrioritizationWeights(updated.weights),
+      };
       await this.outbox.enqueue(
         {
           scope,
