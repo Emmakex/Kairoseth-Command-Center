@@ -16,6 +16,7 @@ import { MongoLocalIdentityStore } from './local-identity-store';
 import { MongoOperationalAuditStore } from './operational-audit-store';
 import { PersistentLocalAuthProvider } from './persistent-local-auth';
 import { MongoTaskDependencyStore } from './task-dependency-store';
+import { MongoTaskReminderStore } from './task-reminder-store';
 
 const config = loadApiConfig();
 const mongo = new MongoClient(config.MONGODB_URI, { serverSelectionTimeoutMS: 3000 });
@@ -23,6 +24,7 @@ const operationalStore = new MongoOperationalStore(mongo.db());
 const operationalAuditStore = new MongoOperationalAuditStore(mongo, mongo.db());
 const decisionLifecycleStore = new MongoDecisionLifecycleStore(mongo, mongo.db());
 const taskDependencyStore = new MongoTaskDependencyStore(mongo, mongo.db());
+const taskReminderStore = new MongoTaskReminderStore(mongo, mongo.db());
 const integrationSignalStore = new MongoIntegrationSignalStore(mongo.db());
 const integrationSyncJobStore = new MongoIntegrationSyncJobStore(mongo.db());
 const signalAlertRulePolicyStore = new MongoSignalAlertRulePolicyStore(mongo, mongo.db());
@@ -49,6 +51,7 @@ try {
     operationalStore.ensureIndexes(),
     decisionLifecycleStore.ensureIndexes(),
     taskDependencyStore.ensureIndexes(),
+    taskReminderStore.ensureIndexes(),
     integrationSignalStore.ensureIndexes(),
     integrationSyncJobStore.ensureIndexes(),
     signalAlertRulePolicyStore.ensureIndexes(),
@@ -95,6 +98,7 @@ const app = buildApp({
   milestoneStore: operationalStore,
   decisionLifecycleStore,
   taskDependencyStore,
+  taskReminderStore,
   integrationSignalStore,
   integrationSyncJobStore,
   signalAlertRulePolicyStore,
