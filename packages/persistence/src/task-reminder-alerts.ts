@@ -122,7 +122,7 @@ export class MongoTaskReminderAlertStore {
 
   private async consumeExisting(candidate: ReminderCandidate): Promise<MaterializeOneResult> {
     const scoped = scopeFilter(candidate.scope);
-    return this.transaction(async (session) => {
+    return this.transaction<MaterializeOneResult>(async (session) => {
       const task = await this.tasks.findOne(
         {
           ...scoped,
@@ -154,7 +154,7 @@ export class MongoTaskReminderAlertStore {
     const alertFilter = { ...scoped, fingerprint };
 
     try {
-      return await this.transaction(async (session) => {
+      return await this.transaction<MaterializeOneResult>(async (session) => {
         const task = await this.tasks.findOne(
           {
             ...scoped,
