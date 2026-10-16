@@ -47,6 +47,7 @@ Esta carpeta es la fuente de verdad para las decisiones de producto, arquitectur
 40. [`35-dependency-prioritization.md`](35-dependency-prioritization.md) — deterministic dependency-chain impact scoring with legacy weight-policy compatibility.
 41. [`36-task-dependency-ui.md`](36-task-dependency-ui.md) — ES/EN task dependency editor over the guarded same-origin mutation boundary.
 42. [`37-dependency-start-readiness.md`](37-dependency-start-readiness.md) — server-authoritative start guard and complete scoped dependency catalog/readiness UI.
+43. [`38-task-reminders.md`](38-task-reminders.md) — explicit one-time task reminder rules, guarded mutation and transactional audit.
 
 ## Living documents / Documentos vivos
 
