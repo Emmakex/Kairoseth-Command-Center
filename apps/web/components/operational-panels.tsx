@@ -1,4 +1,4 @@
-import type { TodayResponse } from '../lib/api';
+import type { TaskSummary, TodayResponse } from '../lib/api';
 import type { DictionaryCopy, Locale } from '../lib/i18n';
 
 const dependencyCopy = {
@@ -7,6 +7,8 @@ const dependencyCopy = {
     help: 'Selecciona las tareas que deben completarse antes de esta tarea.',
     noneAvailable: 'No hay otras tareas disponibles en este ámbito.',
     selectedNone: 'Sin dependencias',
+    pending: 'Pendientes',
+    startBlocked: 'Completa primero las dependencias pendientes.',
     save: 'Guardar dependencias',
   },
   en: {
@@ -14,6 +16,8 @@ const dependencyCopy = {
     help: 'Select the tasks that must be completed before this task.',
     noneAvailable: 'There are no other tasks available in this scope.',
     selectedNone: 'No dependencies',
+    pending: 'Pending',
+    startBlocked: 'Complete pending dependencies before starting this task.',
     save: 'Save dependencies',
   },
 } as const;
@@ -49,15 +53,18 @@ export function OperationalPanels({
   scope,
   copy,
   today,
+  taskCatalog,
 }: {
   locale: Locale;
   scope: 'workspace' | 'private';
   copy: DictionaryCopy;
   today: TodayResponse | null;
+  taskCatalog: TaskSummary[];
 }) {
   const statuses = statusLabels(copy);
   const severities = severityLabels(copy);
   const dependencyText = dependencyCopy[locale];
+  const taskById = new Map(taskCatalog.map((task) => [task.id, task] as const));
 
   return (
     <section className="operational-grid">
@@ -113,11 +120,17 @@ export function OperationalPanels({
         <div className="item-list">
           {today?.tasks.length ? (
             today.tasks.map((task) => {
-              const dependencyCandidates = today.tasks.filter((candidate) => candidate.id !== task.id);
+              const dependencyCandidates = taskCatalog.filter((candidate) => candidate.id !== task.id);
               const selectedDependencyIds = task.dependencyIds ?? [];
-              const selectedDependencyNames = selectedDependencyIds
-                .map((dependencyId) => today.tasks.find((candidate) => candidate.id === dependencyId)?.title)
-                .filter((title): title is string => Boolean(title));
+              const selectedDependencyNames = selectedDependencyIds.map(
+                (dependencyId) => taskById.get(dependencyId)?.title ?? dependencyId,
+              );
+              const pendingDependencyIds = selectedDependencyIds.filter(
+                (dependencyId) => taskById.get(dependencyId)?.status !== 'done',
+              );
+              const pendingDependencyNames = pendingDependencyIds.map(
+                (dependencyId) => taskById.get(dependencyId)?.title ?? dependencyId,
+              );
 
               return (
                 <div className="item-row item-row-manage" key={task.id}>
@@ -132,6 +145,9 @@ export function OperationalPanels({
                         ? selectedDependencyNames.join(', ')
                         : dependencyText.selectedNone}
                     </span>
+                    {pendingDependencyNames.length ? (
+                      <span>{dependencyText.pending}: {pendingDependencyNames.join(', ')}</span>
+                    ) : null}
                   </div>
                   <div className="task-operation-stack">
                     <form className="action-buttons" action="/api/operations" method="post">
@@ -144,7 +160,8 @@ export function OperationalPanels({
                         type="submit"
                         name="status"
                         value="in_progress"
-                        disabled={task.status === 'in_progress'}
+                        disabled={task.status === 'in_progress' || pendingDependencyIds.length > 0}
+                        title={pendingDependencyIds.length ? dependencyText.startBlocked : undefined}
                       >
                         {copy.start}
                       </button>
@@ -178,7 +195,7 @@ export function OperationalPanels({
                         >
                           {dependencyCandidates.map((candidate) => (
                             <option key={candidate.id} value={candidate.id}>
-                              {candidate.title}
+                              {candidate.title} · {statuses[candidate.status] ?? candidate.status}
                             </option>
                           ))}
                         </select>
