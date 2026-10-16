@@ -146,6 +146,30 @@ export type AutomationRulePolicySummary = {
   updatedAt?: string;
 };
 
+export type PrioritizationWeightsSummary = {
+  taskManualPriorityMax: number;
+  taskBlocked: number;
+  taskOverdue: number;
+  taskDueToday: number;
+  alertInfo: number;
+  alertWarning: number;
+  alertUrgent: number;
+  alertCritical: number;
+  projectBlocked: number;
+  projectOverdue: number;
+  projectDueToday: number;
+  projectRemainingProgressMax: number;
+  milestoneOverdue: number;
+  milestoneDueToday: number;
+  milestoneWeightMax: number;
+};
+
+export type PrioritizationWeightPolicySummary = {
+  weights: PrioritizationWeightsSummary;
+  overridden: boolean;
+  updatedAt?: string;
+};
+
 export type OperationalPriorityReasonSummary = {
   code:
     | 'task.manual_priority'
@@ -206,6 +230,7 @@ export type IntegrationSignalsResponse = { signals: IntegrationSignalSummary[] }
 export type GitHubConnectionsResponse = { connections: GitHubConnectionSummary[] };
 export type GitHubRepositoriesResponse = { repositories: GitHubRepositorySummary[] };
 export type AutomationRulesResponse = { rules: AutomationRulePolicySummary[] };
+export type PrioritizationWeightPolicyResponse = { policy: PrioritizationWeightPolicySummary };
 
 export function apiBaseUrl(): string {
   return (
@@ -318,6 +343,16 @@ export async function getGitHubRepositories(token: string): Promise<GitHubReposi
 export async function getAutomationRules(token: string): Promise<AutomationRulePolicySummary[] | null> {
   const response = await authenticatedGet<AutomationRulesResponse>('/v1/automation/rules', token);
   return response?.rules ?? null;
+}
+
+export async function getPrioritizationWeightPolicy(
+  token: string,
+): Promise<PrioritizationWeightPolicySummary | null> {
+  const response = await authenticatedGet<PrioritizationWeightPolicyResponse>(
+    '/v1/prioritization/weights',
+    token,
+  );
+  return response?.policy ?? null;
 }
 
 export async function getGitHubWebhookState(
