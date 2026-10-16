@@ -32,12 +32,59 @@ export type OperationalPriority = {
   severity?: AlertSeverity;
 };
 
-const alertSeverityScore: Record<AlertSeverity, number> = {
-  info: 30,
-  warning: 60,
-  urgent: 90,
-  critical: 100,
+export type PrioritizationWeights = {
+  taskManualPriorityMax: number;
+  taskBlocked: number;
+  taskOverdue: number;
+  taskDueToday: number;
+  alertInfo: number;
+  alertWarning: number;
+  alertUrgent: number;
+  alertCritical: number;
+  projectBlocked: number;
+  projectOverdue: number;
+  projectDueToday: number;
+  projectRemainingProgressMax: number;
+  milestoneOverdue: number;
+  milestoneDueToday: number;
+  milestoneWeightMax: number;
 };
+
+export const DEFAULT_PRIORITIZATION_WEIGHTS: Readonly<PrioritizationWeights> = Object.freeze({
+  taskManualPriorityMax: 50,
+  taskBlocked: 30,
+  taskOverdue: 35,
+  taskDueToday: 20,
+  alertInfo: 30,
+  alertWarning: 60,
+  alertUrgent: 90,
+  alertCritical: 100,
+  projectBlocked: 45,
+  projectOverdue: 35,
+  projectDueToday: 20,
+  projectRemainingProgressMax: 20,
+  milestoneOverdue: 40,
+  milestoneDueToday: 25,
+  milestoneWeightMax: 20,
+});
+
+export function defaultPrioritizationWeights(): PrioritizationWeights {
+  return { ...DEFAULT_PRIORITIZATION_WEIGHTS };
+}
+
+function effectiveWeights(overrides?: Partial<PrioritizationWeights>): PrioritizationWeights {
+  return { ...DEFAULT_PRIORITIZATION_WEIGHTS, ...(overrides ?? {}) };
+}
+
+function alertSeverityScore(
+  severity: AlertSeverity,
+  weights: PrioritizationWeights,
+): number {
+  if (severity === 'critical') return weights.alertCritical;
+  if (severity === 'urgent') return weights.alertUrgent;
+  if (severity === 'warning') return weights.alertWarning;
+  return weights.alertInfo;
+}
 
 function clampScore(value: number): number {
   return Math.max(0, Math.min(100, Math.round(value)));
@@ -57,11 +104,16 @@ function deadlineState(
   return 'future';
 }
 
-function taskPriority(task: Task, range: { start: string; end: string }): OperationalPriority | null {
+function taskPriority(
+  task: Task,
+  range: { start: string; end: string },
+  weights: PrioritizationWeights,
+): OperationalPriority | null {
   if (task.status === 'done' || task.status === 'cancelled') return null;
 
   const reasons: OperationalPriorityReason[] = [];
-  const manualContribution = Math.round(Math.max(0, Math.min(100, task.priority)) * 0.5);
+  const normalizedPriority = Math.max(0, Math.min(100, task.priority));
+  const manualContribution = Math.round((normalizedPriority / 100) * weights.taskManualPriorityMax);
   if (manualContribution > 0) {
     reasons.push({
       code: 'task.manual_priority',
@@ -70,13 +122,17 @@ function taskPriority(task: Task, range: { start: string; end: string }): Operat
     });
   }
 
-  if (task.status === 'blocked') {
-    reasons.push({ code: 'task.blocked', contribution: 30 });
+  if (task.status === 'blocked' && weights.taskBlocked > 0) {
+    reasons.push({ code: 'task.blocked', contribution: weights.taskBlocked });
   }
 
   const deadline = deadlineState(task.dueAt, range);
-  if (deadline === 'overdue') reasons.push({ code: 'task.overdue', contribution: 35 });
-  if (deadline === 'today') reasons.push({ code: 'task.due_today', contribution: 20 });
+  if (deadline === 'overdue' && weights.taskOverdue > 0) {
+    reasons.push({ code: 'task.overdue', contribution: weights.taskOverdue });
+  }
+  if (deadline === 'today' && weights.taskDueToday > 0) {
+    reasons.push({ code: 'task.due_today', contribution: weights.taskDueToday });
+  }
 
   const score = clampScore(reasons.reduce((total, reason) => total + reason.contribution, 0));
   return {
@@ -91,14 +147,17 @@ function taskPriority(task: Task, range: { start: string; end: string }): Operat
   };
 }
 
-function alertPriority(alert: Alert): OperationalPriority | null {
+function alertPriority(
+  alert: Alert,
+  weights: PrioritizationWeights,
+): OperationalPriority | null {
   if (alert.status !== 'open' && alert.status !== 'acknowledged') return null;
-  const contribution = alertSeverityScore[alert.severity];
+  const contribution = alertSeverityScore(alert.severity, weights);
   return {
     kind: 'alert',
     id: alert.id,
     title: alert.title,
-    score: contribution,
+    score: clampScore(contribution),
     status: alert.status,
     severity: alert.severity,
     reasons: [{ code: 'alert.severity', contribution, value: alert.severity }],
@@ -109,18 +168,30 @@ function alertPriority(alert: Alert): OperationalPriority | null {
 function projectPriority(
   project: Project,
   range: { start: string; end: string },
+  weights: PrioritizationWeights,
 ): OperationalPriority | null {
   if (project.status === 'done' || project.status === 'archived') return null;
 
   const reasons: OperationalPriorityReason[] = [];
-  if (project.status === 'blocked') reasons.push({ code: 'project.blocked', contribution: 45 });
+  if (project.status === 'blocked' && weights.projectBlocked > 0) {
+    reasons.push({ code: 'project.blocked', contribution: weights.projectBlocked });
+  }
 
   const deadline = deadlineState(project.dueAt, range);
-  if (deadline === 'overdue') reasons.push({ code: 'project.overdue', contribution: 35 });
-  if (deadline === 'today') reasons.push({ code: 'project.due_today', contribution: 20 });
+  if (deadline === 'overdue' && weights.projectOverdue > 0) {
+    reasons.push({ code: 'project.overdue', contribution: weights.projectOverdue });
+  }
+  if (deadline === 'today' && weights.projectDueToday > 0) {
+    reasons.push({ code: 'project.due_today', contribution: weights.projectDueToday });
+  }
 
-  if ((deadline === 'overdue' || deadline === 'today') && project.progress < 100) {
-    const contribution = Math.round((100 - Math.max(0, Math.min(100, project.progress))) * 0.2);
+  if (
+    (deadline === 'overdue' || deadline === 'today') &&
+    project.progress < 100 &&
+    weights.projectRemainingProgressMax > 0
+  ) {
+    const remaining = 100 - Math.max(0, Math.min(100, project.progress));
+    const contribution = Math.round((remaining / 100) * weights.projectRemainingProgressMax);
     if (contribution > 0) {
       reasons.push({
         code: 'project.remaining_progress',
@@ -146,6 +217,7 @@ function projectPriority(
 function milestonePriority(
   milestone: Milestone,
   range: { start: string; end: string },
+  weights: PrioritizationWeights,
 ): OperationalPriority | null {
   if (milestone.status === 'done' || milestone.status === 'cancelled') return null;
 
@@ -153,11 +225,15 @@ function milestonePriority(
   if (deadline !== 'overdue' && deadline !== 'today') return null;
 
   const reasons: OperationalPriorityReason[] = [];
-  if (deadline === 'overdue') reasons.push({ code: 'milestone.overdue', contribution: 40 });
-  if (deadline === 'today') reasons.push({ code: 'milestone.due_today', contribution: 25 });
+  if (deadline === 'overdue' && weights.milestoneOverdue > 0) {
+    reasons.push({ code: 'milestone.overdue', contribution: weights.milestoneOverdue });
+  }
+  if (deadline === 'today' && weights.milestoneDueToday > 0) {
+    reasons.push({ code: 'milestone.due_today', contribution: weights.milestoneDueToday });
+  }
 
   const normalizedWeight = Math.max(1, Math.min(100, Math.round(milestone.weight)));
-  const weightContribution = Math.round(normalizedWeight * 0.2);
+  const weightContribution = Math.round((normalizedWeight / 100) * weights.milestoneWeightMax);
   if (weightContribution > 0) {
     reasons.push({
       code: 'milestone.weight',
@@ -166,6 +242,7 @@ function milestonePriority(
     });
   }
 
+  if (reasons.length === 0) return null;
   return {
     kind: 'milestone',
     id: milestone.id,
@@ -198,13 +275,15 @@ export function rankOperationalPriorities(input: {
   milestones?: Milestone[];
   range: { start: string; end: string };
   limit?: number;
+  weights?: Partial<PrioritizationWeights>;
 }): OperationalPriority[] {
   const limit = Math.max(1, Math.min(50, Math.floor(input.limit ?? 8)));
+  const weights = effectiveWeights(input.weights);
   const candidates = [
-    ...input.tasks.map((task) => taskPriority(task, input.range)),
-    ...input.alerts.map(alertPriority),
-    ...(input.projects ?? []).map((project) => projectPriority(project, input.range)),
-    ...(input.milestones ?? []).map((milestone) => milestonePriority(milestone, input.range)),
+    ...input.tasks.map((task) => taskPriority(task, input.range, weights)),
+    ...input.alerts.map((alert) => alertPriority(alert, weights)),
+    ...(input.projects ?? []).map((project) => projectPriority(project, input.range, weights)),
+    ...(input.milestones ?? []).map((milestone) => milestonePriority(milestone, input.range, weights)),
   ].filter((item): item is OperationalPriority => item !== null);
 
   candidates.sort((left, right) => {
