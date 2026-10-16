@@ -31,6 +31,8 @@ import { registerPriorityRoutes } from './priorities';
 import { registerPrioritizationWeightPolicyRoutes } from './prioritization-weight-policies';
 import { registerTaskDependencyRoutes } from './task-dependencies';
 import type { TaskDependencyStore } from './task-dependency-store';
+import { registerTaskReminderRoutes } from './task-reminders';
+import type { TaskReminderStore } from './task-reminder-store';
 import { registerTaskStartGuard } from './task-start-guard';
 
 type ApplicationOptions = {
@@ -44,6 +46,7 @@ type ApplicationOptions = {
   decisionLifecycleStore?: DecisionLifecycleStore;
   operationalAuditStore?: OperationalAuditStore;
   taskDependencyStore?: TaskDependencyStore;
+  taskReminderStore?: TaskReminderStore;
   githubRepositoryStore?: GitHubRepositoryStore;
   githubConnectionStore?: GitHubConnectionStore;
   githubProviderClient?: GitHubProviderClient;
@@ -99,6 +102,11 @@ export function buildApp(options: ApplicationOptions = {}) {
     ...(options.taskDependencyStore
       ? { taskDependencyStore: options.taskDependencyStore }
       : {}),
+  });
+
+  registerTaskReminderRoutes(app, {
+    ...(options.authProvider ? { authProvider: options.authProvider } : {}),
+    ...(options.taskReminderStore ? { taskReminderStore: options.taskReminderStore } : {}),
   });
 
   registerPriorityRoutes(app, {
