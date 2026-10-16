@@ -2,6 +2,9 @@ import type { IntegrationSignal, IntegrationSignalType } from './index.js';
 
 export type DerivedAlertSeverity = 'info' | 'warning' | 'urgent' | 'critical';
 
+export const STALE_WORK_AFTER_DAYS = 7;
+const STALE_WORK_AFTER_MS = STALE_WORK_AFTER_DAYS * 24 * 60 * 60 * 1000;
+
 export const BUILT_IN_SIGNAL_ALERT_RULES = [
   {
     id: 'repository.ci.failed.v1',
@@ -13,6 +16,18 @@ export const BUILT_IN_SIGNAL_ALERT_RULES = [
     id: 'repository.ci.action_required.v1',
     signalType: 'repository.ci',
     defaultEnabled: true,
+    defaultSeverity: 'warning',
+  },
+  {
+    id: 'repository.pull_request.stale.v1',
+    signalType: 'repository.pull_request',
+    defaultEnabled: false,
+    defaultSeverity: 'warning',
+  },
+  {
+    id: 'repository.issue.stale.v1',
+    signalType: 'repository.issue',
+    defaultEnabled: false,
     defaultSeverity: 'warning',
   },
 ] as const satisfies readonly {
@@ -33,6 +48,10 @@ export type SignalAlertRulePolicy = {
 export type SignalAlertRulePolicyMap = Partial<
   Record<BuiltInSignalAlertRuleId, Pick<SignalAlertRulePolicy, 'enabled' | 'severity'>>
 >;
+
+export type RuleEvaluationContext = {
+  now?: string;
+};
 
 export type DerivedSignalAlert = {
   ruleId: string;
@@ -62,7 +81,9 @@ export type DerivedSignalAlertReconciliation = {
 const FAILURE_CONCLUSIONS = new Set(['failure', 'timed_out', 'startup_failure']);
 const ATTENTION_CONCLUSIONS = new Set(['action_required']);
 const HEALTHY_CONCLUSIONS = new Set(['success']);
-const CI_ALERT_RULE_IDS = BUILT_IN_SIGNAL_ALERT_RULES.map((rule) => rule.id) as BuiltInSignalAlertRuleId[];
+const CI_ALERT_RULE_IDS = BUILT_IN_SIGNAL_ALERT_RULES.filter(
+  (rule) => rule.signalType === 'repository.ci',
+).map((rule) => rule.id) as BuiltInSignalAlertRuleId[];
 
 function payloadText(payload: Record<string, unknown>, key: string, maxLength = 300): string | undefined {
   const value = payload[key];
@@ -71,13 +92,30 @@ function payloadText(payload: Record<string, unknown>, key: string, maxLength = 
   return normalized && normalized.length <= maxLength ? normalized : undefined;
 }
 
+function payloadNumber(payload: Record<string, unknown>, key: string): number | undefined {
+  const value = payload[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function payloadBoolean(payload: Record<string, unknown>, key: string): boolean | undefined {
+  const value = payload[key];
+  return typeof value === 'boolean' ? value : undefined;
+}
+
 function ciConclusion(signal: IntegrationSignal): string | undefined {
   if (signal.type !== 'repository.ci') return undefined;
   return payloadText(signal.payload, 'conclusion', 80)?.toLowerCase();
 }
 
-function ciAlertFingerprint(ruleId: BuiltInSignalAlertRuleId, signalId: string): string {
+function signalAlertFingerprint(ruleId: BuiltInSignalAlertRuleId, signalId: string): string {
   return `integration-rule:${ruleId}:${signalId}`;
+}
+
+function evaluationNow(context?: RuleEvaluationContext): { iso: string; ms: number } {
+  const iso = context?.now ?? new Date().toISOString();
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) throw new Error('signal_alert_rule_now_invalid');
+  return { iso: new Date(ms).toISOString(), ms };
 }
 
 export function defaultSignalAlertRulePolicies(): SignalAlertRulePolicy[] {
@@ -129,13 +167,64 @@ function ciAlert(
 
   return {
     ruleId,
-    fingerprint: ciAlertFingerprint(ruleId, signal.id),
+    fingerprint: signalAlertFingerprint(ruleId, signal.id),
     title: `CI · ${name}`,
     ...(details ? { message: details } : {}),
     severity: policy.severity,
     signalId: signal.id,
     signalType: signal.type,
     occurredAt: signal.occurredAt,
+    ...(projectId ? { projectId } : {}),
+  };
+}
+
+function staleWorkRuleId(signal: IntegrationSignal): BuiltInSignalAlertRuleId | null {
+  if (signal.type === 'repository.pull_request') return 'repository.pull_request.stale.v1';
+  if (signal.type === 'repository.issue') return 'repository.issue.stale.v1';
+  return null;
+}
+
+function staleWorkAlert(
+  signal: IntegrationSignal,
+  policies: SignalAlertRulePolicyMap | undefined,
+  context?: RuleEvaluationContext,
+): DerivedSignalAlert | null {
+  const ruleId = staleWorkRuleId(signal);
+  if (!ruleId) return null;
+
+  const state = payloadText(signal.payload, 'state', 50)?.toLowerCase();
+  if (state !== 'open') return null;
+  if (signal.type === 'repository.pull_request' && payloadBoolean(signal.payload, 'merged') === true) {
+    return null;
+  }
+
+  const signalMs = Date.parse(signal.occurredAt);
+  if (!Number.isFinite(signalMs)) return null;
+  const now = evaluationNow(context);
+  if (now.ms - signalMs < STALE_WORK_AFTER_MS) return null;
+
+  const policy = effectivePolicy(ruleId, policies);
+  if (!policy.enabled) return null;
+
+  const repository = payloadText(signal.payload, 'repository', 300);
+  const projectId = payloadText(signal.payload, 'projectId', 200);
+  const title = payloadText(signal.payload, 'title', 300);
+  const number = payloadNumber(signal.payload, 'number');
+  const kind = signal.type === 'repository.pull_request' ? 'PR' : 'Issue';
+  const label = [number !== undefined ? `#${number}` : undefined, title].filter(Boolean).join(' · ');
+  const details = [repository, `no activity for ${STALE_WORK_AFTER_DAYS}+ days`]
+    .filter(Boolean)
+    .join(' · ');
+
+  return {
+    ruleId,
+    fingerprint: signalAlertFingerprint(ruleId, signal.id),
+    title: `Stale ${kind}${label ? ` · ${label}` : ''}`,
+    ...(details ? { message: details } : {}),
+    severity: policy.severity,
+    signalId: signal.id,
+    signalType: signal.type,
+    occurredAt: now.iso,
     ...(projectId ? { projectId } : {}),
   };
 }
@@ -167,35 +256,57 @@ function isLifecycleConclusion(conclusion: string | undefined): boolean {
 export function deriveAlertsFromIntegrationSignal(
   signal: IntegrationSignal,
   policies?: SignalAlertRulePolicyMap,
+  context?: RuleEvaluationContext,
 ): DerivedSignalAlert[] {
-  const candidates = [ciAlert(signal, policies)];
+  const candidates = [ciAlert(signal, policies), staleWorkAlert(signal, policies, context)];
   return candidates.filter((candidate): candidate is DerivedSignalAlert => candidate !== null);
 }
 
 export function deriveAlertsFromIntegrationSignals(
   signals: IntegrationSignal[],
   policies?: SignalAlertRulePolicyMap,
+  context?: RuleEvaluationContext,
 ): DerivedSignalAlert[] {
-  return signals.flatMap((signal) => deriveAlertsFromIntegrationSignal(signal, policies));
+  return signals.flatMap((signal) => deriveAlertsFromIntegrationSignal(signal, policies, context));
 }
 
 export function reconcileAlertsFromIntegrationSignals(
   signals: IntegrationSignal[],
   policies?: SignalAlertRulePolicyMap,
+  context?: RuleEvaluationContext,
 ): DerivedSignalAlertReconciliation {
   const active: DerivedSignalAlert[] = [];
   const resolutions = new Map<string, DerivedSignalAlertResolution>();
   const ciGroups = new Map<string, IntegrationSignal[]>();
+  const now = evaluationNow(context);
 
   for (const signal of signals) {
+    const staleRuleId = staleWorkRuleId(signal);
+    if (staleRuleId) {
+      const candidate = staleWorkAlert(signal, policies, { now: now.iso });
+      if (candidate) {
+        active.push(candidate);
+      } else {
+        const fingerprint = signalAlertFingerprint(staleRuleId, signal.id);
+        resolutions.set(fingerprint, {
+          ruleId: staleRuleId,
+          fingerprint,
+          causeSignalId: signal.id,
+          signalType: signal.type,
+          occurredAt: now.iso,
+        });
+      }
+      continue;
+    }
+
     if (signal.type !== 'repository.ci') {
-      active.push(...deriveAlertsFromIntegrationSignal(signal, policies));
+      active.push(...deriveAlertsFromIntegrationSignal(signal, policies, { now: now.iso }));
       continue;
     }
 
     const seriesKey = ciSeriesKey(signal);
     if (!seriesKey) {
-      active.push(...deriveAlertsFromIntegrationSignal(signal, policies));
+      active.push(...deriveAlertsFromIntegrationSignal(signal, policies, { now: now.iso }));
       continue;
     }
     const group = ciGroups.get(seriesKey) ?? [];
@@ -214,7 +325,7 @@ export function reconcileAlertsFromIntegrationSignals(
 
     for (const signal of group) {
       for (const ruleId of CI_ALERT_RULE_IDS) {
-        const fingerprint = ciAlertFingerprint(ruleId, signal.id);
+        const fingerprint = signalAlertFingerprint(ruleId, signal.id);
         if (fingerprint === activeFingerprint) continue;
         resolutions.set(fingerprint, {
           ruleId,
