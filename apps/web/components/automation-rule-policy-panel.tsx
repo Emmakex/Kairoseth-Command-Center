@@ -4,7 +4,7 @@ import type { Locale } from '../lib/i18n';
 const copy = {
   es: {
     title: 'Reglas de automatización',
-    help: 'Configura las reglas probadas que convierten señales de CI en alertas del espacio de trabajo.',
+    help: 'Configura las reglas probadas que convierten señales operativas en alertas del espacio de trabajo.',
     unavailable: 'No se pudieron cargar las reglas de automatización.',
     noRules: 'No hay reglas de automatización disponibles.',
     enabled: 'Estado',
@@ -18,6 +18,10 @@ const copy = {
     failedHelp: 'Genera una alerta cuando una ejecución de CI termina con fallo, timeout o error de arranque.',
     actionRequiredTitle: 'CI requiere acción',
     actionRequiredHelp: 'Genera una alerta cuando CI devuelve un estado que requiere intervención humana.',
+    stalePullRequestTitle: 'PR sin actividad',
+    stalePullRequestHelp: 'Genera una alerta cuando una pull request abierta lleva 7 días sin actividad.',
+    staleIssueTitle: 'Issue sin actividad',
+    staleIssueHelp: 'Genera una alerta cuando una issue abierta lleva 7 días sin actividad.',
     info: 'Informativa',
     warning: 'Advertencia',
     urgent: 'Urgente',
@@ -25,7 +29,7 @@ const copy = {
   },
   en: {
     title: 'Automation rules',
-    help: 'Configure the proven rules that turn CI signals into workspace alerts.',
+    help: 'Configure the proven rules that turn operational signals into workspace alerts.',
     unavailable: 'Automation rules could not be loaded.',
     noRules: 'No automation rules are available.',
     enabled: 'Status',
@@ -39,6 +43,10 @@ const copy = {
     failedHelp: 'Creates an alert when a CI run ends in failure, timeout, or startup failure.',
     actionRequiredTitle: 'CI action required',
     actionRequiredHelp: 'Creates an alert when CI reports a state that requires human intervention.',
+    stalePullRequestTitle: 'Stale pull request',
+    stalePullRequestHelp: 'Creates an alert when an open pull request has had no activity for 7 days.',
+    staleIssueTitle: 'Stale issue',
+    staleIssueHelp: 'Creates an alert when an open issue has had no activity for 7 days.',
     info: 'Info',
     warning: 'Warning',
     urgent: 'Urgent',
@@ -53,6 +61,12 @@ function ruleCopy(ruleId: string, locale: Locale) {
   }
   if (ruleId === 'repository.ci.action_required.v1') {
     return { title: t.actionRequiredTitle, help: t.actionRequiredHelp };
+  }
+  if (ruleId === 'repository.pull_request.stale.v1') {
+    return { title: t.stalePullRequestTitle, help: t.stalePullRequestHelp };
+  }
+  if (ruleId === 'repository.issue.stale.v1') {
+    return { title: t.staleIssueTitle, help: t.staleIssueHelp };
   }
   return { title: ruleId, help: ruleId };
 }
