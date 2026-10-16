@@ -90,6 +90,11 @@ export interface Task {
   status: TaskStatus;
   priority: number;
   assigneeIds: string[];
+  /**
+   * IDs of tasks that must be completed before this task can proceed.
+   * Optional for backward compatibility with documents created before dependency support.
+   */
+  dependencyIds?: string[];
   dueAt?: string;
   completedAt?: string;
   createdAt: string;
