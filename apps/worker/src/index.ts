@@ -15,6 +15,7 @@ import {
 } from '@kcc/persistence/integration-sync-jobs';
 import { MongoIntegrationSyncScheduleStore } from '@kcc/persistence/integration-sync-schedules';
 import { MongoSignalAlertRulePolicyStore } from '@kcc/persistence/signal-alert-rule-policies';
+import { MongoTaskReminderAlertStore } from '@kcc/persistence/task-reminder-alerts';
 import { discoverGitHubSchedules, enqueueDueGitHubSchedule } from './integration-scheduler';
 
 const config = loadWorkerConfig();
@@ -25,6 +26,7 @@ const syncJobs = new MongoIntegrationSyncJobStore(db);
 const syncSchedules = new MongoIntegrationSyncScheduleStore(db);
 const signalAlerts = new MongoIntegrationSignalAlertStore(mongo, db);
 const signalAlertRulePolicies = new MongoSignalAlertRulePolicyStore(mongo, db);
+const taskReminderAlerts = new MongoTaskReminderAlertStore(mongo, db);
 const integrationSecretKey = config.KCC_INTEGRATION_SECRET_KEY;
 
 const githubExecution = integrationSecretKey
@@ -255,6 +257,7 @@ async function tick() {
         syncSchedules.ensureIndexes(),
         signalAlerts.ensureIndexes(),
         signalAlertRulePolicies.ensureIndexes(),
+        taskReminderAlerts.ensureIndexes(),
         ...(githubExecution
           ? [githubExecution.secretStore.ensureIndexes(), githubExecution.signalStore.ensureIndexes()]
           : []),
@@ -262,10 +265,11 @@ async function tick() {
       initialized = true;
     }
 
-    const [drained, requeuedSyncJobs, requeuedSchedules] = await Promise.all([
+    const [drained, requeuedSyncJobs, requeuedSchedules, taskReminders] = await Promise.all([
       outbox.drainPending(50),
       syncJobs.requeueExpired({ limit: 100 }),
       syncSchedules.requeueExpired({ limit: 100 }),
+      taskReminderAlerts.materializeDue(new Date().toISOString(), 100),
     ]);
 
     let githubRefresh: 'disabled' | 'idle' | 'processed' = 'disabled';
@@ -294,6 +298,7 @@ async function tick() {
         delivered: drained.delivered,
         failed: drained.failed,
       },
+      taskReminders,
       integrationSync: {
         requeuedExpired: requeuedSyncJobs,
         executionEnabled: Boolean(githubExecution),

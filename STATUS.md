@@ -4,7 +4,7 @@
 **Technical/internal project:** Kairoseth Command Center  
 **Commercial names:** Gestor de Trabajo (ES) / Work Manager (EN)  
 **Category:** Kairoseth Software  
-**Status:** Phase 5 Slice 13 is merged as `1820cf457d5ca2c1eddc3b2f5e26287d940479c4` and post-merge validated 9/9. Phase 5 Slice 14 — Task reminders / Recordatorios de tareas — is active.
+**Status:** Phase 5 Slice 14 is merged as `e9c217af98d529d8720a41928f0257d08524df0e` and post-merge validated 9/9. Phase 5 Slice 15 — Task reminder materialization / Materialización de recordatorios — is active.
 
 ## Naming rule / Regla de naming
 
@@ -48,86 +48,92 @@
 - [x] Slice 11 — Dependency-aware prioritization — PR #43 `fc9670d00579d4a9e2a59753326e5506a0067308`.
 - [x] Slice 12 — Task dependency UI — PR #44 `e33323da5abe83b74a0d4b5ceb9c491b1764fe0a`.
 - [x] Slice 13 — Dependency start readiness — PR #46 `1820cf457d5ca2c1eddc3b2f5e26287d940479c4`.
+- [x] Slice 14 — Task reminders — PR #47 `e9c217af98d529d8720a41928f0257d08524df0e`.
 
-Every resulting `main` boundary through Slice 13 was validated with all nine workflows green.
-
-### Phase 5 Slice 13 — Dependency start readiness / Preparación de inicio por dependencias
-
-- [x] Server-authoritative `in_progress` guard requires every explicit same-scope dependency to be `done`.
-- [x] Missing/foreign dependencies are treated as incomplete without leaking foreign state.
-- [x] Full scoped task catalog replaces truncated Today data for dependency editing/readiness.
-- [x] ES/EN pending-dependency UI and Start-button convenience guard.
-- [x] PR #46 merged as `1820cf457d5ca2c1eddc3b2f5e26287d940479c4`; resulting `main` validated 9/9.
-
-**Phase 5 Slice 13: CLOSED / CERRADA.**
-
-## Active / Activo
+Every resulting `main` boundary through Slice 14 was validated with all nine pre-Slice-15 workflows green.
 
 ### Phase 5 Slice 14 — Task reminders / Recordatorios de tareas
-
-Implemented on `feat/phase-5-task-reminders` so far:
 
 - [x] Optional backward-compatible `Task.reminderRules` model.
 - [x] First deterministic rule type: `{ kind: 'at', remindAt: ISO instant }`.
 - [x] Reminder instants canonicalized to UTC ISO and sorted chronologically.
 - [x] Maximum 10 reminders per task; duplicate instants rejected.
 - [x] Guarded `PUT /v1/tasks/:id/reminders` mutation for workspace and private scope.
-- [x] Scope and actor are derived from authenticated session; tenant/user authority fields are rejected.
-- [x] `tasks.write` + `command-center` entitlement enforced.
-- [x] Transactional task mutation + `task.reminders_changed` audit-outbox event.
-- [x] Optimistic `updatedAt` conflict protection.
-- [x] Unit/API coverage for normalization, limits, malformed input, capability, private/workspace scope, missing task and conflicts.
-- [x] Docker smoke proves real Mongo persistence and delivered reminder audit event.
-- [x] Product/security documentation in `docs/38-task-reminders.md`.
-- [ ] Final-head regression validation.
+- [x] Scope and actor derived from authenticated session; authority fields rejected.
+- [x] Transactional mutation + `task.reminders_changed` audit-outbox event.
+- [x] PR #47 merged as `e9c217af98d529d8720a41928f0257d08524df0e`; resulting `main` validated 9/9.
+
+**Phase 5 Slice 14: CLOSED / CERRADA.**
+
+## Active / Activo
+
+### Phase 5 Slice 15 — Task reminder materialization / Materialización de recordatorios
+
+Implemented on `feat/phase-5-reminder-materialization` so far:
+
+- [x] Worker-side due-reminder materializer over explicit stored `{ kind: 'at' }` rules.
+- [x] Workspace/private tasks only; system scope and done/cancelled tasks are excluded.
+- [x] Stable reminder-alert fingerprint: `task-reminder:<taskId>:<remindAt>`.
+- [x] Due reminders materialize as same-scope `warning/open` in-app alerts.
+- [x] Workspace and private fingerprint uniqueness prevents duplicate durable alerts.
+- [x] Alert creation and `alert.reminder_due` audit-outbox event are transactional.
+- [x] One-time reminder is consumed from `Task.reminderRules` in the same transaction after materialization.
+- [x] Optimistic task `updatedAt` guard prevents silently overwriting concurrent human reminder edits.
+- [x] Duplicate-key races converge on the existing alert and consume the remaining one-time rule.
+- [x] Worker execution is independent from GitHub integration availability.
+- [x] Unit coverage for due/future/completed/cancelled/system candidate selection and stable fingerprints.
+- [x] Dedicated Docker smoke proves real worker materialization, consumption, delivered audit and no duplicate on later ticks.
+- [x] Product/security documentation in `docs/39-task-reminder-materialization.md`.
+- [ ] Final-head lint, typecheck, tests, build and regression validation.
 - [ ] Merge and post-merge `main` validation.
 
-**Phase 5 Slice 14: VALIDATION PENDING / VALIDACIÓN PENDIENTE.**
+**Phase 5 Slice 15: VALIDATION PENDING / VALIDACIÓN PENDIENTE.**
 
 ## Deliberately deferred / Diferido expresamente
 
-- [ ] Reminder execution/materialization into in-app alerts.
 - [ ] Recurring reminder rules.
 - [ ] Email, push, SMS or third-party reminder delivery.
+- [ ] Snooze/repeat policies.
 - [ ] Dedicated graph visualization or drag-and-drop dependency editor.
 - [ ] Automatic task status mutations driven by dependency changes.
 - [ ] Critical-path duration forecasting or probabilistic deadline prediction.
 - [ ] Arbitrary user-authored conditions or executable rule DSL.
-- [ ] Automation actions beyond current derived-alert behavior.
+- [ ] Automation actions beyond current in-app alert behavior.
 - [ ] AI-generated rules, weights, thresholds, dependencies, reminders or silent priority changes.
 - [ ] GitHub App/OAuth and additional providers.
 
 ## Security and correctness invariants
 
-1. Workspace/private scope is server-derived from authenticated context.
+1. Workspace/private scope is server-derived from authenticated context for user mutations.
 2. Product entitlement and capability checks are server-enforced.
-3. Provider credentials never enter durable jobs, signals, alerts, policies, prioritization or audit events.
+3. Provider credentials never enter durable reminder state, alerts or reminder audit events.
 4. Derived automation and prioritization remain deterministic, explainable and AI-independent.
 5. Private scope never crosses workspace dependency or reminder data.
 6. Human dismissed decisions remain authoritative.
-7. Legacy stored prioritization policies preserve configured values while inheriting new defaults.
-8. Task dependencies reference local same-scope task IDs only and remain acyclic.
-9. Dependency scoring uses only explicit stored graph edges; no text/AI inference occurs.
-10. Completed/cancelled work does not create dependency impact.
-11. A task cannot be explicitly started while any same-scope dependency is not `done` at the guard check.
-12. Dependency readiness never causes silent status mutation.
-13. Reminder intent is explicit user-authored data; no reminder time is inferred by AI.
-14. Reminder mutations cannot supply tenant or actor authority fields.
-15. Reminder mutation and audit commit atomically.
-16. Reminder execution remains separate until a scheduler/materializer is explicitly implemented and validated.
+7. Task dependencies reference local same-scope task IDs only and remain acyclic.
+8. A task cannot be explicitly started while any same-scope dependency is not `done` at the guard check.
+9. Reminder intent and reminder time are explicit user-authored data; no AI inference occurs.
+10. Reminder mutation and mutation audit commit atomically.
+11. Reminder execution preserves the task's persisted workspace/private scope.
+12. Done/cancelled tasks and system scope never materialize reminders.
+13. A one-time reminder creates at most one durable alert for its task+instant fingerprint.
+14. Materialization consumes the exact one-time rule so later worker ticks do not repeatedly scan fired reminders.
+15. Materialization uses optimistic task concurrency and does not silently overwrite concurrent human edits.
+16. Reminder alert creation and `alert.reminder_due` audit commit atomically.
+17. Recurrence and external delivery remain separate until explicitly implemented and validated.
 
 ## Next / Siguiente
 
-1. Validate Slice 14 final head with lint, typecheck, tests, build and all existing regression workflows.
-2. Correct any model/API/Docker regression directly on this slice.
+1. Validate Slice 15 final head with lint, typecheck, tests, build and all regression workflows, including the new reminder-materialization smoke.
+2. Correct any worker/persistence/Docker regression directly on this slice.
 3. Merge the exact validated head and revalidate resulting `main`.
-4. If green, implement reminder execution/materialization as the next isolated Phase 5 slice.
-5. Keep recurring rules, external delivery, graph visualization, automatic status behavior, critical-path forecasting, arbitrary DSL, AI changes, OAuth and additional providers as separate fronts.
+4. Select the next Phase 5 micro-slice only from the resulting green repository state and documented boundaries.
+5. Keep recurring rules, external delivery, snooze/repeat, graph visualization, automatic status behavior, critical-path forecasting, arbitrary DSL, AI changes, OAuth and additional providers as separate fronts.
 6. When commercial publication is scheduled, create the Kairoseth Software catalog entry as **Gestor de Trabajo / Work Manager**.
 
 ## Current blockers / Bloqueos actuales
 
-No known product blocker. Slice 14 is ready for regression validation.
+No known product blocker. Slice 15 is ready for regression validation.
 
 ## Operating rule
 
