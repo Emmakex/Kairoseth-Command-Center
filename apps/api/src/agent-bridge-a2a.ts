@@ -13,7 +13,6 @@ import {
 
 const MAX_IDENTIFIER_LENGTH = 512;
 const FINGERPRINT_PATTERN = /^[a-f0-9]{64}$/i;
-const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/;
 
 async function resolveSession(
   request: FastifyRequest,
@@ -32,13 +31,21 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function hasControlCharacters(value: string): boolean {
+  for (const character of value) {
+    const code = character.charCodeAt(0);
+    if (code <= 31 || code === 127) return true;
+  }
+  return false;
+}
+
 function identifier(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const normalized = value.trim();
   if (
     !normalized ||
     normalized.length > MAX_IDENTIFIER_LENGTH ||
-    CONTROL_CHARACTER_PATTERN.test(normalized)
+    hasControlCharacters(normalized)
   ) {
     return null;
   }
