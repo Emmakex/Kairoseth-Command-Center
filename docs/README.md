@@ -36,11 +36,12 @@ Esta carpeta es la fuente de verdad para las decisiones de producto, arquitectur
 29. [`24-github-webhook-ui.md`](24-github-webhook-ui.md) — safe manual GitHub webhook provisioning, one-time secret reveal, rotation and removal.
 30. [`25-automation-rule-policies.md`](25-automation-rule-policies.md) — workspace-scoped enable/severity policies for deterministic built-in automation rules.
 31. [`26-automation-rule-policy-ui.md`](26-automation-rule-policy-ui.md) — ES/EN workspace administration surface for the proven built-in automation policies.
-32. [`27-stale-work-rules.md`](27-stale-work-rules.md) — provider-neutral seven-day stale pull-request/issue rules and lifecycle semantics.
+32. [`27-stale-work-rules.md`](27-stale-work-rules.md) — provider-neutral stale pull-request/issue rules, configurable inactivity window and lifecycle semantics.
 33. [`28-explainable-prioritization.md`](28-explainable-prioritization.md) — deterministic cross-source task/alert ranking with explicit score reasons.
 34. [`29-project-milestone-priority-risk.md`](29-project-milestone-priority-risk.md) — deterministic project/milestone delivery-risk contributions in the explainable ranking.
 35. [`30-prioritization-weight-policies.md`](30-prioritization-weight-policies.md) — workspace-scoped configurable weights for deterministic explainable prioritization.
 36. [`31-prioritization-weight-ui.md`](31-prioritization-weight-ui.md) — ES/EN workspace editor and safe same-origin mutation boundary for prioritization weights.
+37. [`32-stale-threshold-policies.md`](32-stale-threshold-policies.md) — workspace-scoped 1..365-day inactivity thresholds for the two stale-work rules.
 
 ## Living documents / Documentos vivos
 

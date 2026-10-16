@@ -3,7 +3,11 @@ import { authorize } from '@kcc/auth';
 import type { AuthProvider, SessionContext } from '@kcc/auth';
 import type { Scope } from '@kcc/domain';
 import {
+  MAX_STALE_WORK_AFTER_DAYS,
+  MIN_STALE_WORK_AFTER_DAYS,
+  STALE_WORK_AFTER_DAYS,
   isBuiltInSignalAlertRuleId,
+  isStaleWorkRuleId,
   type DerivedAlertSeverity,
 } from '@kcc/integrations/signal-alert-rules';
 import type { SignalAlertRulePolicyStore } from '@kcc/persistence/signal-alert-rule-policies';
@@ -43,6 +47,19 @@ function parseSeverity(value: unknown): DerivedAlertSeverity | null | undefined 
   if (value === undefined) return undefined;
   if (typeof value !== 'string' || !severities.has(value as DerivedAlertSeverity)) return null;
   return value as DerivedAlertSeverity;
+}
+
+function parseStaleAfterDays(value: unknown): number | null | undefined {
+  if (value === undefined) return undefined;
+  if (
+    typeof value !== 'number' ||
+    !Number.isInteger(value) ||
+    value < MIN_STALE_WORK_AFTER_DAYS ||
+    value > MAX_STALE_WORK_AFTER_DAYS
+  ) {
+    return null;
+  }
+  return value;
 }
 
 export function registerAutomationRulePolicyRoutes(
@@ -85,11 +102,18 @@ export function registerAutomationRulePolicyRoutes(
     const body = (request.body ?? {}) as Record<string, unknown>;
     const enabled = body.enabled;
     const severity = parseSeverity(body.severity);
+    const staleAfterDays = parseStaleAfterDays(body.staleAfterDays);
     if (enabled !== undefined && typeof enabled !== 'boolean') {
       return reply.code(400).send({ error: 'invalid_enabled' });
     }
     if (severity === null) return reply.code(400).send({ error: 'invalid_severity' });
-    if (enabled === undefined && severity === undefined) {
+    if (staleAfterDays === null) {
+      return reply.code(400).send({ error: 'invalid_stale_after_days' });
+    }
+    if (staleAfterDays !== undefined && !isStaleWorkRuleId(rawRuleId)) {
+      return reply.code(400).send({ error: 'stale_threshold_not_supported' });
+    }
+    if (enabled === undefined && severity === undefined && staleAfterDays === undefined) {
       return reply.code(400).send({ error: 'automation_rule_policy_change_required' });
     }
 
@@ -104,6 +128,14 @@ export function registerAutomationRulePolicyRoutes(
       ruleId: rawRuleId,
       enabled: enabled === undefined ? current.enabled : enabled,
       severity: severity === undefined ? current.severity : severity,
+      ...(isStaleWorkRuleId(rawRuleId)
+        ? {
+            staleAfterDays:
+              staleAfterDays === undefined
+                ? current.staleAfterDays ?? STALE_WORK_AFTER_DAYS
+                : staleAfterDays,
+          }
+        : {}),
     });
 
     return {
@@ -111,6 +143,7 @@ export function registerAutomationRulePolicyRoutes(
         ruleId: policy.ruleId,
         enabled: policy.enabled,
         severity: policy.severity,
+        ...(policy.staleAfterDays !== undefined ? { staleAfterDays: policy.staleAfterDays } : {}),
         overridden: true,
         updatedAt: policy.updatedAt,
       },

@@ -4,7 +4,7 @@
 **Technical/internal project:** Kairoseth Command Center  
 **Commercial names:** Gestor de Trabajo (ES) / Work Manager (EN)  
 **Category:** Kairoseth Software  
-**Status:** Phase 5 Slice 6 is merged as `f4ef6e27f50b35c88f7c39e298c63035fe7ee684` and post-merge validated 9/9. Phase 5 Slice 7 — Prioritization weight UI / UI de pesos de priorización — is active.
+**Status:** Phase 5 Slice 7 is merged as `76e59d11c7471682d80ce9b0c65fb571b9e50acd` and post-merge validated 9/9. Phase 5 Slice 8 — Stale threshold policies / Políticas de umbral de inactividad — is active.
 
 ## Naming rule / Regla de naming
 
@@ -46,7 +46,7 @@
 
 ### Phase 5 Slice 3 — Stale work rules
 
-- [x] Provider-neutral stale PR/issue rules with seven-day v1 threshold and opt-in defaults.
+- [x] Provider-neutral stale PR/issue rules with seven-day default and opt-in defaults.
 - [x] Stable fingerprints, resolve/reopen lifecycle and ES/EN configuration UI.
 - [x] PR #35 merged as `1a88ae5280d0115fbdf2e61834859d6847bcc77e`; `main` 9/9 green.
 
@@ -64,46 +64,55 @@
 ### Phase 5 Slice 6 — Prioritization weight policies
 
 - [x] Explicit `PrioritizationWeights` model with exact historical defaults.
-- [x] Workspace-scoped durable `prioritization_weight_policies`, integer bounds `0..100` and transactional `prioritization.weights_changed` audit.
-- [x] `GET /v1/prioritization/weights` and guarded partial `PATCH /v1/prioritization/weights`.
-- [x] Administration requires `automation.manage`; workspace/actor are server-derived.
+- [x] Workspace-scoped durable policies, integer bounds `0..100`, guarded API and transactional audit.
 - [x] Workspace ranking applies effective weights; private ranking intentionally keeps product defaults.
-- [x] Stable reason codes and the 100-point cap remain unchanged.
-- [x] Unit/API coverage and `docs/30-prioritization-weight-policies.md`.
-- [x] PR #38 merged as `f4ef6e27f50b35c88f7c39e298c63035fe7ee684`.
-- [x] Resulting `main` validated with all nine workflows green.
+- [x] PR #38 merged as `f4ef6e27f50b35c88f7c39e298c63035fe7ee684`; `main` 9/9 green.
 
 **Phase 5 Slice 6: CLOSED / CERRADA.**
 
-## Active / Activo
-
 ### Phase 5 Slice 7 — Prioritization weight UI / UI de pesos de priorización
 
-Implemented on `feat/phase-5-priority-weight-ui` so far:
+- [x] ES/EN workspace editor for all 15 deterministic prioritization weights.
+- [x] Workspace-only + `automation.manage` loading/rendering; private scope remains on defaults and does not load the editor.
+- [x] Same-origin guarded proxy and exact allow-list parser with integer `0..100` validation.
+- [x] Priority UI capability loading aligned with the authoritative task/alert/project/milestone read boundary.
+- [x] Parser coverage and `docs/31-prioritization-weight-ui.md`.
+- [x] PR #39 merged as `76e59d11c7471682d80ce9b0c65fb571b9e50acd`.
+- [x] Resulting `main` validated with all nine workflows green.
 
-- [x] Web API client reads the effective workspace prioritization-weight policy.
-- [x] ES/EN administration panel groups all 15 weights into Tasks, Alerts, Projects and Milestones.
-- [x] Inputs are bounded to integer `0..100` and the UI explains the 100-point final cap and private-scope default behavior.
-- [x] Panel displays default-vs-custom policy state.
-- [x] Panel is loaded/rendered only in workspace scope with `automation.manage`.
-- [x] Private scope never loads/renders workspace weight administration.
-- [x] Priority-panel loading now matches the authoritative API capability set: tasks, alerts, projects and milestones read.
-- [x] Same-origin `POST /api/prioritization/weights` proxy forwards only validated data to the authenticated API.
-- [x] Web parser allow-lists exactly the 15 weight names plus locale/operation and rejects missing, unexpected, fractional, negative, non-numeric and >100 values.
-- [x] Parser unit coverage including `0` and `100` boundaries.
-- [x] Architecture/UI documentation in `docs/31-prioritization-weight-ui.md`.
+**Phase 5 Slice 7: CLOSED / CERRADA.**
+
+## Active / Activo
+
+### Phase 5 Slice 8 — Stale threshold policies / Políticas de umbral de inactividad
+
+Implemented on `feat/phase-5-stale-threshold-policies` so far:
+
+- [x] Historical stale default remains exactly `7` days when no threshold override exists.
+- [x] Only `repository.pull_request.stale.v1` and `repository.issue.stale.v1` support `staleAfterDays`.
+- [x] Thresholds are whole days constrained to `1..365`; CI rules reject stale thresholds.
+- [x] Provider-neutral stale evaluation uses the effective per-rule workspace threshold.
+- [x] Alert rule IDs and fingerprints remain unchanged when the threshold changes.
+- [x] Raising the threshold can resolve the existing stable alert; lowering it can activate/reopen the same fingerprint on later reconciliation.
+- [x] Existing stored stale policies without `staleAfterDays` are interpreted as the historical 7-day default.
+- [x] Durable workspace policy persistence and transactional `automation.rule_policy_changed` audit include current/previous thresholds.
+- [x] `GET /v1/automation/rules` exposes effective thresholds for stale rules.
+- [x] Guarded partial `PATCH /v1/automation/rules/:ruleId` accepts stale thresholds and preserves them when later mutations change only state/severity.
+- [x] Workspace/actor remain server-derived and administration still requires `automation.manage` plus `command-center` entitlement.
+- [x] Unit/API coverage for defaults, custom thresholds, stable fingerprints, raised-threshold resolution, 1/365 bounds, invalid values, CI rejection, partial-update preservation and workspace isolation.
+- [x] Architecture/product documentation updated in `docs/27-stale-work-rules.md` and `docs/32-stale-threshold-policies.md`.
 - [ ] Final-head regression validation.
 - [ ] Merge and post-merge `main` validation.
 
-**Phase 5 Slice 7: VALIDATION PENDING / VALIDACIÓN PENDIENTE.**
+**Phase 5 Slice 8: VALIDATION PENDING / VALIDACIÓN PENDIENTE.**
 
 ## Deliberately deferred / Diferido expresamente
 
+- [ ] Customer-facing ES/EN stale-threshold editor UI.
 - [ ] Dependency-chain scoring and dependency data-model/mutation work; no dependency model exists yet.
-- [ ] Customer-configurable stale thresholds.
 - [ ] Arbitrary user-authored conditions or rule DSL.
 - [ ] Automation actions beyond current derived-alert behavior.
-- [ ] AI-generated automation rules, weights or silent priority changes.
+- [ ] AI-generated automation rules, weights, thresholds or silent priority changes.
 - [ ] GitHub App/OAuth and additional providers.
 
 ## Security and correctness invariants
@@ -112,30 +121,32 @@ Implemented on `feat/phase-5-priority-weight-ui` so far:
 2. Product entitlement and capability checks are server-enforced.
 3. Provider credentials never enter durable jobs, signals, alerts, policies, prioritization or audit events.
 4. Derived automation remains provider-neutral over normalized durable signals.
-5. Versioned rule IDs and deterministic alert fingerprints remain stable.
-6. Private scope never loads workspace automation administration or workspace prioritization-weight overrides/editors.
+5. Versioned rule IDs and deterministic alert fingerprints remain stable across policy changes.
+6. Private scope never loads workspace automation or prioritization administration.
 7. Human dismissed decisions remain authoritative.
 8. Priority ranking remains deterministic, explainable and AI-independent.
-9. Stable reason codes and the final 100-point cap are unchanged by weight configuration.
-10. Priority scoring remains read-only and never triggers external actions.
-11. Missing weight policy preserves exact product defaults.
-12. Workspace policies are unique per workspace, integer-bounded and transactionally audited.
-13. Workspace policy changes cannot alter private-scope ranking behavior.
-14. Browser weight mutation is allow-listed and cannot choose tenant, actor, API path or arbitrary JSON fields.
-15. Dependency-chain scoring stays separate until dependency data is explicitly modelled and authorized.
+9. Missing prioritization policy preserves exact product defaults.
+10. Missing stale threshold preserves the historical seven-day default exactly.
+11. Stale thresholds are integer whole days from 1 through 365 and are accepted only for the two stale-work rules.
+12. CI automation rules reject stale-threshold fields.
+13. Partial enable/severity changes preserve the effective stale threshold.
+14. Threshold changes preserve alert identity and history; qualification changes are handled through the existing resolve/reopen lifecycle.
+15. Workspace policy changes remain transactionally audited and isolated by workspace.
+16. Browser/API clients cannot choose tenant or actor identity; those are derived from session context.
+17. Dependency-chain scoring stays separate until dependency data is explicitly modelled and authorized.
 
 ## Next / Siguiente
 
-1. Validate the final Slice 7 head with lint, typecheck, tests, build and all existing regression workflows.
-2. Correct any web/parser regression directly on this slice.
+1. Validate the final Slice 8 head with lint, typecheck, tests, build and all existing regression workflows.
+2. Correct any threshold policy/runtime regression directly on this slice.
 3. Merge the exact validated head and revalidate resulting `main`.
-4. Select the next isolated Phase 5 slice only from the resulting green repository state.
-5. Keep dependency modelling, stale-threshold customization, AI suggestions, external automation actions, OAuth and additional providers as separate fronts.
+4. Then implement the ES/EN stale-threshold editor as its own isolated Slice 9.
+5. Keep dependency modelling, arbitrary DSL, external automation actions, AI changes, OAuth and additional providers as separate fronts.
 6. When commercial publication is scheduled, create the Kairoseth Software catalog entry as **Gestor de Trabajo / Work Manager**.
 
 ## Current blockers / Bloqueos actuales
 
-No known product blocker. Slice 7 is ready for regression validation.
+No known product blocker. Slice 8 is ready for regression validation.
 
 ## Operating rule
 
