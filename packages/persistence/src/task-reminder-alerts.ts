@@ -60,6 +60,12 @@ function hasReminder(task: Task, remindAt: string): boolean {
   );
 }
 
+function withoutReminder(task: Task, remindAt: string): TaskReminderRule[] {
+  return (task.reminderRules ?? []).filter(
+    (rule) => !(rule.kind === 'at' && rule.remindAt === remindAt),
+  );
+}
+
 export class MongoTaskReminderAlertStore {
   private readonly tasks: Collection<Task>;
   private readonly alerts: Collection<Alert>;
@@ -114,6 +120,34 @@ export class MongoTaskReminderAlertStore {
     }
   }
 
+  private async consumeExisting(candidate: ReminderCandidate): Promise<MaterializeOneResult> {
+    const scoped = scopeFilter(candidate.scope);
+    return this.transaction(async (session) => {
+      const task = await this.tasks.findOne(
+        {
+          ...scoped,
+          id: candidate.taskId,
+          status: { $nin: ['done', 'cancelled'] },
+        },
+        { session },
+      );
+      if (!task || !hasReminder(task, candidate.remindAt)) return 'existing';
+
+      const update = await this.tasks.updateOne(
+        { ...scoped, id: task.id, updatedAt: task.updatedAt },
+        {
+          $set: {
+            reminderRules: withoutReminder(task, candidate.remindAt),
+            updatedAt: new Date().toISOString(),
+          },
+        },
+        { session },
+      );
+      if (update.matchedCount === 0) throw new Error('task_reminder_consume_conflict');
+      return 'existing';
+    });
+  }
+
   private async materializeOne(candidate: ReminderCandidate): Promise<MaterializeOneResult> {
     const fingerprint = taskReminderFingerprint(candidate.taskId, candidate.remindAt);
     const scoped = scopeFilter(candidate.scope);
@@ -132,52 +166,70 @@ export class MongoTaskReminderAlertStore {
         if (!task || !hasReminder(task, candidate.remindAt)) return 'skipped';
 
         const existing = await this.alerts.findOne(alertFilter, { session });
-        if (existing) return 'existing';
-
         const now = new Date().toISOString();
-        const alert: Alert = {
-          id: randomUUID(),
-          scope: candidate.scope,
-          title: task.title,
-          severity: 'warning',
-          status: 'open',
-          fingerprint,
-          createdAt: now,
-          updatedAt: now,
-          ...(task.projectId ? { projectId: task.projectId } : {}),
-        };
+        let stored = existing;
+        let created = false;
 
-        const upsert = await this.alerts.updateOne(
-          alertFilter,
-          { $setOnInsert: alert },
-          { upsert: true, session },
-        );
-        const stored = await this.alerts.findOne(alertFilter, { session });
-        if (!stored) throw new Error('task_reminder_alert_materialization_failed');
-        if (upsert.upsertedCount === 0) return 'existing';
-
-        await this.outbox.enqueue(
-          {
+        if (!stored) {
+          const alert: Alert = {
+            id: randomUUID(),
             scope: candidate.scope,
-            type: 'alert.reminder_due',
-            entityType: 'alert',
-            entityId: stored.id,
-            summary: task.title,
-            source: 'task-reminders',
-            metadata: {
-              taskId: task.id,
-              remindAt: candidate.remindAt,
-              severity: stored.severity,
+            title: task.title,
+            severity: 'warning',
+            status: 'open',
+            fingerprint,
+            createdAt: now,
+            updatedAt: now,
+            ...(task.projectId ? { projectId: task.projectId } : {}),
+          };
+
+          const upsert = await this.alerts.updateOne(
+            alertFilter,
+            { $setOnInsert: alert },
+            { upsert: true, session },
+          );
+          stored = await this.alerts.findOne(alertFilter, { session });
+          if (!stored) throw new Error('task_reminder_alert_materialization_failed');
+          created = upsert.upsertedCount === 1;
+        }
+
+        const consume = await this.tasks.updateOne(
+          { ...scoped, id: task.id, updatedAt: task.updatedAt },
+          {
+            $set: {
+              reminderRules: withoutReminder(task, candidate.remindAt),
+              updatedAt: now,
             },
           },
-          session,
+          { session },
         );
-        return 'created';
+        if (consume.matchedCount === 0) throw new Error('task_reminder_consume_conflict');
+
+        if (created) {
+          await this.outbox.enqueue(
+            {
+              scope: candidate.scope,
+              type: 'alert.reminder_due',
+              entityType: 'alert',
+              entityId: stored.id,
+              summary: task.title,
+              source: 'task-reminders',
+              metadata: {
+                taskId: task.id,
+                remindAt: candidate.remindAt,
+                severity: stored.severity,
+                consumed: true,
+              },
+            },
+            session,
+          );
+        }
+        return created ? 'created' : 'existing';
       });
     } catch (error) {
       if (error instanceof MongoServerError && error.code === 11000) {
         const concurrent = await this.alerts.findOne(alertFilter);
-        if (concurrent) return 'existing';
+        if (concurrent) return this.consumeExisting(candidate);
       }
       throw error;
     }
