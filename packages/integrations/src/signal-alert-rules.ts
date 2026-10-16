@@ -3,7 +3,8 @@ import type { IntegrationSignal, IntegrationSignalType } from './index.js';
 export type DerivedAlertSeverity = 'info' | 'warning' | 'urgent' | 'critical';
 
 export const STALE_WORK_AFTER_DAYS = 7;
-const STALE_WORK_AFTER_MS = STALE_WORK_AFTER_DAYS * 24 * 60 * 60 * 1000;
+export const MIN_STALE_WORK_AFTER_DAYS = 1;
+export const MAX_STALE_WORK_AFTER_DAYS = 365;
 
 export const BUILT_IN_SIGNAL_ALERT_RULES = [
   {
@@ -23,18 +24,21 @@ export const BUILT_IN_SIGNAL_ALERT_RULES = [
     signalType: 'repository.pull_request',
     defaultEnabled: false,
     defaultSeverity: 'warning',
+    defaultStaleAfterDays: STALE_WORK_AFTER_DAYS,
   },
   {
     id: 'repository.issue.stale.v1',
     signalType: 'repository.issue',
     defaultEnabled: false,
     defaultSeverity: 'warning',
+    defaultStaleAfterDays: STALE_WORK_AFTER_DAYS,
   },
 ] as const satisfies readonly {
   id: string;
   signalType: IntegrationSignalType;
   defaultEnabled: boolean;
   defaultSeverity: DerivedAlertSeverity;
+  defaultStaleAfterDays?: number;
 }[];
 
 export type BuiltInSignalAlertRuleId = (typeof BUILT_IN_SIGNAL_ALERT_RULES)[number]['id'];
@@ -43,10 +47,14 @@ export type SignalAlertRulePolicy = {
   ruleId: BuiltInSignalAlertRuleId;
   enabled: boolean;
   severity: DerivedAlertSeverity;
+  staleAfterDays?: number;
 };
 
 export type SignalAlertRulePolicyMap = Partial<
-  Record<BuiltInSignalAlertRuleId, Pick<SignalAlertRulePolicy, 'enabled' | 'severity'>>
+  Record<
+    BuiltInSignalAlertRuleId,
+    Pick<SignalAlertRulePolicy, 'enabled' | 'severity' | 'staleAfterDays'>
+  >
 >;
 
 export type RuleEvaluationContext = {
@@ -118,11 +126,30 @@ function evaluationNow(context?: RuleEvaluationContext): { iso: string; ms: numb
   return { iso: new Date(ms).toISOString(), ms };
 }
 
+export function isStaleWorkRuleId(value: string): value is BuiltInSignalAlertRuleId {
+  return value === 'repository.pull_request.stale.v1' || value === 'repository.issue.stale.v1';
+}
+
+function validatedStaleAfterDays(value: number | undefined): number {
+  const candidate = value ?? STALE_WORK_AFTER_DAYS;
+  if (
+    !Number.isInteger(candidate) ||
+    candidate < MIN_STALE_WORK_AFTER_DAYS ||
+    candidate > MAX_STALE_WORK_AFTER_DAYS
+  ) {
+    throw new Error('signal_alert_rule_stale_after_days_invalid');
+  }
+  return candidate;
+}
+
 export function defaultSignalAlertRulePolicies(): SignalAlertRulePolicy[] {
   return BUILT_IN_SIGNAL_ALERT_RULES.map((rule) => ({
     ruleId: rule.id,
     enabled: rule.defaultEnabled,
     severity: rule.defaultSeverity,
+    ...('defaultStaleAfterDays' in rule
+      ? { staleAfterDays: rule.defaultStaleAfterDays }
+      : {}),
   }));
 }
 
@@ -133,12 +160,17 @@ export function isBuiltInSignalAlertRuleId(value: string): value is BuiltInSigna
 function effectivePolicy(
   ruleId: BuiltInSignalAlertRuleId,
   policies: SignalAlertRulePolicyMap | undefined,
-): Pick<SignalAlertRulePolicy, 'enabled' | 'severity'> {
-  const override = policies?.[ruleId];
-  if (override) return override;
+): Pick<SignalAlertRulePolicy, 'enabled' | 'severity' | 'staleAfterDays'> {
   const definition = BUILT_IN_SIGNAL_ALERT_RULES.find((rule) => rule.id === ruleId);
   if (!definition) throw new Error('signal_alert_rule_definition_missing');
-  return { enabled: definition.defaultEnabled, severity: definition.defaultSeverity };
+  const override = policies?.[ruleId];
+  return {
+    enabled: override?.enabled ?? definition.defaultEnabled,
+    severity: override?.severity ?? definition.defaultSeverity,
+    ...(isStaleWorkRuleId(ruleId)
+      ? { staleAfterDays: validatedStaleAfterDays(override?.staleAfterDays) }
+      : {}),
+  };
 }
 
 function ciAlert(
@@ -201,9 +233,10 @@ function staleWorkAlert(
   const signalMs = Date.parse(signal.occurredAt);
   if (!Number.isFinite(signalMs)) return null;
   const now = evaluationNow(context);
-  if (now.ms - signalMs < STALE_WORK_AFTER_MS) return null;
-
   const policy = effectivePolicy(ruleId, policies);
+  const staleAfterDays = validatedStaleAfterDays(policy.staleAfterDays);
+  const staleAfterMs = staleAfterDays * 24 * 60 * 60 * 1000;
+  if (now.ms - signalMs < staleAfterMs) return null;
   if (!policy.enabled) return null;
 
   const repository = payloadText(signal.payload, 'repository', 300);
@@ -212,7 +245,7 @@ function staleWorkAlert(
   const number = payloadNumber(signal.payload, 'number');
   const kind = signal.type === 'repository.pull_request' ? 'PR' : 'Issue';
   const label = [number !== undefined ? `#${number}` : undefined, title].filter(Boolean).join(' · ');
-  const details = [repository, `no activity for ${STALE_WORK_AFTER_DAYS}+ days`]
+  const details = [repository, `no activity for ${staleAfterDays}+ days`]
     .filter(Boolean)
     .join(' · ');
 
