@@ -86,6 +86,7 @@ export function buildApp(options: ApplicationOptions = {}) {
   registerPriorityRoutes(app, {
     ...(options.authProvider ? { authProvider: options.authProvider } : {}),
     ...(options.operationalStore ? { operationalStore: options.operationalStore } : {}),
+    ...(options.milestoneStore ? { milestoneStore: options.milestoneStore } : {}),
   });
 
   registerIntegrationSignalRoutes(app, {
@@ -137,8 +138,7 @@ export function buildApp(options: ApplicationOptions = {}) {
       ? { githubRepositoryStore: options.githubRepositoryStore }
       : {}),
     ...(options.githubConnectionStore
-      ? { githubConnectionStore: options.githubConnectionStore }
-      : {}),
+      ? { githubConnectionStore: options.githubConnectionStore } : {}),
     ...(options.integrationSyncJobStore
       ? { integrationSyncJobStore: options.integrationSyncJobStore }
       : {}),
