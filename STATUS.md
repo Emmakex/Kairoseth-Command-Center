@@ -4,7 +4,7 @@
 **Technical/internal project:** Kairoseth Command Center  
 **Commercial names:** Gestor de Trabajo (ES) / Work Manager (EN)  
 **Category:** Kairoseth Software  
-**Status:** Phase 5 Slice 3 is merged as `1a88ae5280d0115fbdf2e61834859d6847bcc77e` and post-merge validated 9/9. Phase 5 Slice 4 — Explainable prioritization / Priorización explicable — is active.
+**Status:** Phase 5 Slice 4 is merged as `375b9d2ecef75243f6335732bd1f6e646df1c3f0` and post-merge validated 9/9. Phase 5 Slice 5 — Project/milestone priority risk / Riesgo de prioridad de proyectos e hitos — is active.
 
 ## Naming rule / Regla de naming
 
@@ -71,34 +71,48 @@
 
 **Phase 5 Slice 3: CLOSED / CERRADA.**
 
-## Active / Activo
-
 ### Phase 5 Slice 4 — Explainable prioritization / Priorización explicable
 
-Implemented on `feat/phase-5-explainable-priorities` so far:
-
-- [x] Deterministic domain ranking for active tasks and alerts.
-- [x] Explicit stable reason codes and exact score contributions.
-- [x] Task contributions: manual priority, blocked, overdue and due today.
-- [x] Alert severity scoring: critical 100, urgent 90, warning 60, info 30.
+- [x] Deterministic ranking for active tasks and alerts with explicit score contributions.
+- [x] Task signals: manual priority, blocked, overdue and due today.
+- [x] Alert severity scores: critical 100, urgent 90, warning 60, info 30.
 - [x] Scores capped at 100 with deterministic tie-breaking.
-- [x] Completed/cancelled tasks and resolved/dismissed alerts excluded.
-- [x] Authenticated `GET /v1/priorities` with server-derived workspace/private scope.
-- [x] API requires `tasks.read`, `alerts.read` and `command-center` entitlement.
-- [x] User-timezone local day boundary for due-today/overdue reasoning.
-- [x] ES/EN Today panel showing top 8 priorities and translated reasons.
-- [x] Cross-source ranking naturally combines manual tasks/alerts with integration-derived alerts already materialized by the platform.
-- [x] Unit/API coverage for scoring, filtering, ranking, scope and invalid limits.
-- [x] Architecture/product documentation in `docs/28-explainable-prioritization.md`.
+- [x] Authenticated `GET /v1/priorities` with server-derived workspace/private scope and timezone-aware day boundaries.
+- [x] ES/EN Today panel showing top priorities and translated reasons.
+- [x] Integration-derived alerts participate through the normalized operational alert model.
+- [x] Unit/API coverage and `docs/28-explainable-prioritization.md`.
+- [x] PR #36 merged as `375b9d2ecef75243f6335732bd1f6e646df1c3f0`.
+- [x] Resulting `main` validated with all nine workflows green.
+
+**Phase 5 Slice 4: CLOSED / CERRADA.**
+
+## Active / Activo
+
+### Phase 5 Slice 5 — Project/milestone priority risk / Riesgo de prioridad de proyectos e hitos
+
+Implemented on `feat/phase-5-project-milestone-risk` so far:
+
+- [x] Project and milestone entities participate in the same deterministic priority ranking as tasks and alerts.
+- [x] Project risk contributions: blocked `+45`, overdue `+35`, due today `+20`.
+- [x] Due/overdue projects receive up to `+20` for remaining progress using `round((100 - progress) * 0.2)`.
+- [x] Projects that are `done`/`archived`, or active without blocked/due risk, do not create noise in the priority list.
+- [x] Milestone risk contributions: overdue `+40`, due today `+25`, normalized weight up to `+20`.
+- [x] Future milestones and `done`/`cancelled` milestones are excluded from this slice.
+- [x] Stable project/milestone reason codes preserve exact explainability and the global 100-point cap.
+- [x] Priority API now reads tasks, alerts, projects and milestones from the authenticated scope.
+- [x] Priority API requires `tasks.read`, `alerts.read`, `projects.read`, `milestones.read` and the `command-center` entitlement.
+- [x] ES/EN priority UI recognizes project/milestone kinds and translates every new reason.
+- [x] Unit/API coverage for project risk, milestone risk, exclusions and combined ranking.
+- [x] Architecture/product documentation in `docs/29-project-milestone-priority-risk.md`.
 - [ ] Final-head regression validation.
 - [ ] Merge and post-merge `main` validation.
 
-**Phase 5 Slice 4: VALIDATION PENDING / VALIDACIÓN PENDIENTE.**
+**Phase 5 Slice 5: VALIDATION PENDING / VALIDACIÓN PENDIENTE.**
 
 ## Deliberately deferred / Diferido expresamente
 
 - [ ] Customer-configurable prioritization weights.
-- [ ] Project/milestone risk contributions and dependency-chain scoring.
+- [ ] Dependency-chain scoring and dependency data-model/mutation work.
 - [ ] Customer-configurable stale thresholds.
 - [ ] Arbitrary user-authored conditions or rule DSL.
 - [ ] Automation actions beyond current derived-alert behavior.
@@ -117,21 +131,24 @@ Implemented on `feat/phase-5-explainable-priorities` so far:
 8. Human dismissed decisions remain authoritative under the alert lifecycle.
 9. Priority ranking is deterministic, explainable and does not require AI.
 10. Every priority score contribution is returned as a stable reason code; the ES/EN UI translates reasons without changing scoring.
-11. Priority API derives tenant/private scope from the authenticated session and requires both task/alert read capability.
-12. Priority scoring does not mutate tasks, alerts or external systems.
+11. Priority API derives tenant/private scope from the authenticated session and now requires task, alert, project and milestone read capability.
+12. Priority scoring does not mutate operational entities or external systems.
+13. Project progress contributes only when a project is already due/overdue; incomplete future work does not become artificial risk.
+14. Milestone weight contributes only when the milestone is due today or overdue; future milestones remain outside the attention list.
+15. Dependency-chain scoring remains separate until dependency data is explicitly modelled and authorized.
 
 ## Next / Siguiente
 
-1. Validate the final Slice 4 head with lint, typecheck, tests, build and all existing regression workflows.
-2. Correct any prioritization/API/UI regression directly on this slice.
+1. Validate the final Slice 5 head with lint, typecheck, tests, build and all existing regression workflows.
+2. Correct any project/milestone prioritization regression directly on this slice.
 3. Merge the exact validated head and revalidate resulting `main`.
 4. Continue Phase 5 only from the resulting green repository state.
-5. Keep configurable weights, AI suggestions, external automation actions, OAuth and additional providers as separate fronts.
+5. Keep dependency chains, configurable weights, AI suggestions, external automation actions, OAuth and additional providers as separate fronts.
 6. When commercial publication is scheduled, create the Kairoseth Software catalog entry as **Gestor de Trabajo / Work Manager**.
 
 ## Current blockers / Bloqueos actuales
 
-No known product blocker. Slice 4 is ready for regression validation.
+No known product blocker. Slice 5 is ready for regression validation.
 
 ## Operating rule
 
