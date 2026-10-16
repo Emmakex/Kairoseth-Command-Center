@@ -1,5 +1,6 @@
 import type { AgentBridgeRuntimeSummary } from '../lib/agent-bridge-api';
 import type { Locale } from '../lib/i18n';
+import styles from './agent-bridge-runtime-panel.module.css';
 
 const copy = {
   es: {
@@ -117,7 +118,7 @@ export function AgentBridgeRuntimePanel({
                 <div className="integration-activity-title-row">
                   <span className="integration-type">{labels.runtime}</span>
                   <strong>{runtime.installationId}</strong>
-                  <span className={`runtime-freshness runtime-freshness-${runtime.freshness}`}>
+                  <span className={`${styles.freshness} ${styles[runtime.freshness]}`}>
                     {freshnessLabel(runtime.freshness, locale)}
                   </span>
                 </div>
@@ -133,25 +134,25 @@ export function AgentBridgeRuntimePanel({
                     {formatDate(runtime.receivedAt, locale, timeZone)}
                   </time>
                 </div>
-                <div className="agent-bridge-connector-list">
+                <div className={styles.connectorList}>
                   {runtime.connectors.map((connector) => {
                     const localizedName = connector.localizations?.[locale]?.name ?? connector.name;
                     return (
                       <div
-                        className="agent-bridge-connector-row"
+                        className={styles.connectorRow}
                         key={`${connector.connectorId}:${connector.connectorInstanceId}`}
                       >
-                        <div>
+                        <div className={styles.connectorIdentity}>
                           <strong>{localizedName}</strong>
                           <span>{connector.connectorInstanceId} · v{connector.version}</span>
                         </div>
-                        <span>
+                        <span className={styles.connectorStatus}>
                           {connector.health
                             ? connectorStatusLabel(connector.health.status, locale)
                             : '—'}
                         </span>
                         {connector.health ? (
-                          <div className="agent-bridge-tool-health">
+                          <div className={styles.toolHealth}>
                             {connector.health.tools.map((tool) => (
                               <span key={tool.runtimeToolId}>
                                 {tool.toolId}: {toolStatusLabel(tool.availability, locale)}
