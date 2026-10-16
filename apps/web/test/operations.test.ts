@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { parseOperationalMutation } from '../lib/operations';
 
-function form(values: Record<string, string>) {
+function form(values: Record<string, string | string[]>) {
   const data = new FormData();
-  for (const [key, value] of Object.entries(values)) data.set(key, value);
+  for (const [key, value] of Object.entries(values)) {
+    if (Array.isArray(value)) {
+      for (const item of value) data.append(key, item);
+    } else {
+      data.set(key, value);
+    }
+  }
   return data;
 }
 
@@ -122,6 +128,86 @@ describe('parseOperationalMutation', () => {
       method: 'PATCH',
       body: { scope: 'workspace', status: 'done' },
     });
+  });
+
+  it('builds a safe task dependency replacement and supports clearing the graph edge set', () => {
+    expect(
+      parseOperationalMutation(
+        form({
+          locale: 'es',
+          operation: 'task-dependencies',
+          scope: 'workspace',
+          id: 'task/one',
+          dependencyIds: ['task-a', 'task-b'],
+        }),
+      ),
+    ).toEqual({
+      path: '/v1/tasks/task%2Fone/dependencies',
+      method: 'PUT',
+      body: { scope: 'workspace', dependencyIds: ['task-a', 'task-b'] },
+    });
+
+    expect(
+      parseOperationalMutation(
+        form({
+          locale: 'en',
+          operation: 'task-dependencies',
+          scope: 'private',
+          id: 'task-one',
+        }),
+      ),
+    ).toEqual({
+      path: '/v1/tasks/task-one/dependencies',
+      method: 'PUT',
+      body: { scope: 'private', dependencyIds: [] },
+    });
+  });
+
+  it('rejects unsafe task dependency form data before the same-origin proxy', () => {
+    expect(
+      parseOperationalMutation(
+        form({
+          operation: 'task-dependencies',
+          scope: 'workspace',
+          id: 'task-a',
+          dependencyIds: ['task-a'],
+        }),
+      ),
+    ).toBeNull();
+
+    expect(
+      parseOperationalMutation(
+        form({
+          operation: 'task-dependencies',
+          scope: 'workspace',
+          id: 'task-a',
+          dependencyIds: ['task-b', 'task-b'],
+        }),
+      ),
+    ).toBeNull();
+
+    expect(
+      parseOperationalMutation(
+        form({
+          operation: 'task-dependencies',
+          scope: 'workspace',
+          id: 'task-a',
+          dependencyIds: Array.from({ length: 51 }, (_, index) => `task-${index}`),
+        }),
+      ),
+    ).toBeNull();
+
+    expect(
+      parseOperationalMutation(
+        form({
+          operation: 'task-dependencies',
+          scope: 'workspace',
+          id: 'task-a',
+          dependencyIds: ['task-b'],
+          workspaceId: 'foreign-workspace',
+        }),
+      ),
+    ).toBeNull();
   });
 
   it('rejects invalid scope, status, weights and out-of-range progress values', () => {
