@@ -28,9 +28,11 @@ A measurable phase or delivery checkpoint belonging to a project.
 ### Task
 Atomic actionable work item.
 
-Key fields: `id`, `scope`, `workspaceId?`, `ownerUserId?`, `projectId?`, `title`, `description`, `status`, `priority`, `assigneeIds`, `dueAt`, `reminderRules`, `dependencyIds`, `source`.
+Key fields: `id`, `scope`, `workspaceId?`, `ownerUserId?`, `projectId?`, `title`, `description`, `status`, `priority`, `assigneeIds`, `dueAt`, `reminderRules`, `recurrenceRule`, `dependencyIds`, `source`.
 
 `dependencyIds` is the explicit local task-dependency graph. Legacy tasks may omit the field and are interpreted as having no dependencies. References must resolve inside the exact same server-derived scope, self-dependencies and cycles are rejected, and successful graph mutations are transactionally audited. Dependency scoring is a separate later concern.
+
+`recurrenceRule` is optional for backward compatibility. The first supported deterministic form is `{ kind: 'interval_days', intervalDays: 1..365 }`. Enabling it requires an existing valid `dueAt`, which is the explicit anchor for a later execution slice. This model does not itself create future occurrences or mutate task status/dates automatically.
 
 ### Alert
 Attention signal. Alerts may be manually created or generated from rules/integrations.
@@ -113,9 +115,11 @@ External resources include the workspace scope in uniqueness, reads, deletes and
 
 Task dependency references follow the same exact-scope rule: a workspace task cannot depend on a task from another workspace, and a private task cannot depend on a task owned by another user. Foreign references are treated as not found rather than disclosed.
 
+Task recurrence mutations follow the same exact-scope rule. The authenticated session selects the concrete workspace/private owner; callers cannot supply tenant or actor identifiers as recurrence authority.
+
 ## Auditability
 
-Important changes to permissions, alerts, decisions, integrations, task dependencies and project progress should emit timeline/audit events with actor, timestamp and source.
+Important changes to permissions, alerts, decisions, integrations, task dependencies, task recurrence and project progress should emit timeline/audit events with actor, timestamp and source.
 
 Initial GitHub repository-link events:
 
@@ -123,3 +127,5 @@ Initial GitHub repository-link events:
 - `integration.github.repository_unlinked`
 
 Task dependency graph mutations emit `task.dependencies_changed` through the transactional audit outbox.
+
+Task recurrence mutations emit `task.recurrence_changed` through the transactional audit outbox.
