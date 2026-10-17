@@ -1,5 +1,6 @@
 import type { TaskSummary, TodayResponse } from '../lib/api';
 import type { DictionaryCopy, Locale } from '../lib/i18n';
+import { TaskRecurrenceEditor } from './task-recurrence-editor';
 import { TaskReminderEditor } from './task-reminder-editor';
 
 const dependencyCopy = {
@@ -22,6 +23,13 @@ const dependencyCopy = {
     save: 'Save dependencies',
   },
 } as const;
+
+type TaskWithRecurrence = TaskSummary & {
+  recurrenceRule?: {
+    kind: 'interval_days';
+    intervalDays: number;
+  };
+};
 
 function statusLabels(copy: DictionaryCopy): Record<string, string> {
   return {
@@ -154,7 +162,7 @@ export function OperationalPanels({
           {today?.tasks.length ? (
             today.tasks.map((task) => {
               const dependencyCandidates = taskCatalog.filter((candidate) => candidate.id !== task.id);
-              const catalogTask = taskById.get(task.id) ?? task;
+              const catalogTask = (taskById.get(task.id) ?? task) as TaskWithRecurrence;
               const selectedDependencyIds = catalogTask.dependencyIds ?? [];
               const selectedDependencyNames = selectedDependencyIds.map(
                 (dependencyId) => taskById.get(dependencyId)?.title ?? dependencyId,
@@ -168,6 +176,10 @@ export function OperationalPanels({
               const reminderValues = (catalogTask.reminderRules ?? [])
                 .map((rule) => reminderLocalValue(rule.remindAt, timeZone))
                 .filter((value): value is string => value !== null);
+              const recurrenceInterval =
+                catalogTask.recurrenceRule?.kind === 'interval_days'
+                  ? catalogTask.recurrenceRule.intervalDays
+                  : undefined;
 
               return (
                 <div className="item-row item-row-manage" key={task.id}>
@@ -251,6 +263,14 @@ export function OperationalPanels({
                       taskId={task.id}
                       timeZone={timeZone}
                       initialValues={reminderValues}
+                    />
+
+                    <TaskRecurrenceEditor
+                      locale={locale}
+                      scope={scope}
+                      taskId={task.id}
+                      dueAt={catalogTask.dueAt}
+                      intervalDays={recurrenceInterval}
                     />
                   </div>
                 </div>
