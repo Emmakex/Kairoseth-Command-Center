@@ -149,15 +149,16 @@ export function registerAgentBridgeA2ARoutes(
     const auth = await authenticate(request);
     if (!auth.session) return reply.code(auth.code).send({ code: auth.error });
 
+    const tenantId = auth.session.activeWorkspaceId;
     const store = options.agentBridgeA2AStore;
-    if (!store?.summarizeTenant) {
+    if (!tenantId || !store?.summarizeTenant) {
       return reply.code(503).send({ code: 'agent_bridge_observability_unavailable' });
     }
 
     try {
       return {
         version: 'kcc.agent-bridge-observability.v1',
-        summary: await store.summarizeTenant(auth.session.activeWorkspaceId),
+        summary: await store.summarizeTenant(tenantId),
       };
     } catch {
       return reply.code(503).send({ code: 'agent_bridge_observability_unavailable' });
