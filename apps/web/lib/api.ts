@@ -25,12 +25,18 @@ export type ProjectSummary = {
   dueAt?: string;
 };
 
+export type TaskReminderRuleSummary = {
+  kind: 'at';
+  remindAt: string;
+};
+
 export type TaskSummary = {
   id: string;
   title: string;
   status: string;
   priority: number;
   dependencyIds?: string[];
+  reminderRules?: TaskReminderRuleSummary[];
   dueAt?: string;
 };
 

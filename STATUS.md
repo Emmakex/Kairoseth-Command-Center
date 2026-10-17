@@ -4,7 +4,7 @@
 **Technical/internal project:** Kairoseth Command Center  
 **Commercial names:** Gestor de Trabajo (ES) / Work Manager (EN)  
 **Category:** Kairoseth Software  
-**Status:** Phase 5 Slice 14 is merged as `e9c217af98d529d8720a41928f0257d08524df0e` and post-merge validated 9/9. Phase 5 Slice 15 — Task reminder materialization / Materialización de recordatorios — is active.
+**Status:** Phase 5 Slice 15 is merged as `2998e19e236d29e10a34dcd6ff59690317002eac` and post-merge validated 10/10. Phase 5 Slice 16 — Task reminder UI / UI de recordatorios — is active.
 
 ## Naming rule / Regla de naming
 
@@ -49,45 +49,46 @@
 - [x] Slice 12 — Task dependency UI — PR #44 `e33323da5abe83b74a0d4b5ceb9c491b1764fe0a`.
 - [x] Slice 13 — Dependency start readiness — PR #46 `1820cf457d5ca2c1eddc3b2f5e26287d940479c4`.
 - [x] Slice 14 — Task reminders — PR #47 `e9c217af98d529d8720a41928f0257d08524df0e`.
+- [x] Slice 15 — Task reminder materialization — PR #48 `2998e19e236d29e10a34dcd6ff59690317002eac`.
 
-Every resulting `main` boundary through Slice 14 was validated with all nine pre-Slice-15 workflows green.
-
-### Phase 5 Slice 14 — Task reminders / Recordatorios de tareas
-
-- [x] Optional backward-compatible `Task.reminderRules` model.
-- [x] First deterministic rule type: `{ kind: 'at', remindAt: ISO instant }`.
-- [x] Reminder instants canonicalized to UTC ISO and sorted chronologically.
-- [x] Maximum 10 reminders per task; duplicate instants rejected.
-- [x] Guarded `PUT /v1/tasks/:id/reminders` mutation for workspace and private scope.
-- [x] Scope and actor derived from authenticated session; authority fields rejected.
-- [x] Transactional mutation + `task.reminders_changed` audit-outbox event.
-- [x] PR #47 merged as `e9c217af98d529d8720a41928f0257d08524df0e`; resulting `main` validated 9/9.
-
-**Phase 5 Slice 14: CLOSED / CERRADA.**
-
-## Active / Activo
+Slice 15 introduced a tenth dedicated regression gate. The resulting `main` boundary is validated 10/10 green.
 
 ### Phase 5 Slice 15 — Task reminder materialization / Materialización de recordatorios
 
-Implemented on `feat/phase-5-reminder-materialization` so far:
-
 - [x] Worker-side due-reminder materializer over explicit stored `{ kind: 'at' }` rules.
-- [x] Workspace/private tasks only; system scope and done/cancelled tasks are excluded.
-- [x] Stable reminder-alert fingerprint: `task-reminder:<taskId>:<remindAt>`.
-- [x] Due reminders materialize as same-scope `warning/open` in-app alerts.
-- [x] Workspace and private fingerprint uniqueness prevents duplicate durable alerts.
-- [x] Alert creation and `alert.reminder_due` audit-outbox event are transactional.
-- [x] One-time reminder is consumed from `Task.reminderRules` in the same transaction after materialization.
-- [x] Optimistic task `updatedAt` guard prevents silently overwriting concurrent human reminder edits.
-- [x] Duplicate-key races converge on the existing alert and consume the remaining one-time rule.
-- [x] Worker execution is independent from GitHub integration availability.
-- [x] Unit coverage for due/future/completed/cancelled/system candidate selection and stable fingerprints.
-- [x] Dedicated Docker smoke proves real worker materialization, consumption, delivered audit and no duplicate on later ticks.
-- [x] Product/security documentation in `docs/39-task-reminder-materialization.md`.
-- [ ] Final-head lint, typecheck, tests, build and regression validation.
+- [x] Workspace/private tasks only; system scope and done/cancelled tasks excluded.
+- [x] Stable `task-reminder:<taskId>:<remindAt>` alert fingerprints.
+- [x] Same-scope warning/open in-app alerts with scope-bound durable idempotence.
+- [x] Transactional alert creation + `alert.reminder_due` audit-outbox event.
+- [x] One-time rule consumed transactionally after materialization.
+- [x] Optimistic task concurrency guard and duplicate-key race convergence.
+- [x] Dedicated Docker smoke proves materialization, consumption, delivered audit and no duplicates.
+- [x] PR #48 merged as `2998e19e236d29e10a34dcd6ff59690317002eac`; resulting `main` validated 10/10.
+
+**Phase 5 Slice 15: CLOSED / CERRADA.**
+
+## Active / Activo
+
+### Phase 5 Slice 16 — Task reminder UI / UI de recordatorios
+
+Implemented on `feat/phase-5-task-reminder-ui` so far:
+
+- [x] Existing scoped task catalog exposes one-time `reminderRules` to the web UI.
+- [x] Dynamic ES/EN reminder editor is embedded in each existing task card.
+- [x] Up to 10 one-time reminder rows can be added/removed; an empty editor clears all reminders.
+- [x] Workspace and private task surfaces reuse the existing guarded `PUT /v1/tasks/:id/reminders` endpoint.
+- [x] Same-origin proxy accepts no client tenant/user/time-zone authority fields.
+- [x] For reminder mutations, the proxy resolves the authenticated session and uses `session.user.timezone` as the authoritative IANA zone.
+- [x] `datetime-local` values are converted to canonical UTC ISO before reaching the API.
+- [x] Existing seconds are preserved by the editor/parser.
+- [x] Time-zone conversion round-trips and rejects non-existent DST local times instead of silently shifting them.
+- [x] Strict parser allow-list rejects unexpected authority fields, duplicates and more than 10 reminders.
+- [x] Tests cover Madrid summer/winter conversion, seconds, spring-forward gap, sorting, clearing, duplicates, limits and authority rejection.
+- [x] Product/security documentation in `docs/40-task-reminder-ui.md`.
+- [ ] Final-head lint, typecheck, tests, build and all 10 regression workflows.
 - [ ] Merge and post-merge `main` validation.
 
-**Phase 5 Slice 15: VALIDATION PENDING / VALIDACIÓN PENDIENTE.**
+**Phase 5 Slice 16: VALIDATION PENDING / VALIDACIÓN PENDIENTE.**
 
 ## Deliberately deferred / Diferido expresamente
 
@@ -120,12 +121,14 @@ Implemented on `feat/phase-5-reminder-materialization` so far:
 14. Materialization consumes the exact one-time rule so later worker ticks do not repeatedly scan fired reminders.
 15. Materialization uses optimistic task concurrency and does not silently overwrite concurrent human edits.
 16. Reminder alert creation and `alert.reminder_due` audit commit atomically.
-17. Recurrence and external delivery remain separate until explicitly implemented and validated.
+17. Browser reminder forms cannot choose tenant, actor or authoritative time zone.
+18. Reminder UI conversion uses the authenticated session IANA time zone and rejects non-existent local wall-clock times.
+19. Recurrence and external delivery remain separate until explicitly implemented and validated.
 
 ## Next / Siguiente
 
-1. Validate Slice 15 final head with lint, typecheck, tests, build and all regression workflows, including the new reminder-materialization smoke.
-2. Correct any worker/persistence/Docker regression directly on this slice.
+1. Validate Slice 16 final head with lint, typecheck, tests, build and all 10 regression workflows.
+2. Correct any web/parser/time-zone regression directly on this slice.
 3. Merge the exact validated head and revalidate resulting `main`.
 4. Select the next Phase 5 micro-slice only from the resulting green repository state and documented boundaries.
 5. Keep recurring rules, external delivery, snooze/repeat, graph visualization, automatic status behavior, critical-path forecasting, arbitrary DSL, AI changes, OAuth and additional providers as separate fronts.
@@ -133,7 +136,7 @@ Implemented on `feat/phase-5-reminder-materialization` so far:
 
 ## Current blockers / Bloqueos actuales
 
-No known product blocker. Slice 15 is ready for regression validation.
+No known product blocker. Slice 16 is ready for regression validation.
 
 ## Operating rule
 

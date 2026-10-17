@@ -194,7 +194,14 @@ export default async function CommandCenterPage({
 
       {canReadPriorities ? <PriorityPanel locale={locale} priorities={priorities} /> : null}
 
-      <OperationalPanels locale={locale} scope={scope} copy={copy} today={today} taskCatalog={taskCatalog} />
+      <OperationalPanels
+        locale={locale}
+        scope={scope}
+        copy={copy}
+        today={today}
+        taskCatalog={taskCatalog}
+        timeZone={session.user.timezone}
+      />
 
       <section className="management-grid">
         <MilestonePanel
