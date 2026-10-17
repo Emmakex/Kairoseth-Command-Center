@@ -51,6 +51,7 @@ Esta carpeta es la fuente de verdad para las decisiones de producto, arquitectur
 44. [`39-task-reminder-materialization.md`](39-task-reminder-materialization.md) — deterministic worker materialization of due one-time reminders into scope-safe in-app alerts.
 45. [`40-task-reminder-ui.md`](40-task-reminder-ui.md) — ES/EN task reminder editor with authenticated time-zone conversion and strict same-origin mutation boundary.
 46. [`41-task-recurrence.md`](41-task-recurrence.md) — explicit fixed-day task recurrence intent, guarded mutation and transactional audit.
+47. [`42-task-recurrence-ui.md`](42-task-recurrence-ui.md) — ES/EN recurrence editor over the guarded recurrence mutation boundary.
 
 ## Living documents / Documentos vivos
 
