@@ -149,7 +149,6 @@ export type AutomationRulePolicySummary = {
     | 'repository.issue.stale.v1';
   enabled: boolean;
   severity: AutomationRuleSeverity;
-  staleAfterDays?: number;
   overridden: boolean;
   updatedAt?: string;
 };
@@ -157,9 +156,9 @@ export type AutomationRulePolicySummary = {
 export type PrioritizationWeightsSummary = {
   taskManualPriorityMax: number;
   taskBlocked: number;
+  taskDependencyImpactPerDependent: number;
   taskOverdue: number;
   taskDueToday: number;
-  taskDependentImpactEach: number;
   alertInfo: number;
   alertWarning: number;
   alertUrgent: number;
@@ -183,9 +182,9 @@ export type OperationalPriorityReasonSummary = {
   code:
     | 'task.manual_priority'
     | 'task.blocked'
+    | 'task.dependency_impact'
     | 'task.overdue'
     | 'task.due_today'
-    | 'task.dependent_impact'
     | 'alert.severity'
     | 'project.blocked'
     | 'project.overdue'
