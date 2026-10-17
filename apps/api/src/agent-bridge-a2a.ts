@@ -144,6 +144,26 @@ export function registerAgentBridgeA2ARoutes(
     return { session, code: 200 as const, error: null };
   };
 
+  app.get('/v1/products/agent-bridge/observability', async (request, reply) => {
+    reply.header('cache-control', 'no-store');
+    const auth = await authenticate(request);
+    if (!auth.session) return reply.code(auth.code).send({ code: auth.error });
+
+    const store = options.agentBridgeA2AStore;
+    if (!store?.summarizeTenant) {
+      return reply.code(503).send({ code: 'agent_bridge_observability_unavailable' });
+    }
+
+    try {
+      return {
+        version: 'kcc.agent-bridge-observability.v1',
+        summary: await store.summarizeTenant(auth.session.activeWorkspaceId),
+      };
+    } catch {
+      return reply.code(503).send({ code: 'agent_bridge_observability_unavailable' });
+    }
+  });
+
   app.post('/api/products/agent-bridge/a2a/tasks/save', async (request, reply) => {
     reply.header('cache-control', 'no-store');
     const auth = await authenticate(request);
