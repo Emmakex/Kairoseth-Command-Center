@@ -4,7 +4,9 @@
 **Technical/internal project:** Kairoseth Command Center  
 **Commercial names:** Gestor de Trabajo (ES) / Work Manager (EN)  
 **Category:** Kairoseth Software  
-**Technical release boundary:** merged `main` `d7eb0769bfed765727a851635eca41006ee412c2`, validated 15/15 after Phase 5 Slice 22.
+**Technical runtime release boundary:** merged `main` `d7eb0769bfed765727a851635eca41006ee412c2`, validated 15/15 after Phase 5 Slice 22.  
+**Formal Phase 5 closure:** merged `main` `f327c584be4bc55deec710dc6e61d0746ae57958`.  
+**Commercial catalog publication:** merged in `Emmakex/kairoseth-platform` PR #507 as `0d07c14894560096053498a32a4e14d12ec3f1ae`; preserved in later platform `main` history.
 
 ## Naming rule / Regla de naming
 
@@ -70,8 +72,26 @@
 - [x] Core correctness remains AI-independent.
 - [x] Exact merged `main` after Slice 22 validated with the full 15-workflow regression set; no failed, queued or in-progress workflow remained.
 - [x] Closure and future backlog documented in `docs/47-phase-5-release-boundary.md`.
+- [x] Formal closure documentation merged in PR #60 as `f327c584be4bc55deec710dc6e61d0746ae57958`.
 
 **Phase 5 technical release boundary: CLOSED / CERRADA.**
+
+### Commercial publication / Publicación comercial
+
+- [x] Kairoseth Software catalog entry created under independent commercial naming.
+- [x] **ES:** Gestor de Trabajo.
+- [x] **EN:** Work Manager.
+- [x] Canonical catalog route: `/products/work-manager`.
+- [x] `software` catalog area promoted to available.
+- [x] ES/EN landing, metadata, structured data and sitemap entry added.
+- [x] SEO copy oriented to validated demand around project management, task management and task organization while retaining the commercial name.
+- [x] Growth lifecycle profile added to `content/growth/products.json` after the Product birth → Growth guard identified the missing profile.
+- [x] Kairoseth Platform PR #507 passed Growth guard plus CI: editorial contract, lint, typecheck, full unit/acceptance suite, public-products responsive smoke, build and runtime smoke.
+- [x] PR #507 merged as `0d07c14894560096053498a32a4e14d12ec3f1ae`.
+- [x] Work Manager remains present in the later Kairoseth Platform `main` history after concurrent Search Console work merged on top.
+- [ ] Public production deployment of `/products/work-manager` conclusively verified.
+
+**Production note:** the first post-merge Cargo production proof triggered because `src/app/sitemap.ts` changed. It reached a healthy `kairoseth.com` but the deployed site still lacked pre-existing Kairoseth Cargo release markers during the bounded window. That is evidence of deployment/revision lag, not a Work Manager code regression. Do not mark the public landing as live until the current platform revision/deployment checks and the canonical route are verified.
 
 ## Deliberately deferred / Diferido expresamente
 
@@ -111,14 +131,14 @@ These are future roadmap candidates and do **not** block the Phase 5 release:
 
 ## Next / Siguiente
 
-1. Merge the Phase 5 release-boundary documentation only after the same regression gate stays green.
-2. After the closure documentation is on `main`, move to release/commercial packaging rather than silently opening another Phase 5 feature.
-3. Prepare the Kairoseth Software catalog publication as **Gestor de Trabajo** (ES) / **Work Manager** (EN).
+1. Verify the current `kairoseth-platform` deployed revision after the catalog merge and concurrent platform merges.
+2. Verify the public canonical landing `/products/work-manager` in production before marking the commercial publication fully live.
+3. Keep public pricing deferred until the Cloud / Private Cloud / Self-Hosted resource and operating-cost profile is measured.
 4. Any deferred capability must enter a newly documented future phase or explicitly scoped maintenance slice.
 
 ## Current blockers / Bloqueos actuales
 
-No known technical product blocker. The functional Phase 5 runtime boundary is green; only the formal closure-documentation PR is pending.
+No known technical product blocker in Gestor de Trabajo / Work Manager. Phase 5 is closed and the catalog publication is merged. The only open release-state item is **external deployment/revision verification in Kairoseth Platform production**; the first post-merge production proof showed a healthy site serving an older revision.
 
 ## Operating rule
 
