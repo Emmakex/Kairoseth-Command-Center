@@ -77,6 +77,8 @@ const copy = {
     snapshot: 'Snapshot',
     connectors: 'Conectores',
     tools: 'Herramientas',
+    healthy: 'sanos',
+    toolAvailable: 'disponibles',
     connectivity: {
       connected: 'Conectado',
       stale: 'Heartbeat vencido',
@@ -132,6 +134,8 @@ const copy = {
     snapshot: 'Snapshot',
     connectors: 'Connectors',
     tools: 'Tools',
+    healthy: 'healthy',
+    toolAvailable: 'available',
     connectivity: {
       connected: 'Connected',
       stale: 'Heartbeat stale',
@@ -303,8 +307,8 @@ export default async function AgentBridgeObservabilityPage({
                       {text.version} {runtime.runtimeVersion} · {text.deployment} {runtime.deploymentMode}
                     </span>
                     <span>
-                      {text.connectors}: {runtime.connectors.healthy}/{runtime.connectors.total} healthy ·{' '}
-                      {text.tools}: {runtime.tools.available}/{runtime.tools.total} available
+                      {text.connectors}: {runtime.connectors.healthy}/{runtime.connectors.total} {text.healthy} ·{' '}
+                      {text.tools}: {runtime.tools.available}/{runtime.tools.total} {text.toolAvailable}
                     </span>
                     <span>
                       {text.heartbeat}: {formatTimestamp(runtime.lastHeartbeatAt, locale, session.user.timezone) ?? '—'} ·{' '}
