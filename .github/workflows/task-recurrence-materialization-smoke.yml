@@ -1,0 +1,145 @@
+name: Task recurrence materialization smoke
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  task-recurrence-materialization-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build and start stack
+        run: |
+          export KCC_AUTH_MODE=local
+          export KCC_LOCAL_ADMIN_EMAIL=ci-recurrence@kcc.local
+          export KCC_LOCAL_ADMIN_PASSWORD="ci-recurrence-${GITHUB_RUN_ID}-valid"
+          export KCC_LOCAL_AUTH_SECRET="$(openssl rand -hex 32)"
+          {
+            echo "KCC_AUTH_MODE=$KCC_AUTH_MODE"
+            echo "KCC_LOCAL_ADMIN_EMAIL=$KCC_LOCAL_ADMIN_EMAIL"
+            echo "KCC_LOCAL_ADMIN_PASSWORD=$KCC_LOCAL_ADMIN_PASSWORD"
+            echo "KCC_LOCAL_AUTH_SECRET=$KCC_LOCAL_AUTH_SECRET"
+          } >> "$GITHUB_ENV"
+          docker compose up -d --build
+
+      - name: Wait for API readiness
+        run: |
+          for attempt in {1..45}; do
+            if curl --fail --silent http://localhost:4000/ready >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose ps
+          docker compose logs api worker
+          exit 1
+
+      - name: Materialize completed recurring task exactly once
+        run: |
+          login_response="$(curl --fail --silent \
+            -X POST http://localhost:4000/v1/auth/local/login \
+            -H 'content-type: application/json' \
+            --data "{\"email\":\"$KCC_LOCAL_ADMIN_EMAIL\",\"password\":\"$KCC_LOCAL_ADMIN_PASSWORD\"}")"
+          access_token="$(printf '%s' "$login_response" | python3 -c 'import json,sys; print(json.load(sys.stdin)["accessToken"])')"
+
+          source_due='2026-10-20T09:00:00.000Z'
+          next_due='2026-10-27T09:00:00.000Z'
+          source_response="$(curl --fail --silent \
+            -X POST http://localhost:4000/v1/quick-capture \
+            -H 'content-type: application/json' \
+            -H "authorization: Bearer $access_token" \
+            --data "{\"scope\":\"workspace\",\"kind\":\"task\",\"title\":\"CI recurring source\",\"priority\":77,\"dueAt\":\"$source_due\"}")"
+          source_id="$(printf '%s' "$source_response" | python3 -c 'import json,sys; print(json.load(sys.stdin)["task"]["id"])')"
+          test -n "$source_id"
+
+          dependency_response="$(curl --fail --silent \
+            -X POST http://localhost:4000/v1/tasks \
+            -H 'content-type: application/json' \
+            -H "authorization: Bearer $access_token" \
+            --data '{"scope":"workspace","title":"CI recurrence dependency"}')"
+          dependency_id="$(printf '%s' "$dependency_response" | python3 -c 'import json,sys; print(json.load(sys.stdin)["task"]["id"])')"
+          test -n "$dependency_id"
+
+          curl --fail --silent \
+            -X PUT "http://localhost:4000/v1/tasks/$source_id/dependencies" \
+            -H 'content-type: application/json' \
+            -H "authorization: Bearer $access_token" \
+            --data "{\"scope\":\"workspace\",\"dependencyIds\":[\"$dependency_id\"]}" >/dev/null
+
+          future_reminder='2099-01-01T09:00:00.000Z'
+          curl --fail --silent \
+            -X PUT "http://localhost:4000/v1/tasks/$source_id/reminders" \
+            -H 'content-type: application/json' \
+            -H "authorization: Bearer $access_token" \
+            --data "{\"scope\":\"workspace\",\"reminderRules\":[{\"kind\":\"at\",\"remindAt\":\"$future_reminder\"}]}" >/dev/null
+
+          recurrence_response="$(curl --fail --silent \
+            -X PUT "http://localhost:4000/v1/tasks/$source_id/recurrence" \
+            -H 'content-type: application/json' \
+            -H "authorization: Bearer $access_token" \
+            --data '{"scope":"workspace","recurrenceRule":{"kind":"interval_days","intervalDays":7}}')"
+          test "$(printf '%s' "$recurrence_response" | python3 -c 'import json,sys; print(json.load(sys.stdin)["task"]["recurrenceRule"]["intervalDays"])')" = "7"
+
+          curl --fail --silent \
+            -X PATCH "http://localhost:4000/v1/tasks/$source_id/status" \
+            -H 'content-type: application/json' \
+            -H "authorization: Bearer $access_token" \
+            --data '{"scope":"workspace","status":"done"}' >/dev/null
+
+          materialized=0
+          next_task_id=''
+          for attempt in {1..30}; do
+            next_task_id="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
+              "const t=db.tasks.findOne({recurrenceSourceTaskId:'$source_id'}); if(t) print(t.id)")"
+            child_count="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
+              "print(db.tasks.countDocuments({recurrenceSourceTaskId:'$source_id','scope.kind':'workspace',status:'todo',dueAt:'$next_due','recurrenceRule.kind':'interval_days','recurrenceRule.intervalDays':7}))")"
+            source_link_count="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
+              "print(db.tasks.countDocuments({id:'$source_id','recurrenceNextTaskId':{\$type:'string'},'recurrenceMaterializedAt':{\$type:'string'}}))")"
+            no_reminders="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
+              "print(db.tasks.countDocuments({recurrenceSourceTaskId:'$source_id',reminderRules:{\$exists:false}}))")"
+            no_dependencies="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
+              "print(db.tasks.countDocuments({recurrenceSourceTaskId:'$source_id',dependencyIds:{\$exists:false}}))")"
+            audit_count="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
+              "print(db.timeline_events.countDocuments({type:'task.recurrence_materialized','metadata.sourceTaskId':'$source_id','metadata.nextDueAt':'$next_due'}))")"
+            if [ -n "$next_task_id" ] && [ "$child_count" = "1" ] && [ "$source_link_count" = "1" ] && [ "$no_reminders" = "1" ] && [ "$no_dependencies" = "1" ] && [ "$audit_count" = "1" ]; then
+              materialized=1
+              break
+            fi
+            sleep 2
+          done
+
+          if [ "$materialized" != "1" ]; then
+            docker compose logs worker api
+            exit 1
+          fi
+
+          source_next_id="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
+            "print(db.tasks.findOne({id:'$source_id'}).recurrenceNextTaskId)")"
+          test "$source_next_id" = "$next_task_id"
+
+          outbox_status="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
+            "print(db.audit_outbox.findOne({'event.type':'task.recurrence_materialized','event.entityId':'$next_task_id'}).status)")"
+          test "$outbox_status" = "delivered"
+
+          sleep 7
+          test "$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
+            "print(db.tasks.countDocuments({recurrenceSourceTaskId:'$source_id'}))")" = "1"
+          test "$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
+            "print(db.timeline_events.countDocuments({type:'task.recurrence_materialized','metadata.sourceTaskId':'$source_id'}))")" = "1"
+
+      - name: Show service state on failure
+        if: failure()
+        run: |
+          docker compose ps
+          docker compose logs --no-color
+
+      - name: Stop stack
+        if: always()
+        run: docker compose down -v
