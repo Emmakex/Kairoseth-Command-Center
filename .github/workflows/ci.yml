@@ -172,7 +172,7 @@ jobs:
             -X POST http://localhost:4000/v1/quick-capture \
             -H 'content-type: application/json' \
             -H "authorization: Bearer $access_token" \
-            --data '{"scope":"private","kind":"task","title":"CI private quick capture","priority":90}')"
+            --data '{"scope":"private","kind":"task","title":"CI private quick capture","priority":90,"dueAt":"2026-12-31T12:00:00.000Z"}')"
           task_id="$(printf '%s' "$task_response" | python3 -c 'import json,sys; print(json.load(sys.stdin)["task"]["id"])')"
           test -n "$task_id"
 
@@ -183,6 +183,13 @@ jobs:
             -H "authorization: Bearer $access_token" \
             --data "{\"scope\":\"private\",\"reminderRules\":[{\"kind\":\"at\",\"remindAt\":\"$reminder_at\"}]}")"
           test "$(printf '%s' "$reminder_response" | python3 -c 'import json,sys; print(json.load(sys.stdin)["task"]["reminderRules"][0]["remindAt"])')" = "$reminder_at"
+
+          recurrence_response="$(curl --fail --silent \
+            -X PUT "http://localhost:4000/v1/tasks/$task_id/recurrence" \
+            -H 'content-type: application/json' \
+            -H "authorization: Bearer $access_token" \
+            --data '{"scope":"private","recurrenceRule":{"kind":"interval_days","intervalDays":7}}')"
+          test "$(printf '%s' "$recurrence_response" | python3 -c 'import json,sys; print(json.load(sys.stdin)["task"]["recurrenceRule"]["intervalDays"])')" = "7"
 
           dependency_a_response="$(curl --fail --silent \
             -X POST http://localhost:4000/v1/tasks \
@@ -216,22 +223,29 @@ jobs:
               "print(db.timeline_events.countDocuments({type:'task.reminders_changed',entityId:'$task_id','scope.kind':'private'}))")"
             reminder_persisted="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
               "print(db.tasks.countDocuments({id:'$task_id','scope.kind':'private','reminderRules.remindAt':'$reminder_at'}))")"
+            recurrence_count="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
+              "print(db.timeline_events.countDocuments({type:'task.recurrence_changed',entityId:'$task_id','scope.kind':'private'}))")"
+            recurrence_persisted="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
+              "print(db.tasks.countDocuments({id:'$task_id','scope.kind':'private','recurrenceRule.kind':'interval_days','recurrenceRule.intervalDays':7}))")"
             dependency_count="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
               "print(db.timeline_events.countDocuments({type:'task.dependencies_changed',entityId:'$dependency_a_id'}))")"
             dependency_persisted="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
               "print(db.tasks.countDocuments({id:'$dependency_a_id',dependencyIds:'$dependency_b_id'}))")"
-            if [ "$decision_count" = "1" ] && [ "$task_count" = "1" ] && [ "$reminder_count" = "1" ] && [ "$reminder_persisted" = "1" ] && [ "$dependency_count" = "1" ] && [ "$dependency_persisted" = "1" ]; then
+            if [ "$decision_count" = "1" ] && [ "$task_count" = "1" ] && [ "$reminder_count" = "1" ] && [ "$reminder_persisted" = "1" ] && [ "$recurrence_count" = "1" ] && [ "$recurrence_persisted" = "1" ] && [ "$dependency_count" = "1" ] && [ "$dependency_persisted" = "1" ]; then
               decision_outbox="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
                 "print(db.audit_outbox.findOne({'event.entityId':'$decision_id'}).status)")"
               task_outbox="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
                 "print(db.audit_outbox.findOne({'event.entityId':'$task_id'}).status)")"
               reminder_outbox="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
                 "print(db.audit_outbox.findOne({'event.type':'task.reminders_changed','event.entityId':'$task_id'}).status)")"
+              recurrence_outbox="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
+                "print(db.audit_outbox.findOne({'event.type':'task.recurrence_changed','event.entityId':'$task_id'}).status)")"
               dependency_outbox="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
                 "print(db.audit_outbox.findOne({'event.type':'task.dependencies_changed','event.entityId':'$dependency_a_id'}).status)")"
               test "$decision_outbox" = "delivered"
               test "$task_outbox" = "delivered"
               test "$reminder_outbox" = "delivered"
+              test "$recurrence_outbox" = "delivered"
               test "$dependency_outbox" = "delivered"
               exit 0
             fi

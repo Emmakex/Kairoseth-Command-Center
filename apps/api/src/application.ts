@@ -33,6 +33,8 @@ import { registerPriorityRoutes } from './priorities';
 import { registerPrioritizationWeightPolicyRoutes } from './prioritization-weight-policies';
 import { registerTaskDependencyRoutes } from './task-dependencies';
 import type { TaskDependencyStore } from './task-dependency-store';
+import { registerTaskRecurrenceRoutes } from './task-recurrence';
+import type { TaskRecurrenceStore } from './task-recurrence-store';
 import { registerTaskReminderRoutes } from './task-reminders';
 import type { TaskReminderStore } from './task-reminder-store';
 import { registerTaskStartGuard } from './task-start-guard';
@@ -48,6 +50,7 @@ type ApplicationOptions = {
   decisionLifecycleStore?: DecisionLifecycleStore;
   operationalAuditStore?: OperationalAuditStore;
   taskDependencyStore?: TaskDependencyStore;
+  taskRecurrenceStore?: TaskRecurrenceStore;
   taskReminderStore?: TaskReminderStore;
   agentBridgeA2AStore?: AgentBridgeA2AStore;
   githubRepositoryStore?: GitHubRepositoryStore;
@@ -110,6 +113,13 @@ export function buildApp(options: ApplicationOptions = {}) {
     ...(options.authProvider ? { authProvider: options.authProvider } : {}),
     ...(options.taskDependencyStore
       ? { taskDependencyStore: options.taskDependencyStore }
+      : {}),
+  });
+
+  registerTaskRecurrenceRoutes(app, {
+    ...(options.authProvider ? { authProvider: options.authProvider } : {}),
+    ...(options.taskRecurrenceStore
+      ? { taskRecurrenceStore: options.taskRecurrenceStore }
       : {}),
   });
 
