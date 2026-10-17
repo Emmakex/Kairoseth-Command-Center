@@ -119,10 +119,11 @@ Implemented on `feat/phase-5-task-reminder-ui` so far:
 12. Done/cancelled tasks and system scope never materialize reminders.
 13. A one-time reminder creates at most one durable alert for its task+instant fingerprint.
 14. Materialization consumes the exact one-time rule so later worker ticks do not repeatedly scan fired reminders.
-15. Reminder alert creation and `alert.reminder_due` audit commit atomically.
-16. Browser reminder forms cannot choose tenant, actor or authoritative time zone.
-17. Reminder UI conversion uses the authenticated session IANA time zone and rejects non-existent local wall-clock times.
-18. Recurrence and external delivery remain separate until explicitly implemented and validated.
+15. Materialization uses optimistic task concurrency and does not silently overwrite concurrent human edits.
+16. Reminder alert creation and `alert.reminder_due` audit commit atomically.
+17. Browser reminder forms cannot choose tenant, actor or authoritative time zone.
+18. Reminder UI conversion uses the authenticated session IANA time zone and rejects non-existent local wall-clock times.
+19. Recurrence and external delivery remain separate until explicitly implemented and validated.
 
 ## Next / Siguiente
 
