@@ -1,10 +1,10 @@
 # Project status / Estado del proyecto
 
-**Current phase:** Phase 5 — Automation and intelligence  
+**Current phase:** Phase 5 — Automation and intelligence — **CLOSED / CERRADA**  
 **Technical/internal project:** Kairoseth Command Center  
 **Commercial names:** Gestor de Trabajo (ES) / Work Manager (EN)  
 **Category:** Kairoseth Software  
-**Status:** Phase 5 Slice 21 is merged as `01ea5e29885ddac920d37a0b148bbbc2de8eed3a` and post-merge validated 14/14. Phase 5 Slice 22 — Milestone deadline alerts / Alertas de vencimiento de hitos — is active.
+**Technical release boundary:** merged `main` `d7eb0769bfed765727a851635eca41006ee412c2`, validated 15/15 after Phase 5 Slice 22.
 
 ## Naming rule / Regla de naming
 
@@ -56,49 +56,26 @@
 - [x] Slice 19 — Task recurrence materialization — PR #56 `0805dddd1a076a7fddaf4594cde4a3411fb8d3ad`.
 - [x] Slice 20 — Task deadline alerts — PR #57 `18f97410a776d8414747e6a1c7212c4f6962d18a`.
 - [x] Slice 21 — Project deadline alerts — PR #58 `01ea5e29885ddac920d37a0b148bbbc2de8eed3a`.
+- [x] Slice 22 — Milestone deadline alerts — PR #59 `d7eb0769bfed765727a851635eca41006ee412c2`.
 
-The current merged `main` boundary is validated 14/14 green, including CI, standalone release, reminder materialization, recurrence materialization, task/project deadline lifecycles and Agent Bridge A2A acceptance.
+### Phase 5 release boundary / Cierre de Fase 5
 
-### Phase 5 Slice 21 — Project deadline alerts / Alertas de vencimiento de proyectos
+- [x] Configurable deterministic rules/automation delivered.
+- [x] Cross-source operational signals delivered.
+- [x] Explainable prioritization delivered with configurable weights and explicit reasons.
+- [x] Task dependencies/start readiness delivered.
+- [x] One-time reminders and materialization delivered.
+- [x] Fixed-day recurrence and exactly-once materialization delivered.
+- [x] Task, project and milestone overdue-alert lifecycles delivered.
+- [x] Core correctness remains AI-independent.
+- [x] Exact merged `main` after Slice 22 validated with the full 15-workflow regression set; no failed, queued or in-progress workflow remained.
+- [x] Closure and future backlog documented in `docs/47-phase-5-release-boundary.md`.
 
-- [x] Deterministic overdue rule for workspace/private projects with valid `dueAt <= worker now` and status other than `done`/`archived`.
-- [x] Stable fingerprint `project-deadline:<projectId>` and severity `urgent`.
-- [x] Exact persisted project scope and project link preserved on derived alerts.
-- [x] One alert per scoped project fingerprint via unique indexes.
-- [x] `open`/`acknowledged` alerts auto-resolve when the project stops being overdue.
-- [x] `resolved` alerts reopen without duplication when the project becomes overdue again.
-- [x] `dismissed` remains human-authoritative and is never reopened automatically.
-- [x] Create/reopen/auto-resolve transitions use transactional audit-outbox events.
-- [x] Worker exposes independent `projectDeadlines` reconciliation metrics.
-- [x] Pure tests and dedicated Docker lifecycle acceptance cover workspace/private scope, delivered audit, resolve, reopen, deduplication and dismissal persistence.
-- [x] PR #58 merged as `01ea5e29885ddac920d37a0b148bbbc2de8eed3a`; resulting `main` validated 14/14.
-
-**Phase 5 Slice 21: CLOSED / CERRADA.**
-
-## Active / Activo
-
-### Phase 5 Slice 22 — Milestone deadline alerts / Alertas de vencimiento de hitos
-
-Implemented on `feat/phase-5-milestone-deadline-alerts` so far:
-
-- [x] Deterministic overdue rule for workspace/private milestones with valid `dueAt <= worker now` and status other than `done`/`cancelled`.
-- [x] Stable fingerprint `milestone-deadline:<milestoneId>` and severity `urgent`.
-- [x] Alert is materialized in the exact persisted milestone scope and linked to its parent project with `projectId = milestone.projectId`.
-- [x] Existing scope-bound unique alert indexes guarantee one alert per milestone deadline fingerprint.
-- [x] `open`/`acknowledged` alerts auto-resolve when the milestone is done, cancelled, missing or no longer overdue.
-- [x] `resolved` alerts reopen on a later overdue state without creating a second alert record.
-- [x] `dismissed` remains human-authoritative and is never reopened automatically.
-- [x] Create, reopen and auto-resolve transitions use transactional audit-outbox events.
-- [x] Worker exposes independent `milestoneDeadlines` reconciliation metrics alongside project/task deadlines, reminders, recurrence and integrations.
-- [x] Pure tests cover scope, status/date eligibility, exact deadline instant, parent-project context and fingerprint stability.
-- [x] Dedicated Docker smoke covers workspace/private creation, delivered audit, auto-resolve, reopen, exactly-one alert and dismissal persistence.
-- [x] Product/security documentation in `docs/46-milestone-deadline-alerts.md` and documentation index.
-- [ ] Final-head lint, typecheck, tests, build and complete regression workflow set including the new milestone deadline alert smoke.
-- [ ] Merge exact validated head and revalidate resulting `main`.
-
-**Phase 5 Slice 22: VALIDATION PENDING / VALIDACIÓN PENDIENTE.**
+**Phase 5 technical release boundary: CLOSED / CERRADA.**
 
 ## Deliberately deferred / Diferido expresamente
+
+These are future roadmap candidates and do **not** block the Phase 5 release:
 
 - [ ] Pre-deadline warning windows and configurable deadline severity.
 - [ ] Monthly/calendar/weekday/local-wall-clock recurrence semantics.
@@ -123,43 +100,26 @@ Implemented on `feat/phase-5-milestone-deadline-alerts` so far:
 6. Human `dismissed` alert state remains authoritative for task/project/milestone deadline automation.
 7. Task dependencies reference local same-scope task IDs only and remain acyclic.
 8. A task cannot be explicitly started while any same-scope dependency is not `done` at the guard check.
-9. Reminder intent and reminder time are explicit user-authored data; no AI inference occurs.
-10. Reminder mutation and mutation audit commit atomically.
-11. Reminder execution preserves the task's persisted workspace/private scope.
-12. Done/cancelled tasks and system scope never materialize reminders.
-13. A one-time reminder creates at most one durable alert for its task+instant fingerprint.
-14. Materialization consumes the exact one-time rule so later worker ticks do not repeatedly scan fired reminders.
-15. Reminder materialization uses optimistic task concurrency and does not silently overwrite concurrent human edits.
-16. Reminder alert creation and `alert.reminder_due` audit commit atomically.
-17. Browser reminder forms cannot choose tenant, actor or authoritative time zone.
-18. Reminder UI conversion uses the authenticated session IANA time zone and rejects non-existent local wall-clock times.
-19. Recurrence intent is explicit user-authored data and cannot choose tenant or actor authority.
-20. Enabling recurrence requires a persisted valid `dueAt` anchor.
-21. Recurrence mutation and `task.recurrence_changed` audit commit atomically with optimistic task concurrency.
-22. Browser recurrence forms can choose only recurrence mode and interval; tenant and actor authority remain server-derived.
-23. Recurrence materialization runs only after explicit task completion and preserves the exact persisted workspace/private scope.
-24. Each completed recurrence occurrence can create at most one direct successor; source link, successor and `task.recurrence_materialized` audit commit atomically.
-25. A recurrence successor does not inherit one-time reminder instants, occurrence-specific dependencies, completion state or prior lineage.
-26. Fixed-day recurrence currently means exact 24-hour UTC increments; monthly/weekday/local-calendar semantics are not implied.
-27. Task/project/milestone deadline alerts use persisted entity scope and deadline only; browser input cannot choose derived alert tenant or actor.
-28. Each deadline fingerprint creates at most one alert in its exact workspace/private scope.
-29. Deadline create/reopen/auto-resolve transitions and their audit records commit transactionally.
-30. A dismissed task/project/milestone deadline alert remains dismissed even while its entity remains overdue.
-31. Milestone deadline alerts preserve `projectId` only as same-scope contextual linkage; it does not replace the milestone scope as the tenancy boundary.
+9. Reminder intent/time and recurrence intent are explicit user-authored data; no AI inference occurs.
+10. Reminder/recurrence/deadline lifecycle writes and their audit events preserve transactional boundaries.
+11. One-time reminders and recurrence materialization are idempotent under repeated worker ticks.
+12. Browser forms never choose authoritative tenant/actor scope.
+13. Fixed-day recurrence means exact 24-hour UTC increments; calendar semantics are not implied.
+14. Task/project/milestone deadline fingerprints create at most one alert in the exact persisted scope.
+15. A dismissed deadline alert remains dismissed even while its entity remains overdue.
+16. Milestone deadline `projectId` is contextual linkage; milestone scope remains the tenancy boundary.
 
 ## Next / Siguiente
 
-1. Validate Slice 22 final head with lint, typecheck, tests, build and the complete workflow set including milestone deadline alerts acceptance.
-2. Correct any persistence/worker/Docker regression directly on this slice without broadening scope.
-3. Merge the exact validated head and revalidate resulting `main`.
-4. Select the next Phase 5 micro-slice only from the resulting green repository state.
-5. Keep pre-deadline windows, configurable severity, recurring reminders, external delivery, snooze/repeat, calendar recurrence semantics, graph visualization, automatic dependency status behavior, critical-path forecasting, arbitrary DSL, AI changes, OAuth and additional providers as separate fronts.
-6. When commercial publication is scheduled, create the Kairoseth Software catalog entry as **Gestor de Trabajo / Work Manager**.
+1. Merge the Phase 5 release-boundary documentation only after the same regression gate stays green.
+2. After the closure documentation is on `main`, move to release/commercial packaging rather than silently opening another Phase 5 feature.
+3. Prepare the Kairoseth Software catalog publication as **Gestor de Trabajo** (ES) / **Work Manager** (EN).
+4. Any deferred capability must enter a newly documented future phase or explicitly scoped maintenance slice.
 
 ## Current blockers / Bloqueos actuales
 
-No known product blocker. Slice 22 is ready for regression validation.
+No known technical product blocker. The functional Phase 5 runtime boundary is green; only the formal closure-documentation PR is pending.
 
 ## Operating rule
 
-Update this file at meaningful milestones. Keep Phase 5 deterministic, explainable, auditable, workspace-isolated and independently releasable; AI may assist but must not become required for core correctness.
+Keep delivered runtime deterministic, explainable, auditable, workspace-isolated and independently releasable. Reopen Phase 5 only for a regression in an already-delivered Phase 5 contract; new capabilities require explicit future scope.
