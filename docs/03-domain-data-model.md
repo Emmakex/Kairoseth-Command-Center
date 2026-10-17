@@ -28,11 +28,13 @@ A measurable phase or delivery checkpoint belonging to a project.
 ### Task
 Atomic actionable work item.
 
-Key fields: `id`, `scope`, `workspaceId?`, `ownerUserId?`, `projectId?`, `title`, `description`, `status`, `priority`, `assigneeIds`, `dueAt`, `reminderRules`, `recurrenceRule`, `dependencyIds`, `source`.
+Key fields: `id`, `scope`, `workspaceId?`, `ownerUserId?`, `projectId?`, `title`, `description`, `status`, `priority`, `assigneeIds`, `dueAt`, `reminderRules`, `recurrenceRule`, `recurrenceSourceTaskId?`, `recurrenceNextTaskId?`, `recurrenceMaterializedAt?`, `dependencyIds`, `source`.
 
 `dependencyIds` is the explicit local task-dependency graph. Legacy tasks may omit the field and are interpreted as having no dependencies. References must resolve inside the exact same server-derived scope, self-dependencies and cycles are rejected, and successful graph mutations are transactionally audited. Dependency scoring is a separate later concern.
 
-`recurrenceRule` is optional for backward compatibility. The first supported deterministic form is `{ kind: 'interval_days', intervalDays: 1..365 }`. Enabling it requires an existing valid `dueAt`, which is the explicit anchor for a later execution slice. This model does not itself create future occurrences or mutate task status/dates automatically.
+`recurrenceRule` is optional for backward compatibility. The first supported deterministic form is `{ kind: 'interval_days', intervalDays: 1..365 }`. Enabling it requires an existing valid `dueAt`, which is the explicit recurrence anchor.
+
+When a recurring task is explicitly completed, recurrence materialization records direct lineage instead of mutating the completed task back into an active state. The completed source may receive `recurrenceNextTaskId` and `recurrenceMaterializedAt`; the generated successor receives `recurrenceSourceTaskId`. A scope-bound uniqueness constraint on `recurrenceSourceTaskId` allows at most one direct successor for a completed occurrence. The successor preserves stable task-template fields and recurrence intent, but one-time `reminderRules`, occurrence-specific `dependencyIds`, completion state and prior lineage are not inherited.
 
 ### Alert
 Attention signal. Alerts may be manually created or generated from rules/integrations.
@@ -115,7 +117,7 @@ External resources include the workspace scope in uniqueness, reads, deletes and
 
 Task dependency references follow the same exact-scope rule: a workspace task cannot depend on a task from another workspace, and a private task cannot depend on a task owned by another user. Foreign references are treated as not found rather than disclosed.
 
-Task recurrence mutations follow the same exact-scope rule. The authenticated session selects the concrete workspace/private owner; callers cannot supply tenant or actor identifiers as recurrence authority.
+Task recurrence mutations follow the same exact-scope rule. The authenticated session selects the concrete workspace/private owner; callers cannot supply tenant or actor identifiers as recurrence authority. Recurrence materialization persists the exact source scope onto its successor and uses scope-bound lineage uniqueness, so private and workspace recurrence chains cannot cross security boundaries.
 
 ## Auditability
 
@@ -129,3 +131,5 @@ Initial GitHub repository-link events:
 Task dependency graph mutations emit `task.dependencies_changed` through the transactional audit outbox.
 
 Task recurrence mutations emit `task.recurrence_changed` through the transactional audit outbox.
+
+Successful recurrence execution emits `task.recurrence_materialized` in the same transaction that links the completed source task and inserts its next occurrence.
