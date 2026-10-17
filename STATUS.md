@@ -4,7 +4,7 @@
 **Technical/internal project:** Kairoseth Command Center  
 **Commercial names:** Gestor de Trabajo (ES) / Work Manager (EN)  
 **Category:** Kairoseth Software  
-**Status:** Phase 5 Slice 18 is merged as `7de3c8b17d8b9ed0b6ddfa05d445717d4fb6b332` and post-merge validated 11/11. Phase 5 Slice 19 — Task recurrence materialization / Materialización de recurrencia — is active.
+**Status:** Phase 5 Slice 19 is merged as `0805dddd1a076a7fddaf4594cde4a3411fb8d3ad` and post-merge validated 12/12. Phase 5 Slice 20 — Task deadline alerts / Alertas de vencimiento de tareas — is active.
 
 ## Naming rule / Regla de naming
 
@@ -53,50 +53,52 @@
 - [x] Slice 16 — Task reminder UI — PR #49 `2c3cb8a51d5e7973ec1a218a032625e1715e34c4`.
 - [x] Slice 17 — Task recurrence — PR #53 `646e71f8481d2a3eb17fc23f8471d26c81ce0af8`.
 - [x] Slice 18 — Task recurrence UI — PR #55 `7de3c8b17d8b9ed0b6ddfa05d445717d4fb6b332`.
+- [x] Slice 19 — Task recurrence materialization — PR #56 `0805dddd1a076a7fddaf4594cde4a3411fb8d3ad`.
 
-The current merged `main` boundary is validated 11/11 green, including CI, standalone release, reminder materialization and Agent Bridge A2A acceptance.
-
-### Phase 5 Slice 18 — Task recurrence UI / UI de recurrencia
-
-- [x] ES/EN recurrence editor embedded in each existing task card.
-- [x] Recurrence disabled or fixed whole-day interval from 1 through 365 days.
-- [x] Persisted `dueAt` shown as recurrence anchor; enabling is disabled in UI when no valid anchor exists.
-- [x] Clearing remains available independently of due-date presence.
-- [x] Same-origin parser maps only to the guarded `PUT /v1/tasks/:id/recurrence` contract.
-- [x] Strict form allow-list rejects authority-field injection and unsupported modes.
-- [x] Web tests cover activation, clearing, bounds, fractions and authority rejection.
-- [x] PR #55 merged as `7de3c8b17d8b9ed0b6ddfa05d445717d4fb6b332`; resulting `main` validated 11/11.
-
-**Phase 5 Slice 18: CLOSED / CERRADA.**
-
-## Active / Activo
+The current merged `main` boundary is validated 12/12 green, including CI, standalone release, reminder materialization, recurrence materialization and Agent Bridge A2A acceptance.
 
 ### Phase 5 Slice 19 — Task recurrence materialization / Materialización de recurrencia
 
-Implemented on `feat/phase-5-task-recurrence-materialization` so far:
+- [x] Completed recurring workspace/private tasks produce at most one direct successor.
+- [x] Successor preserves stable task-template fields and fixed-day recurrence intent.
+- [x] One-time reminders, occurrence-specific dependencies, completion state and previous lineage are not copied.
+- [x] Scope-bound unique lineage indexes and optimistic concurrency prevent duplicate/silent materialization.
+- [x] Source lineage marker, successor insertion and `task.recurrence_materialized` audit commit atomically.
+- [x] Worker metrics and dedicated Docker exactly-once acceptance added.
+- [x] PR #56 merged as `0805dddd1a076a7fddaf4594cde4a3411fb8d3ad`; resulting `main` validated 12/12.
 
-- [x] Backward-compatible recurrence lineage fields on `Task`: `recurrenceSourceTaskId`, `recurrenceNextTaskId`, `recurrenceMaterializedAt`.
-- [x] Deterministic eligibility: exact workspace/private scope, `done`, valid `completedAt`, valid `dueAt`, valid 1..365-day rule and no committed successor.
-- [x] Next due date is derived as `sourceDueAt + intervalDays * 24h` from the persisted recurrence anchor.
-- [x] Generated successor starts as `todo` and preserves stable template fields: scope, project, title, description, priority, assignees and recurrence rule.
-- [x] One-time `reminderRules`, occurrence-specific `dependencyIds`, completion state and previous lineage are deliberately not copied.
-- [x] Scope-bound unique index on `recurrenceSourceTaskId` prevents more than one direct successor for the same completed occurrence.
-- [x] Source lineage marker, successor insertion and `task.recurrence_materialized` audit event commit atomically in one Mongo transaction.
-- [x] Optimistic `updatedAt` matching prevents silent materialization over concurrent task edits.
-- [x] Worker tick runs recurrence materialization independently alongside reminder materialization and existing GitHub work.
-- [x] Pure tests cover candidate selection, invalid/system/already-materialized exclusions and fixed-day due-date arithmetic.
-- [x] Dedicated Docker acceptance verifies exactly-one successor, source/child linkage, recurrence inheritance, stale reminder/dependency exclusion and delivered audit outbox.
-- [x] Product/domain documentation in `docs/43-task-recurrence-materialization.md`, `docs/03-domain-data-model.md` and documentation index.
-- [ ] Final-head lint, typecheck, tests, build and all regression workflows including the new recurrence materialization smoke.
+**Phase 5 Slice 19: CLOSED / CERRADA.**
+
+## Active / Activo
+
+### Phase 5 Slice 20 — Task deadline alerts / Alertas de vencimiento de tareas
+
+Implemented on `feat/phase-5-task-deadline-alerts` so far:
+
+- [x] Deterministic overdue rule for active workspace/private tasks with valid `dueAt <= worker now`.
+- [x] Stable fingerprint `task-deadline:<taskId>` and severity `urgent`.
+- [x] Alert is materialized in the exact persisted task scope and keeps the task project link when present.
+- [x] Scope-bound existing unique alert indexes guarantee one alert per task deadline fingerprint.
+- [x] `open`/`acknowledged` alerts auto-resolve when the task is done, cancelled, missing or no longer overdue.
+- [x] `resolved` alerts reopen on a later overdue state without creating a second alert record.
+- [x] `dismissed` remains human-authoritative and is never reopened automatically.
+- [x] Create, reopen and auto-resolve transitions use transactional audit-outbox events.
+- [x] Worker exposes independent `taskDeadlines` reconciliation metrics alongside reminders/recurrence/integrations.
+- [x] Pure tests cover scope, status/date eligibility, exact deadline instant and fingerprint stability.
+- [x] Dedicated Docker smoke covers workspace/private creation, delivered audit, auto-resolve, reopen, exactly-one alert and dismissal persistence.
+- [x] Product/security documentation in `docs/44-task-deadline-alerts.md` and documentation index.
+- [ ] Final-head lint, typecheck, tests, build and complete regression workflow set including the new deadline-alert smoke.
 - [ ] Merge exact validated head and revalidate resulting `main`.
 
-**Phase 5 Slice 19: VALIDATION PENDING / VALIDACIÓN PENDIENTE.**
+**Phase 5 Slice 20: VALIDATION PENDING / VALIDACIÓN PENDIENTE.**
 
 ## Deliberately deferred / Diferido expresamente
 
+- [ ] Pre-deadline warning windows and configurable deadline severity.
+- [ ] Project and milestone deadline alerts.
 - [ ] Monthly/calendar/weekday/local-wall-clock recurrence semantics.
 - [ ] Recurring reminder rules inherited or regenerated for future occurrences.
-- [ ] Email, push, SMS or third-party reminder delivery.
+- [ ] Email, push, SMS or third-party reminder/alert delivery.
 - [ ] Snooze/repeat policies.
 - [ ] Dedicated graph visualization or drag-and-drop dependency editor.
 - [ ] Automatic task status mutations driven by dependency changes.
@@ -110,10 +112,10 @@ Implemented on `feat/phase-5-task-recurrence-materialization` so far:
 
 1. Workspace/private scope is server-derived from authenticated context for user mutations.
 2. Product entitlement and capability checks are server-enforced.
-3. Provider credentials never enter durable reminder/recurrence state, alerts or related audit events.
+3. Provider credentials never enter durable reminder/recurrence/deadline state, alerts or related audit events.
 4. Derived automation and prioritization remain deterministic, explainable and AI-independent.
-5. Private scope never crosses workspace dependency, reminder or recurrence data.
-6. Human dismissed decisions remain authoritative.
+5. Private scope never crosses workspace dependency, reminder, recurrence or deadline-alert data.
+6. Human `dismissed` alert state remains authoritative for task-deadline automation.
 7. Task dependencies reference local same-scope task IDs only and remain acyclic.
 8. A task cannot be explicitly started while any same-scope dependency is not `done` at the guard check.
 9. Reminder intent and reminder time are explicit user-authored data; no AI inference occurs.
@@ -130,25 +132,27 @@ Implemented on `feat/phase-5-task-recurrence-materialization` so far:
 20. Enabling recurrence requires a persisted valid `dueAt` anchor.
 21. Recurrence mutation and `task.recurrence_changed` audit commit atomically with optimistic task concurrency.
 22. Browser recurrence forms can choose only recurrence mode and interval; tenant and actor authority remain server-derived.
-23. UI due-date disabling is convenience only; the API remains authoritative for recurrence correctness.
-24. Recurrence materialization runs only after explicit task completion and preserves the exact persisted workspace/private scope.
-25. Each completed recurrence occurrence can create at most one direct successor; source link, successor and `task.recurrence_materialized` audit commit atomically.
-26. A recurrence successor does not inherit one-time reminder instants, occurrence-specific dependencies, completion state or prior lineage.
-27. Fixed-day recurrence currently means exact 24-hour UTC increments; monthly/weekday/local-calendar semantics are not implied.
-28. Recurring reminders and external delivery remain separate until explicitly implemented and validated.
+23. Recurrence materialization runs only after explicit task completion and preserves the exact persisted workspace/private scope.
+24. Each completed recurrence occurrence can create at most one direct successor; source link, successor and `task.recurrence_materialized` audit commit atomically.
+25. A recurrence successor does not inherit one-time reminder instants, occurrence-specific dependencies, completion state or prior lineage.
+26. Fixed-day recurrence currently means exact 24-hour UTC increments; monthly/weekday/local-calendar semantics are not implied.
+27. Task deadline alerts use persisted task scope and deadline only; browser input cannot choose derived alert tenant or actor.
+28. A task deadline fingerprint creates at most one alert in its exact workspace/private scope.
+29. Deadline create/reopen/auto-resolve transitions and their audit records commit transactionally.
+30. A dismissed task deadline alert remains dismissed even while the task remains overdue.
 
 ## Next / Siguiente
 
-1. Validate Slice 19 final head with lint, typecheck, tests, build and the complete workflow set including recurrence materialization acceptance.
+1. Validate Slice 20 final head with lint, typecheck, tests, build and the complete workflow set including task deadline alerts acceptance.
 2. Correct any persistence/worker/Docker regression directly on this slice without broadening scope.
 3. Merge the exact validated head and revalidate resulting `main`.
 4. Select the next Phase 5 micro-slice only from the resulting green repository state.
-5. Keep recurring reminders, external delivery, snooze/repeat, monthly/weekday/local-time semantics, graph visualization, automatic dependency status behavior, critical-path forecasting, arbitrary DSL, AI changes, OAuth and additional providers as separate fronts.
+5. Keep pre-deadline windows, project/milestone deadlines, recurring reminders, external delivery, snooze/repeat, calendar recurrence semantics, graph visualization, automatic dependency status behavior, critical-path forecasting, arbitrary DSL, AI changes, OAuth and additional providers as separate fronts.
 6. When commercial publication is scheduled, create the Kairoseth Software catalog entry as **Gestor de Trabajo / Work Manager**.
 
 ## Current blockers / Bloqueos actuales
 
-No known product blocker. Slice 19 is ready for regression validation.
+No known product blocker. Slice 20 is ready for regression validation.
 
 ## Operating rule
 

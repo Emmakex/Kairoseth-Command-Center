@@ -15,6 +15,7 @@ import {
 } from '@kcc/persistence/integration-sync-jobs';
 import { MongoIntegrationSyncScheduleStore } from '@kcc/persistence/integration-sync-schedules';
 import { MongoSignalAlertRulePolicyStore } from '@kcc/persistence/signal-alert-rule-policies';
+import { MongoTaskDeadlineAlertStore } from '@kcc/persistence/task-deadline-alerts';
 import { MongoTaskRecurrenceMaterializationStore } from '@kcc/persistence/task-recurrence-materialization';
 import { MongoTaskReminderAlertStore } from '@kcc/persistence/task-reminder-alerts';
 import { discoverGitHubSchedules, enqueueDueGitHubSchedule } from './integration-scheduler';
@@ -27,6 +28,7 @@ const syncJobs = new MongoIntegrationSyncJobStore(db);
 const syncSchedules = new MongoIntegrationSyncScheduleStore(db);
 const signalAlerts = new MongoIntegrationSignalAlertStore(mongo, db);
 const signalAlertRulePolicies = new MongoSignalAlertRulePolicyStore(mongo, db);
+const taskDeadlineAlerts = new MongoTaskDeadlineAlertStore(mongo, db);
 const taskRecurrence = new MongoTaskRecurrenceMaterializationStore(mongo, db);
 const taskReminderAlerts = new MongoTaskReminderAlertStore(mongo, db);
 const integrationSecretKey = config.KCC_INTEGRATION_SECRET_KEY;
@@ -259,6 +261,7 @@ async function tick() {
         syncSchedules.ensureIndexes(),
         signalAlerts.ensureIndexes(),
         signalAlertRulePolicies.ensureIndexes(),
+        taskDeadlineAlerts.ensureIndexes(),
         taskRecurrence.ensureIndexes(),
         taskReminderAlerts.ensureIndexes(),
         ...(githubExecution
@@ -268,12 +271,21 @@ async function tick() {
       initialized = true;
     }
 
-    const [drained, requeuedSyncJobs, requeuedSchedules, taskRecurrences, taskReminders] = await Promise.all([
+    const now = new Date().toISOString();
+    const [
+      drained,
+      requeuedSyncJobs,
+      requeuedSchedules,
+      taskDeadlines,
+      taskRecurrences,
+      taskReminders,
+    ] = await Promise.all([
       outbox.drainPending(50),
       syncJobs.requeueExpired({ limit: 100 }),
       syncSchedules.requeueExpired({ limit: 100 }),
+      taskDeadlineAlerts.reconcile(now, 100),
       taskRecurrence.materializeCompleted(100),
-      taskReminderAlerts.materializeDue(new Date().toISOString(), 100),
+      taskReminderAlerts.materializeDue(now, 100),
     ]);
 
     let githubRefresh: 'disabled' | 'idle' | 'processed' = 'disabled';
@@ -302,6 +314,7 @@ async function tick() {
         delivered: drained.delivered,
         failed: drained.failed,
       },
+      taskDeadlines,
       taskRecurrences,
       taskReminders,
       integrationSync: {
