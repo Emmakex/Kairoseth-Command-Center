@@ -6,7 +6,7 @@
 **Category:** Kairoseth Software  
 **Technical runtime release boundary:** merged `main` `d7eb0769bfed765727a851635eca41006ee412c2`, validated 15/15 after Phase 5 Slice 22.  
 **Formal Phase 5 closure:** merged `main` `f327c584be4bc55deec710dc6e61d0746ae57958`.  
-**Commercial catalog publication:** merged in `Emmakex/kairoseth-platform` PR #507 as `0d07c14894560096053498a32a4e14d12ec3f1ae`; preserved in later platform `main` history.
+**Commercial catalog publication:** Kairoseth Platform PR #507 merged as `0d07c14894560096053498a32a4e14d12ec3f1ae` and deployed to Hostinger; later deployed platform revisions retain it in their ancestry.
 
 ## Naming rule / Regla de naming
 
@@ -88,10 +88,12 @@
 - [x] Growth lifecycle profile added to `content/growth/products.json` after the Product birth → Growth guard identified the missing profile.
 - [x] Kairoseth Platform PR #507 passed Growth guard plus CI: editorial contract, lint, typecheck, full unit/acceptance suite, public-products responsive smoke, build and runtime smoke.
 - [x] PR #507 merged as `0d07c14894560096053498a32a4e14d12ec3f1ae`.
-- [x] Work Manager remains present in the later Kairoseth Platform `main` history after concurrent Search Console work merged on top.
-- [ ] Public production deployment of `/products/work-manager` conclusively verified.
+- [x] Hostinger deployment acceptance directly observed deployed revision `0d07c14894560096053498a32a4e14d12ec3f1ae` before the platform advanced to later `main` revision `319b1c0873410af17e0a39812feab45861e4d738`.
+- [x] Later Kairoseth Platform `main` retains the Work Manager merge in its ancestry and the canonical route remains present in source.
 
-**Production note:** the first post-merge Cargo production proof triggered because `src/app/sitemap.ts` changed. It reached a healthy `kairoseth.com` but the deployed site still lacked pre-existing Kairoseth Cargo release markers during the bounded window. That is evidence of deployment/revision lag, not a Work Manager code regression. Do not mark the public landing as live until the current platform revision/deployment checks and the canonical route are verified.
+**Commercial catalog publication and deployment: COMPLETE / COMPLETADA.**
+
+The initial Cargo production proof immediately after the merge failed while production was still serving an older revision. A later deployed-revision acceptance then observed the exact Work Manager merge `0d07c148...` and subsequently the next platform main `319b1c08...`, resolving the deployment-lag condition without any Work Manager code change.
 
 ## Deliberately deferred / Diferido expresamente
 
@@ -131,14 +133,14 @@ These are future roadmap candidates and do **not** block the Phase 5 release:
 
 ## Next / Siguiente
 
-1. Verify the current `kairoseth-platform` deployed revision after the catalog merge and concurrent platform merges.
-2. Verify the public canonical landing `/products/work-manager` in production before marking the commercial publication fully live.
-3. Keep public pricing deferred until the Cloud / Private Cloud / Self-Hosted resource and operating-cost profile is measured.
-4. Any deferred capability must enter a newly documented future phase or explicitly scoped maintenance slice.
+1. Treat Phase 5 and the initial Kairoseth Software catalog publication as closed release boundaries.
+2. Keep public pricing deferred until the Cloud / Private Cloud / Self-Hosted resource and operating-cost profile is measured.
+3. Any deferred capability must enter a newly documented future phase or explicitly scoped maintenance slice.
+4. Reopen the current release only for an actual regression in a delivered product or publication contract.
 
 ## Current blockers / Bloqueos actuales
 
-No known technical product blocker in Gestor de Trabajo / Work Manager. Phase 5 is closed and the catalog publication is merged. The only open release-state item is **external deployment/revision verification in Kairoseth Platform production**; the first post-merge production proof showed a healthy site serving an older revision.
+**None / Ninguno.** No known technical product blocker or catalog-publication blocker remains for Gestor de Trabajo / Work Manager. Phase 5 is closed, the catalog code is merged, and Hostinger deployment acceptance observed the exact publication revision in production.
 
 ## Operating rule
 
