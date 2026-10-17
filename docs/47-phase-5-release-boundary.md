@@ -94,7 +94,7 @@ The technical product remains:
 - commercial EN name: **Work Manager**;
 - catalog category: **Kairoseth Software**.
 
-The commercial packaging action that followed this technical closure has now been completed at repository level:
+The commercial packaging action that followed this technical closure is complete:
 
 - Kairoseth Platform PR #507 published the product under canonical route `/products/work-manager`;
 - the `software` catalog area is available;
@@ -105,16 +105,22 @@ The commercial packaging action that followed this technical closure has now bee
 
 ### Production deployment boundary / Frontera de despliegue en producción
 
-Repository publication and production deployment are tracked separately. The public landing must not be declared live until the current Kairoseth Platform deployed revision is conclusively verified and `/products/work-manager` is observable from production.
+The production deployment is also confirmed. The Kairoseth Platform deployed-revision acceptance later observed:
 
-The first production proof after the publication merge was a pre-existing Kairoseth Cargo proof triggered by the sitemap change. It reached a healthy `kairoseth.com` but did not observe the already-existing Cargo release markers within its bounded deployment window. This is evidence that production was still serving an older revision at that moment, not evidence of a Work Manager regression.
+1. exact deployed revision `0d07c14894560096053498a32a4e14d12ec3f1ae`, which is the Work Manager publication merge;
+2. then deployed revision `319b1c0873410af17e0a39812feab45861e4d738`, the subsequent platform `main` that has `0d07c148...` as a parent.
+
+The same acceptance completed green after Hostinger converged to the newer revision. This resolves the earlier deployment-lag signal from the Cargo production proof, which had run before Hostinger caught up and therefore saw a healthy site with older release markers.
 
 Therefore:
 
 - **technical product boundary:** closed;
 - **commercial catalog code publication:** merged;
-- **production-live verification:** pending until the platform deployment catches up and the canonical Work Manager route is verified.
+- **production deployment:** confirmed;
+- **initial release/publication boundary:** complete.
+
+No Phase 5 feature needs to be reopened because of the temporary deployment lag.
 
 ## Reopening rule / Regla de reapertura
 
-Phase 5 is reopened only if a regression is found in a delivered Phase 5 contract. New capabilities from the deferred backlog belong to a newly documented future phase or explicitly scoped maintenance slice. A Kairoseth Platform deployment delay does not reopen Phase 5.
+Phase 5 is reopened only if a regression is found in a delivered Phase 5 contract. New capabilities from the deferred backlog belong to a newly documented future phase or explicitly scoped maintenance slice. A deployment delay or unrelated Kairoseth Platform production proof does not reopen Phase 5.
