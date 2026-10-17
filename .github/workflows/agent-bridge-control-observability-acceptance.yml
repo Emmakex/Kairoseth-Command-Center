@@ -216,7 +216,7 @@ jobs:
 
           node agent-bridge-control-acceptance.mjs | tee /tmp/agent-bridge-control-acceptance.json
 
-      - name: Verify Platform operator projection and secret-at-rest boundary
+      - name: Verify Platform operator projection
         run: |
           observability="$(curl --fail --silent \
             http://localhost:4000/v1/products/agent-bridge/runtime-observability \
@@ -241,6 +241,8 @@ jobs:
               assert forbidden not in serialized
           '
 
+      - name: Verify secret-at-rest persistence boundary
+        run: |
           mongo_result="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval "
             const enrollment=db.agent_bridge_enrollment_tokens.findOne({tenantId:'$WORKSPACE_ID'});
             const installation=db.agent_bridge_installations.findOne({tenantId:'$WORKSPACE_ID'});
