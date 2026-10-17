@@ -99,7 +99,7 @@ jobs:
             next_task_id="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
               "const t=db.tasks.findOne({recurrenceSourceTaskId:'$source_id'}); if(t) print(t.id)")"
             child_count="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
-              "print(db.tasks.countDocuments({recurrenceSourceTaskId:'$source_id','scope.kind':'workspace',status:'todo',dueAt:'$next_due','recurrenceRule.kind':'interval_days','recurrenceRule.intervalDays':7}))")"
+              "print(db.tasks.countDocuments({recurrenceSourceTaskId:'$source_id','scope.kind':'workspace',title:'CI recurring source',status:'todo',priority:77,dueAt:'$next_due','recurrenceRule.kind':'interval_days','recurrenceRule.intervalDays':7}))")"
             source_link_count="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
               "print(db.tasks.countDocuments({id:'$source_id','recurrenceNextTaskId':{\$type:'string'},'recurrenceMaterializedAt':{\$type:'string'}}))")"
             no_reminders="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
@@ -108,7 +108,9 @@ jobs:
               "print(db.tasks.countDocuments({recurrenceSourceTaskId:'$source_id',dependencyIds:{\$exists:false}}))")"
             audit_count="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
               "print(db.timeline_events.countDocuments({type:'task.recurrence_materialized','metadata.sourceTaskId':'$source_id','metadata.nextDueAt':'$next_due'}))")"
-            if [ -n "$next_task_id" ] && [ "$child_count" = "1" ] && [ "$source_link_count" = "1" ] && [ "$no_reminders" = "1" ] && [ "$no_dependencies" = "1" ] && [ "$audit_count" = "1" ]; then
+            delivered_count="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
+              "print(db.audit_outbox.countDocuments({'event.type':'task.recurrence_materialized','event.metadata.sourceTaskId':'$source_id',status:'delivered'}))")"
+            if [ -n "$next_task_id" ] && [ "$child_count" = "1" ] && [ "$source_link_count" = "1" ] && [ "$no_reminders" = "1" ] && [ "$no_dependencies" = "1" ] && [ "$audit_count" = "1" ] && [ "$delivered_count" = "1" ]; then
               materialized=1
               break
             fi
@@ -124,15 +126,13 @@ jobs:
             "print(db.tasks.findOne({id:'$source_id'}).recurrenceNextTaskId)")"
           test "$source_next_id" = "$next_task_id"
 
-          outbox_status="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
-            "print(db.audit_outbox.findOne({'event.type':'task.recurrence_materialized','event.entityId':'$next_task_id'}).status)")"
-          test "$outbox_status" = "delivered"
-
           sleep 7
           test "$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
             "print(db.tasks.countDocuments({recurrenceSourceTaskId:'$source_id'}))")" = "1"
           test "$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
             "print(db.timeline_events.countDocuments({type:'task.recurrence_materialized','metadata.sourceTaskId':'$source_id'}))")" = "1"
+          test "$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval \
+            "print(db.audit_outbox.countDocuments({'event.type':'task.recurrence_materialized','event.metadata.sourceTaskId':'$source_id'}))")" = "1"
 
       - name: Show service state on failure
         if: failure()
