@@ -4,7 +4,7 @@
 **Technical/internal project:** Kairoseth Command Center  
 **Commercial names:** Gestor de Trabajo (ES) / Work Manager (EN)  
 **Category:** Kairoseth Software  
-**Status:** Phase 5 Slice 15 is merged as `2998e19e236d29e10a34dcd6ff59690317002eac` and post-merge validated 10/10. Phase 5 Slice 16 — Task reminder UI / UI de recordatorios — is active.
+**Status:** Phase 5 Slice 16 is merged as `2c3cb8a51d5e7973ec1a218a032625e1715e34c4` and post-merge validated 11/11. Phase 5 Slice 17 — Task recurrence / Recurrencia de tareas — is active.
 
 ## Naming rule / Regla de naming
 
@@ -50,48 +50,50 @@
 - [x] Slice 13 — Dependency start readiness — PR #46 `1820cf457d5ca2c1eddc3b2f5e26287d940479c4`.
 - [x] Slice 14 — Task reminders — PR #47 `e9c217af98d529d8720a41928f0257d08524df0e`.
 - [x] Slice 15 — Task reminder materialization — PR #48 `2998e19e236d29e10a34dcd6ff59690317002eac`.
+- [x] Slice 16 — Task reminder UI — PR #49 `2c3cb8a51d5e7973ec1a218a032625e1715e34c4`.
 
-Slice 15 introduced a tenth dedicated regression gate. The resulting `main` boundary is validated 10/10 green.
-
-### Phase 5 Slice 15 — Task reminder materialization / Materialización de recordatorios
-
-- [x] Worker-side due-reminder materializer over explicit stored `{ kind: 'at' }` rules.
-- [x] Workspace/private tasks only; system scope and done/cancelled tasks excluded.
-- [x] Stable `task-reminder:<taskId>:<remindAt>` alert fingerprints.
-- [x] Same-scope warning/open in-app alerts with scope-bound durable idempotence.
-- [x] Transactional alert creation + `alert.reminder_due` audit-outbox event.
-- [x] One-time rule consumed transactionally after materialization.
-- [x] Optimistic task concurrency guard and duplicate-key race convergence.
-- [x] Dedicated Docker smoke proves materialization, consumption, delivered audit and no duplicates.
-- [x] PR #48 merged as `2998e19e236d29e10a34dcd6ff59690317002eac`; resulting `main` validated 10/10.
-
-**Phase 5 Slice 15: CLOSED / CERRADA.**
-
-## Active / Activo
+The current merged `main` boundary is validated 11/11 green, including CI, standalone release, reminder materialization and Agent Bridge A2A acceptance.
 
 ### Phase 5 Slice 16 — Task reminder UI / UI de recordatorios
 
-Implemented on `feat/phase-5-task-reminder-ui` so far:
-
 - [x] Existing scoped task catalog exposes one-time `reminderRules` to the web UI.
-- [x] Dynamic ES/EN reminder editor is embedded in each existing task card.
-- [x] Up to 10 one-time reminder rows can be added/removed; an empty editor clears all reminders.
-- [x] Workspace and private task surfaces reuse the existing guarded `PUT /v1/tasks/:id/reminders` endpoint.
-- [x] Same-origin proxy accepts no client tenant/user/time-zone authority fields.
-- [x] For reminder mutations, the proxy resolves the authenticated session and uses `session.user.timezone` as the authoritative IANA zone.
-- [x] `datetime-local` values are converted to canonical UTC ISO before reaching the API.
-- [x] Existing seconds are preserved by the editor/parser.
-- [x] Time-zone conversion round-trips and rejects non-existent DST local times instead of silently shifting them.
-- [x] Strict parser allow-list rejects unexpected authority fields, duplicates and more than 10 reminders.
-- [x] Tests cover Madrid summer/winter conversion, seconds, spring-forward gap, sorting, clearing, duplicates, limits and authority rejection.
-- [x] Product/security documentation in `docs/40-task-reminder-ui.md`.
-- [ ] Final-head lint, typecheck, tests, build and all 10 regression workflows.
+- [x] Dynamic ES/EN reminder editor embedded in each existing task card.
+- [x] Up to 10 one-time reminder rows can be added/removed; empty editor clears reminders.
+- [x] Workspace/private mutations reuse the guarded reminder endpoint.
+- [x] Authenticated session IANA time zone is authoritative for local-to-UTC conversion.
+- [x] DST gaps, duplicates, limits and authority-field injection are rejected.
+- [x] PR #49 merged as `2c3cb8a51d5e7973ec1a218a032625e1715e34c4`; resulting `main` validated 11/11.
+
+**Phase 5 Slice 16: CLOSED / CERRADA.**
+
+## Active / Activo
+
+### Phase 5 Slice 17 — Task recurrence / Recurrencia de tareas
+
+Implemented on `feat/phase-5-task-recurrence` so far:
+
+- [x] Optional backward-compatible `Task.recurrenceRule` model.
+- [x] First deterministic recurrence type: `{ kind: 'interval_days', intervalDays: 1..365 }`.
+- [x] Enabling recurrence requires an existing parseable task `dueAt` anchor.
+- [x] Guarded `PUT /v1/tasks/:id/recurrence` mutation for workspace and private scope.
+- [x] `null` recurrence safely clears recurrence intent without requiring a due-date anchor.
+- [x] Scope and actor are derived from the authenticated session; authority fields are rejected.
+- [x] `tasks.write` + `command-center` entitlement enforced.
+- [x] Transactional task mutation + `task.recurrence_changed` audit-outbox event.
+- [x] Optimistic `updatedAt` conflict protection.
+- [x] API/unit coverage for normalization, bounds, capability, scope, clearing, missing task, missing due date and conflicts.
+- [x] Docker smoke covers recurrence persistence plus delivered transactional audit.
+- [x] Product/security documentation in `docs/41-task-recurrence.md` and domain model alignment.
+- [ ] Final-head lint, typecheck, tests, build and all 11 regression workflows.
 - [ ] Merge and post-merge `main` validation.
 
-**Phase 5 Slice 16: VALIDATION PENDING / VALIDACIÓN PENDIENTE.**
+**Phase 5 Slice 17: VALIDATION PENDING / VALIDACIÓN PENDIENTE.**
 
 ## Deliberately deferred / Diferido expresamente
 
+- [ ] Task recurrence execution/materialization into a next occurrence.
+- [ ] Task recurrence editor UI.
+- [ ] Monthly/calendar recurrence semantics.
 - [ ] Recurring reminder rules.
 - [ ] Email, push, SMS or third-party reminder delivery.
 - [ ] Snooze/repeat policies.
@@ -100,16 +102,16 @@ Implemented on `feat/phase-5-task-reminder-ui` so far:
 - [ ] Critical-path duration forecasting or probabilistic deadline prediction.
 - [ ] Arbitrary user-authored conditions or executable rule DSL.
 - [ ] Automation actions beyond current in-app alert behavior.
-- [ ] AI-generated rules, weights, thresholds, dependencies, reminders or silent priority changes.
+- [ ] AI-generated rules, weights, thresholds, dependencies, reminders, recurrence or silent priority changes.
 - [ ] GitHub App/OAuth and additional providers.
 
 ## Security and correctness invariants
 
 1. Workspace/private scope is server-derived from authenticated context for user mutations.
 2. Product entitlement and capability checks are server-enforced.
-3. Provider credentials never enter durable reminder state, alerts or reminder audit events.
+3. Provider credentials never enter durable reminder/recurrence state, alerts or related audit events.
 4. Derived automation and prioritization remain deterministic, explainable and AI-independent.
-5. Private scope never crosses workspace dependency or reminder data.
+5. Private scope never crosses workspace dependency, reminder or recurrence data.
 6. Human dismissed decisions remain authoritative.
 7. Task dependencies reference local same-scope task IDs only and remain acyclic.
 8. A task cannot be explicitly started while any same-scope dependency is not `done` at the guard check.
@@ -123,20 +125,24 @@ Implemented on `feat/phase-5-task-reminder-ui` so far:
 16. Reminder alert creation and `alert.reminder_due` audit commit atomically.
 17. Browser reminder forms cannot choose tenant, actor or authoritative time zone.
 18. Reminder UI conversion uses the authenticated session IANA time zone and rejects non-existent local wall-clock times.
-19. Recurrence and external delivery remain separate until explicitly implemented and validated.
+19. Recurrence intent is explicit user-authored data and cannot choose tenant or actor authority.
+20. Enabling recurrence requires a persisted valid `dueAt` anchor.
+21. Recurrence mutation and `task.recurrence_changed` audit commit atomically with optimistic task concurrency.
+22. A stored recurrence rule does not itself create tasks, move dates or change statuses.
+23. Recurring reminders and external delivery remain separate until explicitly implemented and validated.
 
 ## Next / Siguiente
 
-1. Validate Slice 16 final head with lint, typecheck, tests, build and all 10 regression workflows.
-2. Correct any web/parser/time-zone regression directly on this slice.
+1. Validate Slice 17 final head with lint, typecheck, tests, build and all 11 regression workflows.
+2. Correct any model/API/Mongo/Docker regression directly on this slice.
 3. Merge the exact validated head and revalidate resulting `main`.
-4. Select the next Phase 5 micro-slice only from the resulting green repository state and documented boundaries.
-5. Keep recurring rules, external delivery, snooze/repeat, graph visualization, automatic status behavior, critical-path forecasting, arbitrary DSL, AI changes, OAuth and additional providers as separate fronts.
+4. Select recurrence execution/materialization or recurrence UI only from the resulting green repository state.
+5. Keep recurring reminders, external delivery, snooze/repeat, monthly semantics, graph visualization, automatic dependency status behavior, critical-path forecasting, arbitrary DSL, AI changes, OAuth and additional providers as separate fronts.
 6. When commercial publication is scheduled, create the Kairoseth Software catalog entry as **Gestor de Trabajo / Work Manager**.
 
 ## Current blockers / Bloqueos actuales
 
-No known product blocker. Slice 16 is ready for regression validation.
+No known product blocker. Slice 17 is ready for regression validation.
 
 ## Operating rule
 
