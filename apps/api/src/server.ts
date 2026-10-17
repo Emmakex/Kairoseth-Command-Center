@@ -7,6 +7,7 @@ import { MongoIntegrationSyncJobStore } from '@kcc/persistence/integration-sync-
 import { MongoPrioritizationWeightPolicyStore } from '@kcc/persistence/prioritization-weight-policies';
 import { MongoSignalAlertRulePolicyStore } from '@kcc/persistence/signal-alert-rule-policies';
 import { MongoAgentBridgeA2AStore } from './agent-bridge-a2a-store';
+import { MongoAgentBridgeControlStore } from './agent-bridge-control-store';
 import { buildApp } from './application';
 import { MongoDecisionLifecycleStore } from './decision-lifecycle-store';
 import { MongoGitHubConnectionStore } from './github-connection-store';
@@ -27,6 +28,7 @@ const decisionLifecycleStore = new MongoDecisionLifecycleStore(mongo, mongo.db()
 const taskDependencyStore = new MongoTaskDependencyStore(mongo, mongo.db());
 const taskReminderStore = new MongoTaskReminderStore(mongo, mongo.db());
 const agentBridgeA2AStore = new MongoAgentBridgeA2AStore(mongo.db());
+const agentBridgeControlStore = new MongoAgentBridgeControlStore(mongo.db());
 const integrationSignalStore = new MongoIntegrationSignalStore(mongo.db());
 const integrationSyncJobStore = new MongoIntegrationSyncJobStore(mongo.db());
 const signalAlertRulePolicyStore = new MongoSignalAlertRulePolicyStore(mongo, mongo.db());
@@ -55,6 +57,7 @@ try {
     taskDependencyStore.ensureIndexes(),
     taskReminderStore.ensureIndexes(),
     agentBridgeA2AStore.ensureIndexes(),
+    agentBridgeControlStore.ensureIndexes(),
     integrationSignalStore.ensureIndexes(),
     integrationSyncJobStore.ensureIndexes(),
     signalAlertRulePolicyStore.ensureIndexes(),
@@ -103,6 +106,7 @@ const app = buildApp({
   taskDependencyStore,
   taskReminderStore,
   agentBridgeA2AStore,
+  agentBridgeControlStore,
   integrationSignalStore,
   integrationSyncJobStore,
   signalAlertRulePolicyStore,
