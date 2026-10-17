@@ -2,9 +2,15 @@
 
 ## Product family
 
-Kairoseth Command Center belongs to **Kairoseth Software**.
+Commercial product names:
 
-The commercial model should preserve one product core and vary hosting, support, integrations and enterprise capabilities rather than creating incompatible forks.
+- **ES:** Gestor de Trabajo
+- **EN:** Work Manager
+- **Vendor/catalog brand:** Kairoseth
+- **Category:** Kairoseth Software
+- **Technical/internal repository name:** `Kairoseth Command Center`
+
+Public product names do not use `Kairoseth` as a prefix. The commercial model preserves one product core and varies hosting, support, integrations and enterprise capabilities rather than creating incompatible forks.
 
 ## Edition A — Kairoseth Cloud
 
@@ -44,7 +50,7 @@ Potential characteristics:
 
 ## Edition D — Enterprise Embedded
 
-Future option for customers that want Command Center functionality inside an existing intranet or application.
+Future option for customers that want Gestor de Trabajo / Work Manager functionality inside an existing intranet or application.
 
 Potential characteristics:
 - API/SDK;
@@ -86,6 +92,6 @@ Do not finalize pricing until the MVP resource profile and operating cost are me
 
 ## Positioning statement
 
-**EN:** One intelligent command center for projects, tasks, alerts, decisions and the signals your team cannot afford to miss — in our cloud or yours.
+**EN:** Work Manager is one intelligent command center for projects, tasks, alerts, decisions and the signals your team cannot afford to miss — in our cloud or yours.
 
-**ES:** Un centro de mando inteligente para proyectos, tareas, alertas, decisiones y las señales que tu equipo no se puede permitir olvidar — en nuestra nube o en la tuya.
+**ES:** Gestor de Trabajo es un centro de mando inteligente para proyectos, tareas, alertas, decisiones y las señales que tu equipo no se puede permitir olvidar — en nuestra nube o en la tuya.
