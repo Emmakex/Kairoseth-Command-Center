@@ -24,78 +24,75 @@
 
 ## Phase 3 — Operational core
 
-### Completed slices
+Completed with persistent standalone multi-user identities, operational domain/UI, transactional audit outbox and a validated standalone release boundary.
 
-- Projects, Tasks, Alerts, Decisions and Timeline domain/API foundation.
-- Scoped MongoDB persistence.
-- Quick Capture and operational mutations.
-- Weighted Milestones and automatic project progress.
-- Standalone login/bootstrap and authenticated Today dashboard.
-- ES/EN operational UI for Quick Capture, Projects, Tasks and Alerts.
-- Milestone management and Decision Log UI.
-- Scoped Timeline/audit UI.
-- Validated Decision create/supersede/reverse lifecycle.
-- Transactional audit outbox foundation and worker delivery.
-- Transactional migration of all current manual operational mutation families.
-- PR #12 merged; post-merge main CI #64 green.
-
-### Current final functional slice — PR #13
-
-Persistent standalone multi-user identities:
-
-- Mongo-backed users/workspaces/memberships/local credentials;
-- `scrypt-v1` password derivation with random salt;
-- persisted owner bootstrap and restart-safe local auth;
-- `owner` / `admin` / `member` capability resolution;
-- protected member management and owner invariants;
-- password change/reset with immediate old-session invalidation;
-- identity/password lifecycle audit through the transactional outbox;
-- ES/EN account and member-management UI;
-- route-level authorization/owner-protection tests;
-- dedicated Docker multi-user lifecycle smoke and GitHub Actions gate.
-
-Phase 3 closes only after PR #13 and its dedicated smoke are green on the final head, merged, and post-merge `main` verification is green.
-
-## Phase 3 release boundary
-
-After PR #13:
-
-1. run one final standalone end-to-end release gate across merged `main`;
-2. verify deployment/backup/configuration documentation is sufficient for a customer installation;
-3. prepare the product for Kairoseth Software publication.
-
-Commercial publication names are already reserved:
+Commercial publication names reserved:
 
 - **ES:** Gestor de Trabajo
 - **EN:** Work Manager
 
 `Kairoseth Command Center` remains the technical/internal repository/project name. Public product names must not use `Kairoseth` as a prefix.
 
+**Status: complete.**
+
 ## Phase 4 — Integrations
 
-Begin only after the standalone Phase 3 release boundary is clean.
+Delivered:
 
-Initial priority:
+- GitHub repository registration and project linking;
+- encrypted token-backed connections and live validation/sync;
+- normalized repository/PR/issue/CI signals;
+- retryable background and recurring refresh;
+- verified webhook ingestion and replay protection;
+- deterministic derived-alert lifecycle;
+- ES/EN setup, maintenance, webhook and activity surfaces.
 
-- GitHub integration;
-- repository/PR/issue status ingestion;
-- project ↔ repository linking;
-- alerts and Timeline signals derived from GitHub without replacing GitHub itself.
+**Status: complete. Final token-backed GitHub boundary validated on merged `main`.**
 
-Future adapters may include additional project, calendar, communication and enterprise systems.
+Future adapters such as GitLab, Calendar, Gmail/Microsoft 365, Jira/Linear, Slack/Teams and generic webhooks remain separate future roadmap items.
 
 ## Phase 5 — Automation and intelligence
+
+Roadmap objectives:
 
 - Configurable rules/automation.
 - Cross-source operational signals.
 - Explainable prioritization.
 - AI assistance only where it improves workflow without becoming required for core correctness.
 
+Delivered through 22 independently releasable slices:
+
+- workspace automation policies and ES/EN administration UI;
+- stale-work rules and configurable thresholds;
+- deterministic explainable prioritization, delivery risk and configurable weights;
+- task dependencies, dependency-aware ranking and start readiness;
+- one-time task reminders, worker materialization and ES/EN reminder UI;
+- fixed-day task recurrence, ES/EN recurrence UI and exactly-once next-occurrence materialization;
+- deterministic task, project and milestone deadline-alert lifecycles;
+- transactional audit paths, exact workspace/private isolation and human-authoritative dismissal semantics throughout.
+
+Final runtime boundary: merged `main` commit `d7eb0769bfed765727a851635eca41006ee412c2` completed the full 15-workflow regression set successfully after Slice 22.
+
+See [`47-phase-5-release-boundary.md`](47-phase-5-release-boundary.md) for objective-to-evidence mapping and the explicitly deferred backlog.
+
+**Status: complete. Technical release boundary CLOSED / CERRADA.**
+
+## After Phase 5 / Después de Fase 5
+
+The next product-level work is release/commercial packaging and catalog publication of:
+
+- **ES:** Gestor de Trabajo
+- **EN:** Work Manager
+- **Category:** Kairoseth Software
+
+Do not silently extend Phase 5 with deferred features. New capabilities require an explicitly documented future phase or maintenance slice with their own product, security and acceptance contracts.
+
 ## Operating principles
 
 - Keep phases small and releasable.
-- Do not open the next major integration front while the current release boundary is red.
+- Do not open the next major integration/front while the current release boundary is red.
 - ES/EN is a product invariant, not a later translation task.
 - Portable/self-hosted operation must remain possible without hidden Kairoseth dependencies.
 - Authorization and tenant/private boundaries are server-enforced.
 - Every security-sensitive lifecycle must have negative tests and an auditable path.
+- Deferred backlog is not release-blocking unless a future roadmap explicitly promotes it into scope.
