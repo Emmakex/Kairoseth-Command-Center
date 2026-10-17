@@ -86,6 +86,11 @@ export type TaskReminderRule = {
   remindAt: string;
 };
 
+export type TaskRecurrenceRule = {
+  kind: 'interval_days';
+  intervalDays: number;
+};
+
 export interface Task {
   id: string;
   scope: Scope;
@@ -105,6 +110,11 @@ export interface Task {
    * Optional for backward compatibility with documents created before reminder support.
    */
   reminderRules?: TaskReminderRule[];
+  /**
+   * Explicit recurrence intent. The first supported rule repeats from a task due-date anchor
+   * by a fixed whole-day interval. Execution is intentionally handled by a separate slice.
+   */
+  recurrenceRule?: TaskRecurrenceRule;
   dueAt?: string;
   completedAt?: string;
   createdAt: string;
