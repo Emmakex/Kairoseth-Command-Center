@@ -141,7 +141,9 @@ export default async function CommandCenterPage({
         </div>
         <div className="topbar-actions">
           {canViewAgentBridge ? (
-            <Link href={`/${locale}/ia/agent-bridge`}>IA · Agent Bridge</Link>
+            <Link href={`/${locale}/ia/agent-bridge`}>
+              {locale === 'es' ? 'IA · Agent Bridge' : 'AI · Agent Bridge'}
+            </Link>
           ) : null}
           <Link href={`/${otherLocale}?scope=${scope}`}>{otherLocale.toUpperCase()}</Link>
           <span className="user-label">
