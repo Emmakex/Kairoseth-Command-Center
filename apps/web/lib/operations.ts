@@ -1,7 +1,14 @@
 export type ManualScope = 'workspace' | 'private';
 
 type ReminderRuleBody = { kind: 'at'; remindAt: string };
-type OperationalBodyValue = string | number | string[] | ReminderRuleBody[];
+type RecurrenceRuleBody = { kind: 'interval_days'; intervalDays: number };
+type OperationalBodyValue =
+  | string
+  | number
+  | string[]
+  | ReminderRuleBody[]
+  | RecurrenceRuleBody
+  | null;
 
 export type OperationalMutation = {
   path: string;
@@ -19,6 +26,14 @@ const TASK_STATUSES = ['todo', 'in_progress', 'blocked', 'done', 'cancelled'] as
 const ALERT_STATUSES = ['open', 'acknowledged', 'resolved', 'dismissed'] as const;
 const TASK_DEPENDENCY_FORM_KEYS = new Set(['locale', 'operation', 'scope', 'id', 'dependencyIds']);
 const TASK_REMINDER_FORM_KEYS = new Set(['locale', 'operation', 'scope', 'id', 'remindAtLocal']);
+const TASK_RECURRENCE_FORM_KEYS = new Set([
+  'locale',
+  'operation',
+  'scope',
+  'id',
+  'recurrenceMode',
+  'intervalDays',
+]);
 const MAX_TASK_REMINDERS = 10;
 
 function requiredText(value: FormDataEntryValue | null, maxLength: number): string | null {
@@ -223,6 +238,24 @@ function taskReminderRules(form: FormData, timeZone: string | undefined): Remind
   return rules.sort((left, right) => left.remindAt.localeCompare(right.remindAt));
 }
 
+function taskRecurrenceRule(form: FormData): RecurrenceRuleBody | null | undefined {
+  for (const key of form.keys()) {
+    if (!TASK_RECURRENCE_FORM_KEYS.has(key)) return undefined;
+  }
+
+  const mode = form.get('recurrenceMode');
+  if (mode === 'none') return null;
+  if (mode !== 'interval_days') return undefined;
+
+  const rawInterval = form.get('intervalDays');
+  if (typeof rawInterval !== 'string' || !rawInterval.trim()) return undefined;
+  const intervalDays = Number(rawInterval);
+  if (!Number.isInteger(intervalDays) || intervalDays < 1 || intervalDays > 365) {
+    return undefined;
+  }
+  return { kind: 'interval_days', intervalDays };
+}
+
 export function parseOperationalMutation(
   form: FormData,
   options: OperationalParseOptions = {},
@@ -301,6 +334,16 @@ export function parseOperationalMutation(
       path: `/v1/tasks/${encodedId}/reminders`,
       method: 'PUT',
       body: { scope, reminderRules },
+    };
+  }
+
+  if (operation === 'task-recurrence') {
+    const recurrenceRule = taskRecurrenceRule(form);
+    if (recurrenceRule === undefined) return null;
+    return {
+      path: `/v1/tasks/${encodedId}/recurrence`,
+      method: 'PUT',
+      body: { scope, recurrenceRule },
     };
   }
 
