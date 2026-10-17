@@ -54,6 +54,7 @@ Esta carpeta es la fuente de verdad para las decisiones de producto, arquitectur
 47. [`42-task-recurrence-ui.md`](42-task-recurrence-ui.md) — ES/EN recurrence editor over the guarded recurrence mutation boundary.
 48. [`43-task-recurrence-materialization.md`](43-task-recurrence-materialization.md) — exactly-once worker materialization of completed recurring tasks into the next scoped occurrence.
 49. [`44-task-deadline-alerts.md`](44-task-deadline-alerts.md) — deterministic overdue-task alert creation, auto-resolution, reopening and dismissal-safe lifecycle.
+50. [`45-project-deadline-alerts.md`](45-project-deadline-alerts.md) — deterministic overdue-project alert creation, auto-resolution, reopening and dismissal-safe lifecycle.
 
 ## Living documents / Documentos vivos
 
