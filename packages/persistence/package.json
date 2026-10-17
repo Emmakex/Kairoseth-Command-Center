@@ -17,6 +17,7 @@
     "./integration-sync-jobs": { "types": "./dist/integration-sync-jobs.d.ts", "import": "./dist/integration-sync-jobs.js" },
     "./integration-sync-schedules": { "types": "./dist/integration-sync-schedules.d.ts", "import": "./dist/integration-sync-schedules.js" },
     "./prioritization-weight-policies": { "types": "./dist/prioritization-weight-policies.d.ts", "import": "./dist/prioritization-weight-policies.js" },
+    "./project-deadline-alerts": { "types": "./dist/project-deadline-alerts.d.ts", "import": "./dist/project-deadline-alerts.js" },
     "./signal-alert-rule-policies": { "types": "./dist/signal-alert-rule-policies.d.ts", "import": "./dist/signal-alert-rule-policies.js" },
     "./task-deadline-alerts": { "types": "./dist/task-deadline-alerts.d.ts", "import": "./dist/task-deadline-alerts.js" },
     "./task-recurrence-materialization": { "types": "./dist/task-recurrence-materialization.d.ts", "import": "./dist/task-recurrence-materialization.js" },
