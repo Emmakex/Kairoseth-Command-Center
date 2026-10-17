@@ -55,6 +55,14 @@ export type AgentBridgeA2ASaveResult =
         | 'agent_bridge_a2a_task_save_conflict';
     };
 
+export type AgentBridgeA2AObservabilitySummary = {
+  totalTasks: number;
+  activeClaims: number;
+  installations: number;
+  latestUpdatedAt: string | null;
+  states: Record<AgentBridgeA2ATaskState, number>;
+};
+
 export interface AgentBridgeA2AStore {
   ensureIndexes(): Promise<void>;
   save(record: AgentBridgeA2AStoredTask): Promise<AgentBridgeA2ASaveResult>;
@@ -73,6 +81,7 @@ export interface AgentBridgeA2AStore {
     claim: AgentBridgeA2ATransitionClaim,
     record: AgentBridgeA2AStoredTask,
   ): Promise<boolean>;
+  summarizeTenant?(tenantId: string): Promise<AgentBridgeA2AObservabilitySummary>;
 }
 
 type AgentBridgeA2ADocument = {
@@ -113,6 +122,12 @@ function clone<T>(value: T): T {
   return structuredClone(value);
 }
 
+function emptyStateCounts(): Record<AgentBridgeA2ATaskState, number> {
+  return Object.fromEntries(
+    AGENT_BRIDGE_A2A_TASK_STATES.map((state) => [state, 0]),
+  ) as Record<AgentBridgeA2ATaskState, number>;
+}
+
 export class MongoAgentBridgeA2AStore implements AgentBridgeA2AStore {
   private readonly tasks: Collection<AgentBridgeA2ADocument>;
 
@@ -129,6 +144,7 @@ export class MongoAgentBridgeA2AStore implements AgentBridgeA2AStore {
         'scope.installationId': 1,
         taskId: 1,
       }),
+      this.tasks.createIndex({ 'scope.tenantId': 1, updatedAt: -1 }),
     ]);
   }
 
@@ -233,5 +249,42 @@ export class MongoAgentBridgeA2AStore implements AgentBridgeA2AStore {
     );
 
     return result.matchedCount === 1;
+  }
+
+  async summarizeTenant(tenantId: string): Promise<AgentBridgeA2AObservabilitySummary> {
+    const tenantFilter = { 'scope.tenantId': tenantId } as const;
+    const [totalTasks, activeClaims, stateRows, installationRows, latest] = await Promise.all([
+      this.tasks.countDocuments(tenantFilter),
+      this.tasks.countDocuments({ ...tenantFilter, claimId: { $exists: true } }),
+      this.tasks
+        .aggregate<{ _id: string; count: number }>([
+          { $match: tenantFilter },
+          { $group: { _id: '$record.task.status.state', count: { $sum: 1 } } },
+        ])
+        .toArray(),
+      this.tasks
+        .aggregate<{ count: number }>([
+          { $match: tenantFilter },
+          { $group: { _id: '$scope.installationId' } },
+          { $count: 'count' },
+        ])
+        .toArray(),
+      this.tasks.find(tenantFilter).sort({ updatedAt: -1 }).limit(1).next(),
+    ]);
+
+    const states = emptyStateCounts();
+    for (const row of stateRows) {
+      if ((AGENT_BRIDGE_A2A_TASK_STATES as readonly string[]).includes(row._id)) {
+        states[row._id as AgentBridgeA2ATaskState] = row.count;
+      }
+    }
+
+    return {
+      totalTasks,
+      activeClaims,
+      installations: installationRows[0]?.count ?? 0,
+      latestUpdatedAt: latest?.updatedAt ?? null,
+      states,
+    };
   }
 }
