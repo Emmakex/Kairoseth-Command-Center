@@ -15,6 +15,7 @@ import {
 } from '@kcc/persistence/integration-sync-jobs';
 import { MongoIntegrationSyncScheduleStore } from '@kcc/persistence/integration-sync-schedules';
 import { MongoSignalAlertRulePolicyStore } from '@kcc/persistence/signal-alert-rule-policies';
+import { MongoTaskRecurrenceMaterializationStore } from '@kcc/persistence/task-recurrence-materialization';
 import { MongoTaskReminderAlertStore } from '@kcc/persistence/task-reminder-alerts';
 import { discoverGitHubSchedules, enqueueDueGitHubSchedule } from './integration-scheduler';
 
@@ -26,6 +27,7 @@ const syncJobs = new MongoIntegrationSyncJobStore(db);
 const syncSchedules = new MongoIntegrationSyncScheduleStore(db);
 const signalAlerts = new MongoIntegrationSignalAlertStore(mongo, db);
 const signalAlertRulePolicies = new MongoSignalAlertRulePolicyStore(mongo, db);
+const taskRecurrence = new MongoTaskRecurrenceMaterializationStore(mongo, db);
 const taskReminderAlerts = new MongoTaskReminderAlertStore(mongo, db);
 const integrationSecretKey = config.KCC_INTEGRATION_SECRET_KEY;
 
@@ -257,6 +259,7 @@ async function tick() {
         syncSchedules.ensureIndexes(),
         signalAlerts.ensureIndexes(),
         signalAlertRulePolicies.ensureIndexes(),
+        taskRecurrence.ensureIndexes(),
         taskReminderAlerts.ensureIndexes(),
         ...(githubExecution
           ? [githubExecution.secretStore.ensureIndexes(), githubExecution.signalStore.ensureIndexes()]
@@ -265,10 +268,11 @@ async function tick() {
       initialized = true;
     }
 
-    const [drained, requeuedSyncJobs, requeuedSchedules, taskReminders] = await Promise.all([
+    const [drained, requeuedSyncJobs, requeuedSchedules, taskRecurrences, taskReminders] = await Promise.all([
       outbox.drainPending(50),
       syncJobs.requeueExpired({ limit: 100 }),
       syncSchedules.requeueExpired({ limit: 100 }),
+      taskRecurrence.materializeCompleted(100),
       taskReminderAlerts.materializeDue(new Date().toISOString(), 100),
     ]);
 
@@ -298,6 +302,7 @@ async function tick() {
         delivered: drained.delivered,
         failed: drained.failed,
       },
+      taskRecurrences,
       taskReminders,
       integrationSync: {
         requeuedExpired: requeuedSyncJobs,
