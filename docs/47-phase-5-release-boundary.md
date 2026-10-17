@@ -6,6 +6,8 @@ Phase 5 — Automation and intelligence is technically complete at merged `main`
 
 La Fase 5 — Automatización e inteligencia queda técnicamente completada en el commit de `main` `d7eb0769bfed765727a851635eca41006ee412c2`, después del merge de la Slice 22 — Alertas de vencimiento de hitos — y de que el `main` resultante completara correctamente los 15 workflows de regresión.
 
+The formal closure documentation was subsequently merged in PR #60 as `f327c584be4bc55deec710dc6e61d0746ae57958`.
+
 ## Roadmap objective evidence / Evidencia de objetivos del roadmap
 
 ### Configurable rules and automation / Reglas y automatización configurables
@@ -92,8 +94,27 @@ The technical product remains:
 - commercial EN name: **Work Manager**;
 - catalog category: **Kairoseth Software**.
 
-The next product-level action after this technical release boundary is commercial/release packaging and catalog publication, not another undocumented Phase 5 feature.
+The commercial packaging action that followed this technical closure has now been completed at repository level:
+
+- Kairoseth Platform PR #507 published the product under canonical route `/products/work-manager`;
+- the `software` catalog area is available;
+- the landing is bilingual ES/EN and uses the independent commercial names without a Kairoseth prefix;
+- the catalog publication includes metadata, sitemap discovery, structured data and Product birth → Growth lifecycle registration;
+- PR #507 passed the Growth guard, editorial contract, lint, typecheck, full unit/acceptance suite, public-products responsive smoke, build and runtime smoke;
+- the publication merged as `0d07c14894560096053498a32a4e14d12ec3f1ae` and remains in the ancestry of later Kairoseth Platform `main` commits.
+
+### Production deployment boundary / Frontera de despliegue en producción
+
+Repository publication and production deployment are tracked separately. The public landing must not be declared live until the current Kairoseth Platform deployed revision is conclusively verified and `/products/work-manager` is observable from production.
+
+The first production proof after the publication merge was a pre-existing Kairoseth Cargo proof triggered by the sitemap change. It reached a healthy `kairoseth.com` but did not observe the already-existing Cargo release markers within its bounded deployment window. This is evidence that production was still serving an older revision at that moment, not evidence of a Work Manager regression.
+
+Therefore:
+
+- **technical product boundary:** closed;
+- **commercial catalog code publication:** merged;
+- **production-live verification:** pending until the platform deployment catches up and the canonical Work Manager route is verified.
 
 ## Reopening rule / Regla de reapertura
 
-Phase 5 is reopened only if a regression is found in a delivered Phase 5 contract. New capabilities from the deferred backlog belong to a newly documented future phase or explicitly scoped maintenance slice.
+Phase 5 is reopened only if a regression is found in a delivered Phase 5 contract. New capabilities from the deferred backlog belong to a newly documented future phase or explicitly scoped maintenance slice. A Kairoseth Platform deployment delay does not reopen Phase 5.
