@@ -245,7 +245,9 @@ export class MongoTaskDeadlineAlertStore {
   private async resolveOne(alert: Alert, now: string): Promise<boolean> {
     if (!isDeadlineScope(alert.scope)) return false;
     if (alert.status !== 'open' && alert.status !== 'acknowledged') return false;
-    const taskId = taskIdFromDeadlineFingerprint(alert.fingerprint);
+    const fingerprint = alert.fingerprint;
+    if (!fingerprint) return false;
+    const taskId = taskIdFromDeadlineFingerprint(fingerprint);
     if (!taskId) return false;
 
     const scoped = scopeFilter(alert.scope);
@@ -259,7 +261,7 @@ export class MongoTaskDeadlineAlertStore {
         {
           ...scoped,
           id: alert.id,
-          fingerprint: alert.fingerprint,
+          fingerprint,
           status: alert.status,
           updatedAt: alert.updatedAt,
         },
