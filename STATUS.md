@@ -4,7 +4,7 @@
 **Technical/internal project:** Kairoseth Command Center  
 **Commercial names:** Gestor de Trabajo (ES) / Work Manager (EN)  
 **Category:** Kairoseth Software  
-**Status:** Phase 5 Slice 16 is merged as `2c3cb8a51d5e7973ec1a218a032625e1715e34c4` and post-merge validated 11/11. Phase 5 Slice 17 — Task recurrence / Recurrencia de tareas — is active.
+**Status:** Phase 5 Slice 17 is merged as `646e71f8481d2a3eb17fc23f8471d26c81ce0af8` and post-merge validated 11/11. Phase 5 Slice 18 — Task recurrence UI / UI de recurrencia — is active.
 
 ## Naming rule / Regla de naming
 
@@ -51,48 +51,45 @@
 - [x] Slice 14 — Task reminders — PR #47 `e9c217af98d529d8720a41928f0257d08524df0e`.
 - [x] Slice 15 — Task reminder materialization — PR #48 `2998e19e236d29e10a34dcd6ff59690317002eac`.
 - [x] Slice 16 — Task reminder UI — PR #49 `2c3cb8a51d5e7973ec1a218a032625e1715e34c4`.
+- [x] Slice 17 — Task recurrence — PR #53 `646e71f8481d2a3eb17fc23f8471d26c81ce0af8`.
 
 The current merged `main` boundary is validated 11/11 green, including CI, standalone release, reminder materialization and Agent Bridge A2A acceptance.
 
-### Phase 5 Slice 16 — Task reminder UI / UI de recordatorios
-
-- [x] Existing scoped task catalog exposes one-time `reminderRules` to the web UI.
-- [x] Dynamic ES/EN reminder editor embedded in each existing task card.
-- [x] Up to 10 one-time reminder rows can be added/removed; empty editor clears reminders.
-- [x] Workspace/private mutations reuse the guarded reminder endpoint.
-- [x] Authenticated session IANA time zone is authoritative for local-to-UTC conversion.
-- [x] DST gaps, duplicates, limits and authority-field injection are rejected.
-- [x] PR #49 merged as `2c3cb8a51d5e7973ec1a218a032625e1715e34c4`; resulting `main` validated 11/11.
-
-**Phase 5 Slice 16: CLOSED / CERRADA.**
-
-## Active / Activo
-
 ### Phase 5 Slice 17 — Task recurrence / Recurrencia de tareas
-
-Implemented on `feat/phase-5-task-recurrence` so far:
 
 - [x] Optional backward-compatible `Task.recurrenceRule` model.
 - [x] First deterministic recurrence type: `{ kind: 'interval_days', intervalDays: 1..365 }`.
 - [x] Enabling recurrence requires an existing parseable task `dueAt` anchor.
-- [x] Guarded `PUT /v1/tasks/:id/recurrence` mutation for workspace and private scope.
-- [x] `null` recurrence safely clears recurrence intent without requiring a due-date anchor.
-- [x] Scope and actor are derived from the authenticated session; authority fields are rejected.
-- [x] `tasks.write` + `command-center` entitlement enforced.
-- [x] Transactional task mutation + `task.recurrence_changed` audit-outbox event.
-- [x] Optimistic `updatedAt` conflict protection.
-- [x] API/unit coverage for normalization, bounds, capability, scope, clearing, missing task, missing due date and conflicts.
-- [x] Docker smoke covers recurrence persistence plus delivered transactional audit.
-- [x] Product/security documentation in `docs/41-task-recurrence.md` and domain model alignment.
+- [x] Guarded workspace/private recurrence mutation with session-derived scope and actor.
+- [x] Transactional recurrence mutation + `task.recurrence_changed` audit outbox.
+- [x] Optimistic task conflict protection and Docker persistence/audit smoke.
+- [x] PR #53 merged as `646e71f8481d2a3eb17fc23f8471d26c81ce0af8`; resulting `main` validated 11/11.
+
+**Phase 5 Slice 17: CLOSED / CERRADA.**
+
+## Active / Activo
+
+### Phase 5 Slice 18 — Task recurrence UI / UI de recurrencia
+
+Implemented on `feat/phase-5-task-recurrence-ui` so far:
+
+- [x] ES/EN recurrence editor embedded in each existing task card.
+- [x] UI supports recurrence disabled or fixed whole-day intervals from 1 through 365 days.
+- [x] Persisted `dueAt` is shown as the recurrence anchor.
+- [x] Interval recurrence is disabled in the UI when the task has no parseable due-date anchor.
+- [x] Clearing recurrence remains available independently of due-date presence.
+- [x] Same-origin mutation parser maps the form to the proven `PUT /v1/tasks/:id/recurrence` API.
+- [x] Strict form allow-list rejects tenant/user/actor authority fields and unsupported modes.
+- [x] Web tests cover activation, clearing, interval bounds, fractions and authority-field rejection.
+- [x] Product/security documentation in `docs/42-task-recurrence-ui.md`.
 - [ ] Final-head lint, typecheck, tests, build and all 11 regression workflows.
 - [ ] Merge and post-merge `main` validation.
 
-**Phase 5 Slice 17: VALIDATION PENDING / VALIDACIÓN PENDIENTE.**
+**Phase 5 Slice 18: VALIDATION PENDING / VALIDACIÓN PENDIENTE.**
 
 ## Deliberately deferred / Diferido expresamente
 
 - [ ] Task recurrence execution/materialization into a next occurrence.
-- [ ] Task recurrence editor UI.
 - [ ] Monthly/calendar recurrence semantics.
 - [ ] Recurring reminder rules.
 - [ ] Email, push, SMS or third-party reminder delivery.
@@ -129,20 +126,22 @@ Implemented on `feat/phase-5-task-recurrence` so far:
 20. Enabling recurrence requires a persisted valid `dueAt` anchor.
 21. Recurrence mutation and `task.recurrence_changed` audit commit atomically with optimistic task concurrency.
 22. A stored recurrence rule does not itself create tasks, move dates or change statuses.
-23. Recurring reminders and external delivery remain separate until explicitly implemented and validated.
+23. Browser recurrence forms can choose only recurrence mode and interval; tenant and actor authority remain server-derived.
+24. UI due-date disabling is convenience only; the API remains authoritative for recurrence correctness.
+25. Recurring reminders and external delivery remain separate until explicitly implemented and validated.
 
 ## Next / Siguiente
 
-1. Validate Slice 17 final head with lint, typecheck, tests, build and all 11 regression workflows.
-2. Correct any model/API/Mongo/Docker regression directly on this slice.
+1. Validate Slice 18 final head with lint, typecheck, tests, build and all 11 regression workflows.
+2. Correct any web/parser/render regression directly on this slice.
 3. Merge the exact validated head and revalidate resulting `main`.
-4. Select recurrence execution/materialization or recurrence UI only from the resulting green repository state.
+4. Design recurrence execution/materialization only from the resulting green repository state, including explicit idempotence and lineage before any automatic task creation.
 5. Keep recurring reminders, external delivery, snooze/repeat, monthly semantics, graph visualization, automatic dependency status behavior, critical-path forecasting, arbitrary DSL, AI changes, OAuth and additional providers as separate fronts.
 6. When commercial publication is scheduled, create the Kairoseth Software catalog entry as **Gestor de Trabajo / Work Manager**.
 
 ## Current blockers / Bloqueos actuales
 
-No known product blocker. Slice 17 is ready for regression validation.
+No known product blocker. Slice 18 is ready for regression validation.
 
 ## Operating rule
 
