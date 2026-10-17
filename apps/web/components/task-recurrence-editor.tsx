@@ -35,8 +35,8 @@ export function TaskRecurrenceEditor({
   locale: Locale;
   scope: 'workspace' | 'private';
   taskId: string;
-  dueAt?: string;
-  intervalDays?: number;
+  dueAt?: string | undefined;
+  intervalDays?: number | undefined;
 }) {
   const t = copy[locale];
   const hasDueAt = typeof dueAt === 'string' && Number.isFinite(Date.parse(dueAt));
