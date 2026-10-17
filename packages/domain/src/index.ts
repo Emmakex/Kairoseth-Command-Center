@@ -112,9 +112,15 @@ export interface Task {
   reminderRules?: TaskReminderRule[];
   /**
    * Explicit recurrence intent. The first supported rule repeats from a task due-date anchor
-   * by a fixed whole-day interval. Execution is intentionally handled by a separate slice.
+   * by a fixed whole-day interval.
    */
   recurrenceRule?: TaskRecurrenceRule;
+  /** Immediate completed occurrence that produced this task. */
+  recurrenceSourceTaskId?: string;
+  /** Successor generated from this occurrence. At most one successor may exist. */
+  recurrenceNextTaskId?: string;
+  /** Worker timestamp recording when the successor was committed. */
+  recurrenceMaterializedAt?: string;
   dueAt?: string;
   completedAt?: string;
   createdAt: string;
