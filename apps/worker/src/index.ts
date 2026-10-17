@@ -14,6 +14,7 @@ import {
   type IntegrationSyncJob,
 } from '@kcc/persistence/integration-sync-jobs';
 import { MongoIntegrationSyncScheduleStore } from '@kcc/persistence/integration-sync-schedules';
+import { MongoMilestoneDeadlineAlertStore } from '@kcc/persistence/milestone-deadline-alerts';
 import { MongoProjectDeadlineAlertStore } from '@kcc/persistence/project-deadline-alerts';
 import { MongoSignalAlertRulePolicyStore } from '@kcc/persistence/signal-alert-rule-policies';
 import { MongoTaskDeadlineAlertStore } from '@kcc/persistence/task-deadline-alerts';
@@ -29,6 +30,7 @@ const syncJobs = new MongoIntegrationSyncJobStore(db);
 const syncSchedules = new MongoIntegrationSyncScheduleStore(db);
 const signalAlerts = new MongoIntegrationSignalAlertStore(mongo, db);
 const signalAlertRulePolicies = new MongoSignalAlertRulePolicyStore(mongo, db);
+const milestoneDeadlineAlerts = new MongoMilestoneDeadlineAlertStore(mongo, db);
 const projectDeadlineAlerts = new MongoProjectDeadlineAlertStore(mongo, db);
 const taskDeadlineAlerts = new MongoTaskDeadlineAlertStore(mongo, db);
 const taskRecurrence = new MongoTaskRecurrenceMaterializationStore(mongo, db);
@@ -263,6 +265,7 @@ async function tick() {
         syncSchedules.ensureIndexes(),
         signalAlerts.ensureIndexes(),
         signalAlertRulePolicies.ensureIndexes(),
+        milestoneDeadlineAlerts.ensureIndexes(),
         projectDeadlineAlerts.ensureIndexes(),
         taskDeadlineAlerts.ensureIndexes(),
         taskRecurrence.ensureIndexes(),
@@ -279,6 +282,7 @@ async function tick() {
       drained,
       requeuedSyncJobs,
       requeuedSchedules,
+      milestoneDeadlines,
       projectDeadlines,
       taskDeadlines,
       taskRecurrences,
@@ -287,6 +291,7 @@ async function tick() {
       outbox.drainPending(50),
       syncJobs.requeueExpired({ limit: 100 }),
       syncSchedules.requeueExpired({ limit: 100 }),
+      milestoneDeadlineAlerts.reconcile(now, 100),
       projectDeadlineAlerts.reconcile(now, 100),
       taskDeadlineAlerts.reconcile(now, 100),
       taskRecurrence.materializeCompleted(100),
@@ -319,6 +324,7 @@ async function tick() {
         delivered: drained.delivered,
         failed: drained.failed,
       },
+      milestoneDeadlines,
       projectDeadlines,
       taskDeadlines,
       taskRecurrences,
