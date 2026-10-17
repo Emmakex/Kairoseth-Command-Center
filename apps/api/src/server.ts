@@ -17,6 +17,7 @@ import { MongoLocalIdentityStore } from './local-identity-store';
 import { MongoOperationalAuditStore } from './operational-audit-store';
 import { PersistentLocalAuthProvider } from './persistent-local-auth';
 import { MongoTaskDependencyStore } from './task-dependency-store';
+import { MongoTaskRecurrenceStore } from './task-recurrence-store';
 import { MongoTaskReminderStore } from './task-reminder-store';
 
 const config = loadApiConfig();
@@ -25,6 +26,7 @@ const operationalStore = new MongoOperationalStore(mongo.db());
 const operationalAuditStore = new MongoOperationalAuditStore(mongo, mongo.db());
 const decisionLifecycleStore = new MongoDecisionLifecycleStore(mongo, mongo.db());
 const taskDependencyStore = new MongoTaskDependencyStore(mongo, mongo.db());
+const taskRecurrenceStore = new MongoTaskRecurrenceStore(mongo, mongo.db());
 const taskReminderStore = new MongoTaskReminderStore(mongo, mongo.db());
 const agentBridgeA2AStore = new MongoAgentBridgeA2AStore(mongo.db());
 const integrationSignalStore = new MongoIntegrationSignalStore(mongo.db());
@@ -53,6 +55,7 @@ try {
     operationalStore.ensureIndexes(),
     decisionLifecycleStore.ensureIndexes(),
     taskDependencyStore.ensureIndexes(),
+    taskRecurrenceStore.ensureIndexes(),
     taskReminderStore.ensureIndexes(),
     agentBridgeA2AStore.ensureIndexes(),
     integrationSignalStore.ensureIndexes(),
@@ -101,6 +104,7 @@ const app = buildApp({
   milestoneStore: operationalStore,
   decisionLifecycleStore,
   taskDependencyStore,
+  taskRecurrenceStore,
   taskReminderStore,
   agentBridgeA2AStore,
   integrationSignalStore,
