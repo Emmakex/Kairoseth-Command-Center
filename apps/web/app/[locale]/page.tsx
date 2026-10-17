@@ -60,6 +60,8 @@ export default async function CommandCenterPage({
   const canManageMembers = session.capabilities.includes('members.manage');
   const canManageIntegrations = session.capabilities.includes('integrations.manage');
   const canManageAutomation = session.capabilities.includes('automation.manage');
+  const canViewAgentBridge =
+    scope === 'workspace' && session.productEntitlements.includes('agent-bridge');
   const canReadPriorities =
     session.capabilities.includes('tasks.read') &&
     session.capabilities.includes('alerts.read') &&
@@ -138,6 +140,9 @@ export default async function CommandCenterPage({
           <strong>{copy.title}</strong>
         </div>
         <div className="topbar-actions">
+          {canViewAgentBridge ? (
+            <Link href={`/${locale}/ia/agent-bridge`}>IA · Agent Bridge</Link>
+          ) : null}
           <Link href={`/${otherLocale}?scope=${scope}`}>{otherLocale.toUpperCase()}</Link>
           <span className="user-label">
             {copy.signedInAs} <strong>{session.user.displayName}</strong>
