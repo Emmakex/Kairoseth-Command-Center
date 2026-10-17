@@ -7,6 +7,9 @@ import type { SignalAlertRulePolicyStore } from '@kcc/persistence/signal-alert-r
 import type { GitHubWebhookStore } from '@kcc/persistence/github-webhooks';
 import { registerAgentBridgeA2ARoutes } from './agent-bridge-a2a';
 import type { AgentBridgeA2AStore } from './agent-bridge-a2a-store';
+import { registerAgentBridgeControlRoutes } from './agent-bridge-control';
+import type { AgentBridgeControlStore } from './agent-bridge-control-store';
+import { registerAgentBridgeRuntimeObservabilityRoutes } from './agent-bridge-runtime-observability';
 import { buildApp as buildBaseApp } from './app';
 import type { ReadinessCheck } from './app';
 import { registerAutomationRulePolicyRoutes } from './automation-rule-policies';
@@ -53,6 +56,7 @@ type ApplicationOptions = {
   taskRecurrenceStore?: TaskRecurrenceStore;
   taskReminderStore?: TaskReminderStore;
   agentBridgeA2AStore?: AgentBridgeA2AStore;
+  agentBridgeControlStore?: AgentBridgeControlStore;
   githubRepositoryStore?: GitHubRepositoryStore;
   githubConnectionStore?: GitHubConnectionStore;
   githubProviderClient?: GitHubProviderClient;
@@ -84,6 +88,18 @@ export function buildApp(options: ApplicationOptions = {}) {
     ...(options.authProvider ? { authProvider: options.authProvider } : {}),
     ...(options.agentBridgeA2AStore
       ? { agentBridgeA2AStore: options.agentBridgeA2AStore }
+      : {}),
+  });
+  registerAgentBridgeControlRoutes(app, {
+    ...(options.authProvider ? { authProvider: options.authProvider } : {}),
+    ...(options.agentBridgeControlStore
+      ? { controlStore: options.agentBridgeControlStore }
+      : {}),
+  });
+  registerAgentBridgeRuntimeObservabilityRoutes(app, {
+    ...(options.authProvider ? { authProvider: options.authProvider } : {}),
+    ...(options.agentBridgeControlStore
+      ? { controlStore: options.agentBridgeControlStore }
       : {}),
   });
 
