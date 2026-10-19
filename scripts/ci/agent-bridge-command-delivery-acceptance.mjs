@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { Buffer } from 'node:buffer';
 import console from 'node:console';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { generateKeyPairSync } from 'node:crypto';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import process from 'node:process';
@@ -66,6 +67,41 @@ async function waitFor(check, message, timeoutMs = 45_000) {
   throw new Error(message);
 }
 
+async function bootstrapReadOnlyApprovalTrust(binding) {
+  assert.deepEqual(
+    binding.trustedApprovalKeys,
+    [],
+    'Phase 7.2A must not silently enable Platform-signed WRITE approvals.',
+  );
+
+  const { publicKey } = generateKeyPairSync('ed25519');
+  const publicKeyPem = publicKey.export({ type: 'spki', format: 'pem' });
+  const securityDir = join(stateDir, 'security');
+  await mkdir(securityDir, { recursive: true, mode: 0o700 });
+  await writeFile(
+    join(securityDir, 'approval-keyset.json'),
+    `${JSON.stringify(
+      {
+        version: 'kab.approval-keyset-state.v1',
+        tenantId: binding.tenantId,
+        installationId: binding.installationId,
+        bridgeInstanceId: binding.bridgeInstanceId,
+        generation: 0,
+        keys: [
+          {
+            keyId: 'phase7-2a-read-only-bootstrap',
+            publicKeyPem,
+          },
+        ],
+        updatedAt: new Date().toISOString(),
+      },
+      null,
+      2,
+    )}\n`,
+    { encoding: 'utf8', mode: 0o600 },
+  );
+}
+
 const connectorHttp = {
   async resolveHost(hostname) {
     assert.equal(hostname, 'shop.example.com');
@@ -124,6 +160,7 @@ try {
   assert.equal(binding.tenantId, process.env.WORKSPACE_ID);
   assert.ok(binding.installationId);
   assert.ok(binding.bridgeInstanceId);
+  await bootstrapReadOnlyApprovalTrust(binding);
   console.log('E2E_STAGE=enrollment:ok');
 
   controller = new globalThis.AbortController();
@@ -188,6 +225,7 @@ try {
     acknowledgementStatus: completed.acknowledgement.status,
     deliveryAttempt: completed.deliveryAttempt,
     connectorCalls: connectorCalls.length,
+    approvalTrustMode: 'acceptance-read-only-bootstrap',
     recoverableSources: [...new Set(recoverableErrors.map((item) => item.source))].sort(),
   }));
 } finally {
