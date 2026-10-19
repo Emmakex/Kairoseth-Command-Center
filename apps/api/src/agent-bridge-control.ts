@@ -32,6 +32,17 @@ function text(value: unknown, max = MAX_ID): string | null {
   return normalized;
 }
 
+function multilineText(value: unknown, max: number): string | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim();
+  if (!normalized || normalized.length > max) return null;
+  for (const character of normalized) {
+    const code = character.charCodeAt(0);
+    if ((code <= 31 && code !== 10 && code !== 13) || code === 127) return null;
+  }
+  return normalized;
+}
+
 function timestamp(value: unknown): string | null {
   const parsed = text(value, 64);
   return parsed && Number.isFinite(Date.parse(parsed)) ? parsed : null;
@@ -74,7 +85,7 @@ function registrationProof(value: unknown): AgentBridgeRegistrationProof | null 
   if (!proof || !payload) return null;
   const bridgeInstanceId = text(payload.bridgeInstanceId);
   const keyId = text(payload.keyId);
-  const publicKeyPem = text(payload.publicKeyPem, 8192);
+  const publicKeyPem = multilineText(payload.publicKeyPem, 8192);
   const runtimeVersion = text(payload.runtimeVersion, 128);
   const deploymentMode = payload.deploymentMode;
   const capabilities = stringArray(payload.capabilities);
