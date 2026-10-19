@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict';
+import { Buffer } from 'node:buffer';
+import console from 'node:console';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import process from 'node:process';
+import { setTimeout as delay } from 'node:timers/promises';
+import { URL, pathToFileURL } from 'node:url';
 
 const bridgeRoot = process.env.AGENT_BRIDGE_SOURCE;
 assert.ok(bridgeRoot, 'AGENT_BRIDGE_SOURCE is required');
@@ -25,14 +29,14 @@ const recoverableErrors = [];
 const stateDir = await mkdtemp(join(tmpdir(), 'kab-platform-7-2a-'));
 
 function json(payload, status = 200) {
-  return new Response(JSON.stringify(payload), {
+  return new globalThis.Response(JSON.stringify(payload), {
     status,
     headers: { 'content-type': 'application/json' },
   });
 }
 
 async function operatorRequest(path, init = {}) {
-  const response = await fetch(`${baseUrl}${path}`, {
+  const response = await globalThis.fetch(`${baseUrl}${path}`, {
     ...init,
     headers: {
       authorization: `Bearer ${process.env.OPERATOR_ACCESS_TOKEN}`,
@@ -57,7 +61,7 @@ async function waitFor(check, message, timeoutMs = 45_000) {
   while (Date.now() < deadline) {
     const value = await check();
     if (value) return value;
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await delay(250);
   }
   throw new Error(message);
 }
@@ -70,7 +74,7 @@ const connectorHttp = {
   async fetch(input, init) {
     const url = new URL(input);
     const method = init.method ?? 'GET';
-    const headers = new Headers(init.headers);
+    const headers = new globalThis.Headers(init.headers);
     const expectedBasic = Buffer.from('ck_phase7_2a:cs_phase7_2a', 'utf8').toString('base64');
     assert.equal(headers.get('authorization'), `Basic ${expectedBasic}`);
     connectorCalls.push({ method, path: url.pathname, query: url.search });
@@ -122,7 +126,7 @@ try {
   assert.ok(binding.bridgeInstanceId);
   console.log('E2E_STAGE=enrollment:ok');
 
-  controller = new AbortController();
+  controller = new globalThis.AbortController();
   runPromise = runtime.run(controller.signal);
 
   console.log('E2E_STAGE=snapshot:start');
