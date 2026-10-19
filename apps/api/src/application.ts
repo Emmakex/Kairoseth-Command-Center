@@ -7,10 +7,13 @@ import type { SignalAlertRulePolicyStore } from '@kcc/persistence/signal-alert-r
 import type { GitHubWebhookStore } from '@kcc/persistence/github-webhooks';
 import { registerAgentBridgeA2ARoutes } from './agent-bridge-a2a';
 import type { AgentBridgeA2AStore } from './agent-bridge-a2a-store';
+import type { AgentBridgeApprovalService } from './agent-bridge-approval-service';
+import type { AgentBridgeAuditStore } from './agent-bridge-audit-store';
 import { registerAgentBridgeControlRoutes } from './agent-bridge-control';
 import type { AgentBridgeControlStore } from './agent-bridge-control-store';
 import { registerAgentBridgeExecutionRoutes } from './agent-bridge-execution';
 import type { AgentBridgeExecutionStore } from './agent-bridge-execution-store';
+import { registerAgentBridgeSecurityRoutes } from './agent-bridge-security';
 import { registerAgentBridgeRuntimeObservabilityRoutes } from './agent-bridge-runtime-observability';
 import { buildApp as buildBaseApp } from './app';
 import type { ReadinessCheck } from './app';
@@ -60,6 +63,8 @@ type ApplicationOptions = {
   agentBridgeA2AStore?: AgentBridgeA2AStore;
   agentBridgeControlStore?: AgentBridgeControlStore;
   agentBridgeExecutionStore?: AgentBridgeExecutionStore;
+  agentBridgeAuditStore?: AgentBridgeAuditStore;
+  agentBridgeApprovalService?: AgentBridgeApprovalService;
   githubRepositoryStore?: GitHubRepositoryStore;
   githubConnectionStore?: GitHubConnectionStore;
   githubProviderClient?: GitHubProviderClient;
@@ -98,6 +103,9 @@ export function buildApp(options: ApplicationOptions = {}) {
     ...(options.agentBridgeControlStore
       ? { controlStore: options.agentBridgeControlStore }
       : {}),
+    ...(options.agentBridgeApprovalService
+      ? { approvalService: options.agentBridgeApprovalService }
+      : {}),
   });
   registerAgentBridgeExecutionRoutes(app, {
     ...(options.authProvider ? { authProvider: options.authProvider } : {}),
@@ -106,6 +114,17 @@ export function buildApp(options: ApplicationOptions = {}) {
       : {}),
     ...(options.agentBridgeExecutionStore
       ? { executionStore: options.agentBridgeExecutionStore }
+      : {}),
+  });
+  registerAgentBridgeSecurityRoutes(app, {
+    ...(options.agentBridgeControlStore
+      ? { controlStore: options.agentBridgeControlStore }
+      : {}),
+    ...(options.agentBridgeAuditStore
+      ? { auditStore: options.agentBridgeAuditStore }
+      : {}),
+    ...(options.agentBridgeApprovalService
+      ? { approvalService: options.agentBridgeApprovalService }
       : {}),
   });
   registerAgentBridgeRuntimeObservabilityRoutes(app, {

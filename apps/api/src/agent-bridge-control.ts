@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { authorize, type AuthProvider, type SessionContext } from '@kcc/auth';
+import type { AgentBridgeApprovalService } from './agent-bridge-approval-service';
 import type {
   AgentBridgeControlStore,
   AgentBridgeHeartbeat,
@@ -380,6 +381,7 @@ export function registerAgentBridgeControlRoutes(
   options: {
     authProvider?: AuthProvider;
     controlStore?: AgentBridgeControlStore;
+    approvalService?: AgentBridgeApprovalService;
   },
 ): void {
   const store = options.controlStore;
@@ -434,7 +436,9 @@ export function registerAgentBridgeControlRoutes(
       binding: {
         version: 'kab.installation-binding.v1',
         ...binding,
-        trustedApprovalKeys: [],
+        trustedApprovalKeys: options.approvalService
+          ? [options.approvalService.trustedKey()]
+          : [],
       },
     };
   });
