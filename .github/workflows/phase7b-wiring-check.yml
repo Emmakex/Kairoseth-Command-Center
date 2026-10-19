@@ -27,82 +27,36 @@ jobs:
           control = Path('apps/api/src/agent-bridge-control.ts')
           text = control.read_text()
           needle = "import { authorize, type AuthProvider, type SessionContext } from '@kcc/auth';\n"
-          addition = needle + "import type { AgentBridgeApprovalService } from './agent-bridge-approval-service';\n"
           if "AgentBridgeApprovalService" not in text:
-              text = text.replace(needle, addition, 1)
-          text = text.replace(
-              "    authProvider?: AuthProvider;\n    controlStore?: AgentBridgeControlStore;\n",
-              "    authProvider?: AuthProvider;\n    controlStore?: AgentBridgeControlStore;\n    approvalService?: AgentBridgeApprovalService;\n",
-              1,
-          )
-          text = text.replace(
-              "        trustedApprovalKeys: [],",
-              "        trustedApprovalKeys: options.approvalService\n          ? [options.approvalService.trustedKey()]\n          : [],",
-              1,
-          )
+              text = text.replace(needle, needle + "import type { AgentBridgeApprovalService } from './agent-bridge-approval-service';\n", 1)
+          text = text.replace("    authProvider?: AuthProvider;\n    controlStore?: AgentBridgeControlStore;\n", "    authProvider?: AuthProvider;\n    controlStore?: AgentBridgeControlStore;\n    approvalService?: AgentBridgeApprovalService;\n", 1)
+          text = text.replace("        trustedApprovalKeys: [],", "        trustedApprovalKeys: options.approvalService\n          ? [options.approvalService.trustedKey()]\n          : [],", 1)
           control.write_text(text)
 
           application = Path('apps/api/src/application.ts')
           text = application.read_text()
           marker = "import type { AgentBridgeA2AStore } from './agent-bridge-a2a-store';\n"
           if "AgentBridgeApprovalService" not in text:
-              text = text.replace(
-                  marker,
-                  marker
-                  + "import type { AgentBridgeApprovalService } from './agent-bridge-approval-service';\n"
-                  + "import type { AgentBridgeAuditStore } from './agent-bridge-audit-store';\n",
-                  1,
-              )
-          security_import = "import { registerAgentBridgeSecurityRoutes } from './agent-bridge-security';\n"
+              text = text.replace(marker, marker + "import type { AgentBridgeApprovalService } from './agent-bridge-approval-service';\n" + "import type { AgentBridgeAuditStore } from './agent-bridge-audit-store';\n", 1)
           exec_import = "import type { AgentBridgeExecutionStore } from './agent-bridge-execution-store';\n"
+          security_import = "import { registerAgentBridgeSecurityRoutes } from './agent-bridge-security';\n"
           if security_import not in text:
               text = text.replace(exec_import, exec_import + security_import, 1)
-          text = text.replace(
-              "  agentBridgeExecutionStore?: AgentBridgeExecutionStore;\n",
-              "  agentBridgeExecutionStore?: AgentBridgeExecutionStore;\n  agentBridgeAuditStore?: AgentBridgeAuditStore;\n  agentBridgeApprovalService?: AgentBridgeApprovalService;\n",
-              1,
-          )
-          control_registration = """  registerAgentBridgeControlRoutes(app, {
-    ...(options.authProvider ? { authProvider: options.authProvider } : {}),
-    ...(options.agentBridgeControlStore
-      ? { controlStore: options.agentBridgeControlStore }
-      : {}),
-  });"""
-          replacement = """  registerAgentBridgeControlRoutes(app, {
-    ...(options.authProvider ? { authProvider: options.authProvider } : {}),
-    ...(options.agentBridgeControlStore
-      ? { controlStore: options.agentBridgeControlStore }
-      : {}),
-    ...(options.agentBridgeApprovalService
-      ? { approvalService: options.agentBridgeApprovalService }
-      : {}),
-  });"""
-          if control_registration in text:
-              text = text.replace(control_registration, replacement, 1)
-          security_registration = """  registerAgentBridgeSecurityRoutes(app, {
-    ...(options.agentBridgeControlStore
-      ? { controlStore: options.agentBridgeControlStore }
-      : {}),
-    ...(options.agentBridgeAuditStore
-      ? { auditStore: options.agentBridgeAuditStore }
-      : {}),
-    ...(options.agentBridgeApprovalService
-      ? { approvalService: options.agentBridgeApprovalService }
-      : {}),
-  });
-"""
+          text = text.replace("  agentBridgeExecutionStore?: AgentBridgeExecutionStore;\n", "  agentBridgeExecutionStore?: AgentBridgeExecutionStore;\n  agentBridgeAuditStore?: AgentBridgeAuditStore;\n  agentBridgeApprovalService?: AgentBridgeApprovalService;\n", 1)
+          old = "  registerAgentBridgeControlRoutes(app, {\n    ...(options.authProvider ? { authProvider: options.authProvider } : {}),\n    ...(options.agentBridgeControlStore\n      ? { controlStore: options.agentBridgeControlStore }\n      : {}),\n  });"
+          new = "  registerAgentBridgeControlRoutes(app, {\n    ...(options.authProvider ? { authProvider: options.authProvider } : {}),\n    ...(options.agentBridgeControlStore\n      ? { controlStore: options.agentBridgeControlStore }\n      : {}),\n    ...(options.agentBridgeApprovalService\n      ? { approvalService: options.agentBridgeApprovalService }\n      : {}),\n  });"
+          if old in text:
+              text = text.replace(old, new, 1)
+          security = "  registerAgentBridgeSecurityRoutes(app, {\n    ...(options.agentBridgeControlStore\n      ? { controlStore: options.agentBridgeControlStore }\n      : {}),\n    ...(options.agentBridgeAuditStore\n      ? { auditStore: options.agentBridgeAuditStore }\n      : {}),\n    ...(options.agentBridgeApprovalService\n      ? { approvalService: options.agentBridgeApprovalService }\n      : {}),\n  });\n"
           anchor = "  registerAgentBridgeRuntimeObservabilityRoutes(app, {"
           if "registerAgentBridgeSecurityRoutes(app" not in text:
-              text = text.replace(anchor, security_registration + anchor, 1)
+              text = text.replace(anchor, security + anchor, 1)
           application.write_text(text)
 
           acceptance = Path('.github/workflows/agent-bridge-command-delivery-acceptance.yml')
           text = acceptance.read_text()
           text = text.replace("assert.equal(writeAttempt.status, 409);", "assert.equal(writeAttempt.status, 503);")
-          text = text.replace(
-              "assert.equal(writeError.code, 'agent_bridge_read_tool_unavailable');",
-              "assert.equal(writeError.code, 'agent_bridge_mutating_approval_unavailable');",
-          )
+          text = text.replace("assert.equal(writeError.code, 'agent_bridge_read_tool_unavailable');", "assert.equal(writeError.code, 'agent_bridge_mutating_approval_unavailable');")
           acceptance.write_text(text)
           PY
 
