@@ -1,11 +1,12 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { authorize, type AuthProvider, type SessionContext } from '@kcc/auth';
 import type { AgentBridgeControlStore, AgentBridgeRuntimeSession } from './agent-bridge-control-store';
-import type {
-  AgentBridgeCommandAcknowledgement,
-  AgentBridgeCommandAckStatus,
-  AgentBridgeCommandOutcomeStatus,
-  AgentBridgeExecutionStore,
+import {
+  AgentBridgeApprovalSigningUnavailableError,
+  type AgentBridgeCommandAcknowledgement,
+  type AgentBridgeCommandAckStatus,
+  type AgentBridgeCommandOutcomeStatus,
+  type AgentBridgeExecutionStore,
 } from './agent-bridge-execution-store';
 
 const MAX_ID = 512;
@@ -167,7 +168,7 @@ export function registerAgentBridgeExecutionRoutes(
     }
 
     try {
-      const command = await options.executionStore.queueReadCommand({
+      const command = await options.executionStore.queueCommand({
         tenantId: session.activeWorkspaceId,
         installationId,
         toolId,
@@ -177,13 +178,16 @@ export function registerAgentBridgeExecutionRoutes(
         ...(correlationId ? { correlationId } : {}),
       });
       if (!command) {
-        return reply.code(409).send({ code: 'agent_bridge_read_tool_unavailable' });
+        return reply.code(409).send({ code: 'agent_bridge_tool_unavailable' });
       }
       return reply.code(201).send({
         version: 'kcc.agent-bridge-command.v1',
         command,
       });
     } catch (error) {
+      if (error instanceof AgentBridgeApprovalSigningUnavailableError) {
+        return reply.code(503).send({ code: 'agent_bridge_mutating_approval_unavailable' });
+      }
       request.log.warn({ err: error }, 'Agent Bridge command queue rejected input');
       return reply.code(400).send({ code: 'invalid_agent_bridge_command' });
     }
