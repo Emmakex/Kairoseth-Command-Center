@@ -52,12 +52,6 @@ jobs:
           if "registerAgentBridgeSecurityRoutes(app" not in text:
               text = text.replace(anchor, security + anchor, 1)
           application.write_text(text)
-
-          acceptance = Path('.github/workflows/agent-bridge-command-delivery-acceptance.yml')
-          text = acceptance.read_text()
-          text = text.replace("assert.equal(writeAttempt.status, 409);", "assert.equal(writeAttempt.status, 503);")
-          text = text.replace("assert.equal(writeError.code, 'agent_bridge_read_tool_unavailable');", "assert.equal(writeError.code, 'agent_bridge_mutating_approval_unavailable');")
-          acceptance.write_text(text)
           PY
 
       - name: Setup pnpm
@@ -80,15 +74,18 @@ jobs:
         run: pnpm --filter @kcc/api typecheck
 
       - name: Run Agent Bridge API tests
-        run: pnpm exec vitest run apps/api/test/agent-bridge-control.test.ts apps/api/test/agent-bridge-execution.test.ts
+        run: pnpm exec vitest run apps/api/test/agent-bridge-control.test.ts apps/api/test/agent-bridge-execution.test.ts apps/api/test/agent-bridge-approval-service.test.ts
 
-      - name: Commit validated wiring and remove helper
+      - name: Commit validated source wiring
         shell: bash
         run: |
           set -euo pipefail
-          rm .github/workflows/phase7b-wiring-check.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add apps/api/src/agent-bridge-control.ts apps/api/src/application.ts .github/workflows/agent-bridge-command-delivery-acceptance.yml .github/workflows/phase7b-wiring-check.yml
+          git add apps/api/src/agent-bridge-control.ts apps/api/src/application.ts
+          if git diff --cached --quiet; then
+            echo 'Source wiring already committed.'
+            exit 0
+          fi
           git commit -m 'feat(agent-bridge): wire approval and audit control plane'
           git push origin HEAD:phase7/agent-bridge-write-approval
