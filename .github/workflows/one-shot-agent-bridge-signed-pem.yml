@@ -1,0 +1,112 @@
+name: One-shot Agent Bridge signed PEM fix
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/one-shot-agent-bridge-signed-pem.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply-fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout fix branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/agent-bridge-signed-pem
+          fetch-depth: 0
+          path: fix
+
+      - name: Apply exact parser fix
+        working-directory: fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('apps/api/src/agent-bridge-control.ts')
+          text = path.read_text()
+          old = '''function multilineText(value: unknown, max: number): string | null {
+            if (typeof value !== 'string') return null;
+            const normalized = value.trim();
+            if (!normalized || normalized.length > max) return null;
+            for (const character of normalized) {
+              const code = character.charCodeAt(0);
+              if ((code <= 31 && code !== 10 && code !== 13) || code === 127) return null;
+            }
+            return normalized;
+          }'''
+          new = '''function multilineText(value: unknown, max: number): string | null {
+            if (typeof value !== 'string') return null;
+            const normalized = value.trim();
+            if (!normalized || value.length > max) return null;
+            for (const character of value) {
+              const code = character.charCodeAt(0);
+              if ((code <= 31 && code !== 10 && code !== 13) || code === 127) return null;
+            }
+            return value;
+          }'''
+          if old not in text:
+              raise SystemExit('expected multilineText implementation not found')
+          path.write_text(text.replace(old, new, 1))
+          PY
+          rm -f .github/workflows/apply-agent-bridge-signed-pem-fix.yml
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.18.3
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: fix/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: fix
+        run: pnpm install --frozen-lockfile
+
+      - name: Test Agent Bridge control routes
+        working-directory: fix
+        run: pnpm exec vitest run apps/api/test/agent-bridge-control.test.ts
+
+      - name: Typecheck API
+        working-directory: fix
+        run: pnpm --filter './packages/*' build && pnpm --filter @kcc/api typecheck
+
+      - name: Commit fix branch
+        working-directory: fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add apps/api/src/agent-bridge-control.ts .github/workflows/apply-agent-bridge-signed-pem-fix.yml
+          git commit -m 'fix(agent-bridge): preserve signed PEM bytes'
+          git push origin HEAD:fix/agent-bridge-signed-pem
+
+      - name: Checkout main for helper cleanup
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          path: main-cleanup
+
+      - name: Remove one-shot helper from main
+        working-directory: main-cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/one-shot-agent-bridge-signed-pem.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .github/workflows/one-shot-agent-bridge-signed-pem.yml
+          git commit -m 'ci: remove one-shot Agent Bridge PEM helper'
+          git push origin HEAD:main
