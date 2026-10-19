@@ -186,7 +186,7 @@ export function registerAgentBridgeExecutionRoutes(
       });
     } catch (error) {
       if (error instanceof AgentBridgeApprovalSigningUnavailableError) {
-        return reply.code(503).send({ code: 'agent_bridge_mutating_approval_unavailable' });
+        return reply.code(409).send({ code: 'agent_bridge_read_tool_unavailable' });
       }
       request.log.warn({ err: error }, 'Agent Bridge command queue rejected input');
       return reply.code(400).send({ code: 'invalid_agent_bridge_command' });

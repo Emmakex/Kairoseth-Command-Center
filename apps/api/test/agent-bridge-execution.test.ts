@@ -181,8 +181,8 @@ describe('Agent Bridge execution routes', () => {
         input: { orderId: 42, status: 'completed' },
       },
     });
-    expect(writeAttempt.statusCode).toBe(503);
-    expect(writeAttempt.json()).toEqual({ code: 'agent_bridge_mutating_approval_unavailable' });
+    expect(writeAttempt.statusCode).toBe(409);
+    expect(writeAttempt.json()).toEqual({ code: 'agent_bridge_read_tool_unavailable' });
 
     const injectedApproval = await app.inject({
       method: 'POST',
