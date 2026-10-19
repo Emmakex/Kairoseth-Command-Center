@@ -65,11 +65,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
+      - name: Build workspace packages
+        run: pnpm --filter './packages/*' build
+
       - name: Test Agent Bridge control routes
         run: pnpm exec vitest run apps/api/test/agent-bridge-control.test.ts
 
       - name: Typecheck API
-        run: pnpm --filter './packages/*' build && pnpm --filter @kcc/api typecheck
+        run: pnpm --filter @kcc/api typecheck
 
       - name: Commit fix and remove temporary workflow
         shell: bash
