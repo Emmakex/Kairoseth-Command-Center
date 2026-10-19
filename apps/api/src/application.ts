@@ -1,17 +1,21 @@
 import type { AuthProvider } from '@kcc/auth';
 import type { MilestoneStore, OperationalStore } from '@kcc/persistence';
+import type { GitHubWebhookStore } from '@kcc/persistence/github-webhooks';
 import type { IntegrationSignalStore } from '@kcc/persistence/integration-signals';
 import type { IntegrationSyncJobStore } from '@kcc/persistence/integration-sync-jobs';
 import type { PrioritizationWeightPolicyStore } from '@kcc/persistence/prioritization-weight-policies';
 import type { SignalAlertRulePolicyStore } from '@kcc/persistence/signal-alert-rule-policies';
-import type { GitHubWebhookStore } from '@kcc/persistence/github-webhooks';
 import { registerAgentBridgeA2ARoutes } from './agent-bridge-a2a';
 import type { AgentBridgeA2AStore } from './agent-bridge-a2a-store';
+import { registerAgentBridgeApprovedExecutionRoutes } from './agent-bridge-approved-execution';
+import type { AgentBridgeApprovalService } from './agent-bridge-approval-store';
+import type { AgentBridgeAuditStore } from './agent-bridge-audit-store';
 import { registerAgentBridgeControlRoutes } from './agent-bridge-control';
 import type { AgentBridgeControlStore } from './agent-bridge-control-store';
 import { registerAgentBridgeExecutionRoutes } from './agent-bridge-execution';
 import type { AgentBridgeExecutionStore } from './agent-bridge-execution-store';
 import { registerAgentBridgeRuntimeObservabilityRoutes } from './agent-bridge-runtime-observability';
+import { registerAgentBridgeSecurityRoutes } from './agent-bridge-security';
 import { buildApp as buildBaseApp } from './app';
 import type { ReadinessCheck } from './app';
 import { registerAutomationRulePolicyRoutes } from './automation-rule-policies';
@@ -60,6 +64,8 @@ type ApplicationOptions = {
   agentBridgeA2AStore?: AgentBridgeA2AStore;
   agentBridgeControlStore?: AgentBridgeControlStore;
   agentBridgeExecutionStore?: AgentBridgeExecutionStore;
+  agentBridgeApprovalService?: AgentBridgeApprovalService;
+  agentBridgeAuditStore?: AgentBridgeAuditStore;
   githubRepositoryStore?: GitHubRepositoryStore;
   githubConnectionStore?: GitHubConnectionStore;
   githubProviderClient?: GitHubProviderClient;
@@ -98,6 +104,9 @@ export function buildApp(options: ApplicationOptions = {}) {
     ...(options.agentBridgeControlStore
       ? { controlStore: options.agentBridgeControlStore }
       : {}),
+    ...(options.agentBridgeApprovalService
+      ? { approvalService: options.agentBridgeApprovalService }
+      : {}),
   });
   registerAgentBridgeExecutionRoutes(app, {
     ...(options.authProvider ? { authProvider: options.authProvider } : {}),
@@ -106,6 +115,23 @@ export function buildApp(options: ApplicationOptions = {}) {
       : {}),
     ...(options.agentBridgeExecutionStore
       ? { executionStore: options.agentBridgeExecutionStore }
+      : {}),
+  });
+  registerAgentBridgeApprovedExecutionRoutes(app, {
+    ...(options.authProvider ? { authProvider: options.authProvider } : {}),
+    ...(options.agentBridgeExecutionStore
+      ? { executionStore: options.agentBridgeExecutionStore }
+      : {}),
+  });
+  registerAgentBridgeSecurityRoutes(app, {
+    ...(options.agentBridgeControlStore
+      ? { controlStore: options.agentBridgeControlStore }
+      : {}),
+    ...(options.agentBridgeApprovalService
+      ? { approvalService: options.agentBridgeApprovalService }
+      : {}),
+    ...(options.agentBridgeAuditStore
+      ? { auditStore: options.agentBridgeAuditStore }
       : {}),
   });
   registerAgentBridgeRuntimeObservabilityRoutes(app, {
