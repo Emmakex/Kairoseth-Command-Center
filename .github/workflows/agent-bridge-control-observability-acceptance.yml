@@ -115,27 +115,33 @@ jobs:
             },
           );
 
+          console.log('E2E_STAGE=enrollment:start');
           const binding = await enrollmentClient.enroll(process.env.ENROLLMENT_TOKEN);
           assert.equal(binding.version, 'kab.installation-binding.v1');
           assert.equal(binding.tenantId, process.env.WORKSPACE_ID);
           assert.ok(binding.installationId);
           assert.equal(binding.trustedApprovalKeys.length, 0);
+          console.log('E2E_STAGE=enrollment:ok');
 
           const sessionClient = new ControlSessionClient(
             identityManager,
             new HttpSessionTransport({ baseUrl, allowInsecureHttp: true }),
             { runtimeVersion, capabilities },
           );
+          console.log('E2E_STAGE=session:start');
           const controlSession = await sessionClient.open(binding);
           assert.equal(controlSession.credential.version, 'kab.session-credential.v1');
           assert.equal(controlSession.credential.tenantId, binding.tenantId);
           assert.equal(controlSession.credential.installationId, binding.installationId);
           assert.ok(controlSession.credential.accessToken);
+          console.log('E2E_STAGE=session:ok');
 
+          console.log('E2E_STAGE=heartbeat:start');
           const heartbeatAck = await controlSession.heartbeat('ready');
           assert.equal(heartbeatAck.version, 'kab.heartbeat-ack.v1');
           assert.equal(heartbeatAck.nextHeartbeatInSeconds, 30);
           assert.ok(Number.isFinite(Date.parse(heartbeatAck.receivedAt)));
+          console.log('E2E_STAGE=heartbeat:ok');
 
           const snapshot = {
             version: 'kab.runtime-snapshot.v1',
@@ -189,6 +195,7 @@ jobs:
             baseUrl,
             allowInsecureHttp: true,
           });
+          console.log('E2E_STAGE=snapshot:start');
           const snapshotAck = await snapshotTransport.report(
             controlSession.credential.accessToken,
             snapshot,
@@ -196,7 +203,9 @@ jobs:
           assert.equal(snapshotAck.version, 'kab.runtime-snapshot-ack.v1');
           assert.equal(snapshotAck.snapshotId, snapshot.snapshotId);
           assert.ok(Number.isFinite(Date.parse(snapshotAck.receivedAt)));
+          console.log('E2E_STAGE=snapshot:ok');
 
+          console.log('E2E_STAGE=operator-isolation:start');
           const operatorSnapshotAttempt = await fetch(`${baseUrl}/api/products/agent-bridge/runtime-snapshot`, {
             method: 'POST',
             headers: {
@@ -205,7 +214,9 @@ jobs:
             },
             body: JSON.stringify({ snapshot }),
           });
+          console.log(`operator_snapshot_status=${operatorSnapshotAttempt.status}`);
           assert.equal(operatorSnapshotAttempt.status, 401);
+          console.log('E2E_STAGE=operator-isolation:ok');
 
           console.log(JSON.stringify({
             installationId: binding.installationId,
