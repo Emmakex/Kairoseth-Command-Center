@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
+import { authorize, type AuthProvider, type SessionContext } from '@kcc/auth';
 import type { AgentBridgeApprovalService } from './agent-bridge-approval-store';
 import type {
   AgentBridgeAuditBatch,
@@ -56,6 +57,19 @@ function bearer(request: FastifyRequest): string | null {
   if (!authorization) return null;
   const [scheme, credential] = authorization.trim().split(/\s+/, 2);
   return scheme?.toLowerCase() === 'bearer' && credential ? credential : null;
+}
+
+async function operatorSession(
+  request: FastifyRequest,
+  authProvider?: AuthProvider,
+): Promise<SessionContext | null> {
+  if (!authProvider) return null;
+  const authorization = request.headers.authorization;
+  const cookie = request.headers.cookie;
+  return authProvider.resolveSession({
+    ...(authorization ? { authorization } : {}),
+    ...(cookie ? { cookie } : {}),
+  });
 }
 
 async function runtimeSession(
@@ -218,11 +232,50 @@ function auditBatch(value: unknown): AgentBridgeAuditBatch | null {
 export function registerAgentBridgeSecurityRoutes(
   app: FastifyInstance,
   options: {
+    authProvider?: AuthProvider;
     controlStore?: AgentBridgeControlStore;
     approvalService?: AgentBridgeApprovalService;
     auditStore?: AgentBridgeAuditStore;
   },
 ): void {
+  app.get('/v1/products/agent-bridge/approval-keys/rotation', async (request, reply) => {
+    reply.header('cache-control', 'no-store');
+    const session = await operatorSession(request, options.authProvider);
+    if (!session) return reply.code(401).send({ code: 'unauthorized' });
+    if (!session.activeWorkspaceId) return reply.code(400).send({ code: 'workspace_required' });
+    if (!authorize(session, { product: 'agent-bridge', capability: 'workspace.manage' })) {
+      return reply.code(403).send({ code: 'agent_bridge_forbidden' });
+    }
+    if (!options.approvalService) {
+      return reply.code(503).send({ code: 'agent_bridge_approval_unavailable' });
+    }
+
+    const status = await options.approvalService.rotationStatus(session.activeWorkspaceId);
+    return {
+      version: 'kcc.agent-bridge-approval-rotation.v1',
+      status,
+    };
+  });
+
+  app.post('/v1/products/agent-bridge/approval-keys/rotate', async (request, reply) => {
+    reply.header('cache-control', 'no-store');
+    const session = await operatorSession(request, options.authProvider);
+    if (!session) return reply.code(401).send({ code: 'unauthorized' });
+    if (!session.activeWorkspaceId) return reply.code(400).send({ code: 'workspace_required' });
+    if (!authorize(session, { product: 'agent-bridge', capability: 'workspace.manage' })) {
+      return reply.code(403).send({ code: 'agent_bridge_forbidden' });
+    }
+    if (!options.approvalService) {
+      return reply.code(503).send({ code: 'agent_bridge_approval_unavailable' });
+    }
+
+    const status = await options.approvalService.beginRotation(session.activeWorkspaceId);
+    return reply.code(202).send({
+      version: 'kcc.agent-bridge-approval-rotation.v1',
+      status,
+    });
+  });
+
   app.post('/api/products/agent-bridge/approval-keys/sync', async (request, reply) => {
     reply.header('cache-control', 'no-store');
     const session = await runtimeSession(request, options.controlStore);
@@ -241,12 +294,31 @@ export function registerAgentBridgeSecurityRoutes(
     ) {
       return reply.code(400).send({ code: 'invalid_approval_key_sync_request' });
     }
-    const generation = await options.approvalService.generation(session.tenantId);
-    if (Number(currentGeneration) === generation) return reply.code(204).send();
-    return reply.code(409).send({
-      code: 'approval_key_generation_mismatch',
-      currentGeneration: generation,
-    });
+    const reportedGeneration = Number(currentGeneration);
+    const platformGeneration = await options.approvalService.generation(session.tenantId);
+    if (reportedGeneration > platformGeneration) {
+      return reply.code(409).send({
+        code: 'approval_key_generation_ahead',
+        currentGeneration: platformGeneration,
+      });
+    }
+
+    try {
+      const result = await options.approvalService.syncApprovalKeys({
+        tenantId: session.tenantId,
+        installationId: session.installationId,
+        bridgeInstanceId: session.bridgeInstanceId,
+        currentGeneration: reportedGeneration,
+      });
+      if (!result.update) return reply.code(204).send();
+      return { update: result.update };
+    } catch (error) {
+      request.log.warn({ err: error }, 'Agent Bridge approval-key synchronization rejected');
+      if (error instanceof Error && error.message === 'agent_bridge_approval_generation_ahead') {
+        return reply.code(409).send({ code: 'approval_key_generation_ahead' });
+      }
+      return reply.code(409).send({ code: 'approval_key_sync_rejected' });
+    }
   });
 
   app.post('/api/products/agent-bridge/audit/batch', async (request, reply) => {

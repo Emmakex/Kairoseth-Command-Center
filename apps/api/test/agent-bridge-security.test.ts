@@ -35,6 +35,18 @@ const approvalService: AgentBridgeApprovalService = {
   async generation() {
     return 0;
   },
+  async rotationStatus() {
+    return { generation: 0, phase: 'stable' as const, signingKeyId: 'unused', trustedKeyIds: [] };
+  },
+  async beginRotation() {
+    return { generation: 1, phase: 'overlap' as const, signingKeyId: 'unused', trustedKeyIds: [] };
+  },
+  async syncApprovalKeys() {
+    return {
+      update: null,
+      status: { generation: 0, phase: 'stable' as const, signingKeyId: 'unused', trustedKeyIds: [] },
+    };
+  },
   async signApproval() {
     return 'unused';
   },
@@ -117,7 +129,7 @@ describe('Agent Bridge approval-key sync and runtime audit security', () => {
     });
     expect(mismatch.statusCode).toBe(409);
     expect(mismatch.json()).toEqual({
-      code: 'approval_key_generation_mismatch',
+      code: 'approval_key_generation_ahead',
       currentGeneration: 0,
     });
 
