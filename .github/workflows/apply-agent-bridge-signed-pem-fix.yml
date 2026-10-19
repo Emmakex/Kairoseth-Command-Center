@@ -57,14 +57,13 @@ jobs:
         with:
           version: 10.18.3
 
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
 
       - name: Test Agent Bridge control routes
         run: pnpm exec vitest run apps/api/test/agent-bridge-control.test.ts
