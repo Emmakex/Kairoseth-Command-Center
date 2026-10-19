@@ -35,12 +35,12 @@ function text(value: unknown, max = MAX_ID): string | null {
 function multilineText(value: unknown, max: number): string | null {
   if (typeof value !== 'string') return null;
   const normalized = value.trim();
-  if (!normalized || normalized.length > max) return null;
-  for (const character of normalized) {
+  if (!normalized || value.length > max) return null;
+  for (const character of value) {
     const code = character.charCodeAt(0);
     if ((code <= 31 && code !== 10 && code !== 13) || code === 127) return null;
   }
-  return normalized;
+  return value;
 }
 
 function timestamp(value: unknown): string | null {
