@@ -90,6 +90,7 @@ jobs:
 
       - name: Prove real Agent Bridge enrollment session heartbeat and snapshot
         run: |
+          set -euo pipefail
           cat > agent-bridge-control-acceptance.mjs <<'NODE'
           import assert from 'node:assert/strict';
           import { BridgeIdentityManager, InMemoryBridgeIdentityStore } from './agent-bridge-source/dist/src/identity/installation-identity.js';
@@ -218,27 +219,60 @@ jobs:
 
       - name: Verify Platform operator projection
         run: |
+          set -euo pipefail
           observability="$(curl --fail --silent \
             http://localhost:4000/v1/products/agent-bridge/runtime-observability \
             -H "authorization: Bearer $OPERATOR_ACCESS_TOKEN")"
           printf '%s' "$observability" | python3 -c '
           import json,sys
           data=json.load(sys.stdin)
-          assert data["version"] == "kcc.agent-bridge-runtime-observability.v1"
-          summary=data["summary"]
-          assert summary["totalInstallations"] == 1
-          assert summary["connectedInstallations"] == 1
-          assert summary["offlineInstallations"] == 0
-          row=summary["installations"][0]
-          assert row["connectivity"] == "connected"
-          assert row["readiness"] == "ready"
-          assert row["runtimeVersion"] == "0.1.0-dev.0"
-          assert row["deploymentMode"] == "local"
-          assert row["connectors"] == {"total":1,"healthy":1,"degraded":0,"unhealthy":0}
-          assert row["tools"] == {"total":1,"available":1,"degraded":0,"blocked":0}
+          summary=data.get("summary", {})
+          rows=summary.get("installations", [])
+          safe={
+              "version": data.get("version"),
+              "totalInstallations": summary.get("totalInstallations"),
+              "connectedInstallations": summary.get("connectedInstallations"),
+              "offlineInstallations": summary.get("offlineInstallations"),
+              "degradedInstallations": summary.get("degradedInstallations"),
+              "installations": [
+                  {
+                      "installationId": row.get("installationId"),
+                      "bridgeInstanceId": row.get("bridgeInstanceId"),
+                      "connectivity": row.get("connectivity"),
+                      "readiness": row.get("readiness"),
+                      "runtimeVersion": row.get("runtimeVersion"),
+                      "deploymentMode": row.get("deploymentMode"),
+                      "connectors": row.get("connectors"),
+                      "tools": row.get("tools"),
+                      "lastHeartbeatAt": row.get("lastHeartbeatAt"),
+                      "lastSnapshotAt": row.get("lastSnapshotAt"),
+                  }
+                  for row in rows
+              ],
+          }
+          print("operator-projection=" + json.dumps(safe, sort_keys=True))
+
+          def expect_equal(label, actual, expected):
+              if actual != expected:
+                  raise AssertionError(f"{label}: expected {expected!r}, got {actual!r}")
+
+          expect_equal("version", data.get("version"), "kcc.agent-bridge-runtime-observability.v1")
+          expect_equal("summary.totalInstallations", summary.get("totalInstallations"), 1)
+          expect_equal("summary.connectedInstallations", summary.get("connectedInstallations"), 1)
+          expect_equal("summary.offlineInstallations", summary.get("offlineInstallations"), 0)
+          if len(rows) != 1:
+              raise AssertionError(f"summary.installations length: expected 1, got {len(rows)}")
+          row=rows[0]
+          expect_equal("installation.connectivity", row.get("connectivity"), "connected")
+          expect_equal("installation.readiness", row.get("readiness"), "ready")
+          expect_equal("installation.runtimeVersion", row.get("runtimeVersion"), "0.1.0-dev.0")
+          expect_equal("installation.deploymentMode", row.get("deploymentMode"), "local")
+          expect_equal("installation.connectors", row.get("connectors"), {"total":1,"healthy":1,"degraded":0,"unhealthy":0})
+          expect_equal("installation.tools", row.get("tools"), {"total":1,"available":1,"degraded":0,"blocked":0})
           serialized=json.dumps(data)
           for forbidden in ["accessToken","publicKeyPem","keyId","privateKeyPem","ENROLLMENT_TOKEN"]:
-              assert forbidden not in serialized
+              if forbidden in serialized:
+                  raise AssertionError(f"forbidden field leaked in operator projection: {forbidden}")
           '
 
       - name: Verify secret-at-rest persistence boundary
