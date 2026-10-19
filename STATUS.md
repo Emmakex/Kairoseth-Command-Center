@@ -1,12 +1,13 @@
 # Project status / Estado del proyecto
 
-**Current phase:** Phase 5 — Automation and intelligence — **CLOSED / CERRADA**  
+**Current phase:** Phase 7 — Agent Bridge execution and security — **IN PROGRESS / EN CURSO**  
 **Technical/internal project:** Kairoseth Command Center  
 **Commercial names:** Gestor de Trabajo (ES) / Work Manager (EN)  
 **Category:** Kairoseth Software  
-**Technical runtime release boundary:** merged `main` `d7eb0769bfed765727a851635eca41006ee412c2`, validated 15/15 after Phase 5 Slice 22.  
-**Formal Phase 5 closure:** merged `main` `f327c584be4bc55deec710dc6e61d0746ae57958`.  
-**Commercial catalog publication:** Kairoseth Platform PR #507 merged as `0d07c14894560096053498a32a4e14d12ec3f1ae` and deployed to Hostinger; later deployed platform revisions retain it in their ancestry.
+**Phase 5 technical boundary:** `d7eb0769bfed765727a851635eca41006ee412c2`, formally closed in `f327c584be4bc55deec710dc6e61d0746ae57958`.  
+**Commercial publication:** complete; canonical catalog route `/products/work-manager`.  
+**Current Agent Bridge backend/trust boundary:** `951e8d30f7d8680441123adf8d9a7d974394a596`, with its full post-merge workflow set green.  
+**Current development slice:** PR #70 — safe ES/EN approval-key rotation controls in the Agent Bridge operator surface.
 
 ## Naming rule / Regla de naming
 
@@ -35,42 +36,19 @@
 
 **Phase 4 token-backed GitHub boundary: CLOSED / CERRADA.**
 
-### Phase 5 — Closed slices / Slices cerradas
+### Phase 5 — Automation and intelligence
 
-- [x] Slice 1 — Automation rule policies — PR #33 `3bda1db529e46e9f52ce1cf4cf4726495fa6a0e4`.
-- [x] Slice 2 — Automation rule policy UI — PR #34 `37755e580fef985dfda96645f7ccc86704a84e08`.
-- [x] Slice 3 — Stale work rules — PR #35 `1a88ae5280d0115fbdf2e61834859d6847bcc77e`.
-- [x] Slice 4 — Explainable prioritization — PR #36 `375b9d2ecef75243f6335732bd1f6e646df1c3f0`.
-- [x] Slice 5 — Project/milestone priority risk — PR #37 `f533c480ea841e61303819e63df3d5801f6ec54d`.
-- [x] Slice 6 — Prioritization weight policies — PR #38 `f4ef6e27f50b35c88f7c39e298c63035fe7ee684`.
-- [x] Slice 7 — Prioritization weight UI — PR #39 `76e59d11c7471682d80ce9b0c65fb571b9e50acd`.
-- [x] Slice 8 — Stale threshold policies — PR #40 `720f06ddd78d7a9c615621f6301357993338004e`.
-- [x] Slice 9 — Stale threshold UI — PR #41 `74cbf3b8462b2c4720a6d7d9bd369ec63bc156ce`.
-- [x] Slice 10 — Task dependencies — PR #42 `67da2d81b3cca2a40f77b0710bb91cb8270499a8`.
-- [x] Slice 11 — Dependency-aware prioritization — PR #43 `fc9670d00579d4a9e2a59753326e5506a0067308`.
-- [x] Slice 12 — Task dependency UI — PR #44 `e33323da5abe83b74a0d4b5ceb9c491b1764fe0a`.
-- [x] Slice 13 — Dependency start readiness — PR #46 `1820cf457d5ca2c1eddc3b2f5e26287d940479c4`.
-- [x] Slice 14 — Task reminders — PR #47 `e9c217af98d529d8720a41928f0257d08524df0e`.
-- [x] Slice 15 — Task reminder materialization — PR #48 `2998e19e236d29e10a34dcd6ff59690317002eac`.
-- [x] Slice 16 — Task reminder UI — PR #49 `2c3cb8a51d5e7973ec1a218a032625e1715e34c4`.
-- [x] Slice 17 — Task recurrence — PR #53 `646e71f8481d2a3eb17fc23f8471d26c81ce0af8`.
-- [x] Slice 18 — Task recurrence UI — PR #55 `7de3c8b17d8b9ed0b6ddfa05d445717d4fb6b332`.
-- [x] Slice 19 — Task recurrence materialization — PR #56 `0805dddd1a076a7fddaf4594cde4a3411fb8d3ad`.
-- [x] Slice 20 — Task deadline alerts — PR #57 `18f97410a776d8414747e6a1c7212c4f6962d18a`.
-- [x] Slice 21 — Project deadline alerts — PR #58 `01ea5e29885ddac920d37a0b148bbbc2de8eed3a`.
-- [x] Slice 22 — Milestone deadline alerts — PR #59 `d7eb0769bfed765727a851635eca41006ee412c2`.
+Delivered through 22 independently releasable slices:
 
-### Phase 5 release boundary / Cierre de Fase 5
-
-- [x] Configurable deterministic rules/automation delivered.
-- [x] Cross-source operational signals delivered.
-- [x] Explainable prioritization delivered with configurable weights and explicit reasons.
-- [x] Task dependencies/start readiness delivered.
-- [x] One-time reminders and materialization delivered.
-- [x] Fixed-day recurrence and exactly-once materialization delivered.
-- [x] Task, project and milestone overdue-alert lifecycles delivered.
-- [x] Core correctness remains AI-independent.
-- [x] Exact merged `main` after Slice 22 validated with the full 15-workflow regression set; no failed, queued or in-progress workflow remained.
+- [x] Workspace automation policies and ES/EN administration UI.
+- [x] Stale-work rules and configurable thresholds.
+- [x] Deterministic explainable prioritization, delivery risk and configurable weights.
+- [x] Task dependencies, dependency-aware ranking and start readiness.
+- [x] One-time task reminders, worker materialization and ES/EN reminder UI.
+- [x] Fixed-day task recurrence, ES/EN recurrence UI and exactly-once next-occurrence materialization.
+- [x] Deterministic task, project and milestone deadline-alert lifecycles.
+- [x] Transactional audit paths, exact workspace/private isolation and human-authoritative dismissal semantics.
+- [x] Exact merged `main` after Slice 22 validated with the full 15-workflow regression set.
 - [x] Closure and future backlog documented in `docs/47-phase-5-release-boundary.md`.
 - [x] Formal closure documentation merged in PR #60 as `f327c584be4bc55deec710dc6e61d0746ae57958`.
 
@@ -84,20 +62,84 @@
 - [x] Canonical catalog route: `/products/work-manager`.
 - [x] `software` catalog area promoted to available.
 - [x] ES/EN landing, metadata, structured data and sitemap entry added.
-- [x] SEO copy oriented to validated demand around project management, task management and task organization while retaining the commercial name.
-- [x] Growth lifecycle profile added to `content/growth/products.json` after the Product birth → Growth guard identified the missing profile.
-- [x] Kairoseth Platform PR #507 passed Growth guard plus CI: editorial contract, lint, typecheck, full unit/acceptance suite, public-products responsive smoke, build and runtime smoke.
-- [x] PR #507 merged as `0d07c14894560096053498a32a4e14d12ec3f1ae`.
-- [x] Hostinger deployment acceptance directly observed deployed revision `0d07c14894560096053498a32a4e14d12ec3f1ae` before the platform advanced to later `main` revision `319b1c0873410af17e0a39812feab45861e4d738`.
-- [x] Later Kairoseth Platform `main` retains the Work Manager merge in its ancestry and the canonical route remains present in source.
+- [x] Growth lifecycle profile added after the Product birth → Growth guard identified the missing profile.
+- [x] Kairoseth Platform PR #507 passed the product/Growth and platform CI gates.
+- [x] PR #507 merged as `0d07c14894560096053498a32a4e14d12ec3f1ae` and Hostinger deployment acceptance observed that publication revision.
 
 **Commercial catalog publication and deployment: COMPLETE / COMPLETADA.**
 
-The initial Cargo production proof immediately after the merge failed while production was still serving an older revision. A later deployed-revision acceptance then observed the exact Work Manager merge `0d07c148...` and subsequently the next platform main `319b1c08...`, resolving the deployment-lag condition without any Work Manager code change.
+### Phase 6 — Agent Bridge Platform integration / Integración de Agent Bridge en Platform
+
+- [x] Authoritative Mongo-backed A2A shared task storage for clustered runtimes — PR #50 / `4b2bfa241b8215658081fb11010190c332dfd62f`.
+- [x] Tenant-scoped Agent Bridge observability foundation — PR #52 / `aa0e227baf0b83c42810c6d3f7d367cb0db46b41`.
+- [x] Authoritative Agent Bridge control store.
+- [x] Enrollment, session, heartbeat and authenticated runtime-snapshot routes.
+- [x] Persistent runtime control state.
+- [x] Runtime connectivity/readiness plus reduced connector/tool health observability.
+- [x] ES/EN operator surface at `/{locale}/ia/agent-bridge`.
+- [x] Real Agent Bridge control/observability acceptance and merged control-observability line in PR #54 / `b444c51bd6f41302d6abbd4d178a940336b23c82`.
+
+**Phase 6 control/observability foundation: COMPLETE / COMPLETA.**
+
+### Phase 7 — Agent Bridge execution and security / Ejecución y seguridad de Agent Bridge
+
+#### Phase 7.2A — READ command delivery
+
+- [x] Mongo-backed READ command delivery.
+- [x] Runtime-session-bound pull/ACK lifecycle.
+- [x] Deterministic action fingerprints.
+- [x] Docker/Mongo acceptance against a real Agent Bridge control session — `5006e21516e38c9798a651e8352980c04c01e603`.
+- [x] `ProductionRuntime` + WooCommerce acceptance hardening — `3f4b5c48879f09d2c3b83bb5462c432cde78675e`.
+
+**Phase 7.2A: COMPLETE / COMPLETA.**
+
+#### Phase 7.2B — Signed WRITE/CRITICAL execution + runtime audit
+
+- [x] Per-workspace Ed25519 approval signer.
+- [x] Approval private keys encrypted at rest through the existing integration-secret store.
+- [x] Exact-action short-lived signed approval tokens for WRITE/CRITICAL.
+- [x] Explicit operator mutation endpoint; approval tokens never appear in operator command projections.
+- [x] Trusted public-key enrollment bootstrap and authenticated runtime key sync.
+- [x] Durable, scope-checked, idempotent runtime audit ingestion.
+- [x] Defensive redaction of bearer credentials, approval tokens, private-key material and secret assignments before durable audit persistence.
+- [x] Negative coverage for tampering, injected approval tokens, invalid TTLs, session/generation errors and cross-scope audit batches.
+- [x] Real acceptance proving WRITE + CRITICAL signing, Agent Bridge verification, tamper rejection, ACK, key sync, encrypted private-key persistence and sanitized audit delivery — `c3ce94a2e6cfde88e5b7676343138cde0288ab09` + `6d348b6ecce118f3e13a045311acec2420c05014`.
+
+**Phase 7.2B: COMPLETE / COMPLETA.**
+
+#### Chained approval-key rotation / Rotación encadenada de claves de aprobación
+
+- [x] Explicit per-workspace generations.
+- [x] Signed approval-keyset synchronization.
+- [x] Per-installation/runtime generation acknowledgement.
+- [x] Safe trust transition `old -> [old,new] -> [new]`.
+- [x] Fail-closed handling when a runtime reports a generation ahead of Platform.
+- [x] Old encrypted private key retired only after active runtimes converge.
+- [x] Operator GET/POST API for rotation status/start.
+- [x] ProductionRuntime acceptance incorporated into the command-delivery boundary.
+- [x] Full post-merge workflow set green on `951e8d30f7d8680441123adf8d9a7d974394a596`.
+
+**Rotation backend/trust-chain boundary: COMPLETE / COMPLETA.**
+
+## Current work / Trabajo actual
+
+### Phase 7 operator surface — approval-key rotation
+
+PR #70 adds the missing operator surface on top of the already-complete rotation backend:
+
+- [x] Safe response parser for rotation status.
+- [x] ES/EN display of generation, phase and trusted-key count only.
+- [x] No key IDs, PEM material or tokens rendered in the UI.
+- [x] Same-origin POST proxy using the existing authenticated session cookie.
+- [x] `workspace.manage` required before the rotation control is exposed.
+- [x] Rotation button disabled while state is `overlap` or `retiring`.
+- [x] Web unit coverage for malformed rotation projections.
+- [ ] Full PR regression set green.
+- [ ] Merge to `main` and post-merge verification.
 
 ## Deliberately deferred / Diferido expresamente
 
-These are future roadmap candidates and do **not** block the Phase 5 release:
+These are future roadmap candidates and do **not** reopen Phase 5 or block the delivered Phase 7 backend boundary:
 
 - [ ] Pre-deadline warning windows and configurable deadline severity.
 - [ ] Monthly/calendar/weekday/local-wall-clock recurrence semantics.
@@ -108,7 +150,6 @@ These are future roadmap candidates and do **not** block the Phase 5 release:
 - [ ] Automatic task status mutations driven by dependency changes.
 - [ ] Critical-path duration forecasting or probabilistic deadline prediction.
 - [ ] Arbitrary user-authored conditions or executable rule DSL.
-- [ ] Automation actions beyond current in-app alert and recurrence behavior.
 - [ ] AI-generated rules, weights, thresholds, dependencies, reminders, recurrence or silent priority changes.
 - [ ] GitHub App/OAuth and additional providers.
 
@@ -116,32 +157,33 @@ These are future roadmap candidates and do **not** block the Phase 5 release:
 
 1. Workspace/private scope is server-derived from authenticated context for user mutations.
 2. Product entitlement and capability checks are server-enforced.
-3. Provider credentials never enter durable reminder/recurrence/deadline state, alerts or related audit events.
+3. Provider credentials never enter durable operational state or related audit text.
 4. Derived automation and prioritization remain deterministic, explainable and AI-independent.
 5. Private scope never crosses workspace dependency, reminder, recurrence or deadline-alert data.
-6. Human `dismissed` alert state remains authoritative for task/project/milestone deadline automation.
+6. Human `dismissed` alert state remains authoritative for deadline automation.
 7. Task dependencies reference local same-scope task IDs only and remain acyclic.
-8. A task cannot be explicitly started while any same-scope dependency is not `done` at the guard check.
-9. Reminder intent/time and recurrence intent are explicit user-authored data; no AI inference occurs.
-10. Reminder/recurrence/deadline lifecycle writes and their audit events preserve transactional boundaries.
-11. One-time reminders and recurrence materialization are idempotent under repeated worker ticks.
-12. Browser forms never choose authoritative tenant/actor scope.
-13. Fixed-day recurrence means exact 24-hour UTC increments; calendar semantics are not implied.
-14. Task/project/milestone deadline fingerprints create at most one alert in the exact persisted scope.
-15. A dismissed deadline alert remains dismissed even while its entity remains overdue.
-16. Milestone deadline `projectId` is contextual linkage; milestone scope remains the tenancy boundary.
+8. Reminder intent/time and recurrence intent are explicit user-authored data; no AI inference occurs.
+9. Browser forms never choose authoritative tenant/actor scope.
+10. Platform is the Agent Bridge control plane; Agent Bridge remains the execution/data plane.
+11. Runtime sessions are bound to tenant + installation + bridge instance and expire independently of persistent installation identity.
+12. READ/WRITE/CRITICAL risk remains explicit end-to-end.
+13. WRITE/CRITICAL execution requires exact-action signed approval; operator-supplied approval tokens are rejected.
+14. Approval private keys are encrypted at rest and are never exposed through operator APIs/UI or audit text.
+15. Approval-key rotation advances only through signed generation synchronization and active-runtime convergence.
+16. Runtime audit ingestion is session/scope checked, idempotent and defensively redacted before durable persistence.
+17. Security-sensitive Phase 7 paths require real Agent Bridge acceptance in addition to unit/type/build checks.
 
 ## Next / Siguiente
 
-1. Treat Phase 5 and the initial Kairoseth Software catalog publication as closed release boundaries.
-2. Keep public pricing deferred until the Cloud / Private Cloud / Self-Hosted resource and operating-cost profile is measured.
-3. Any deferred capability must enter a newly documented future phase or explicitly scoped maintenance slice.
-4. Reopen the current release only for an actual regression in a delivered product or publication contract.
+1. Finish PR #70 and merge only after all repository checks are green.
+2. Re-read `main` after the merge and record the final Phase 7 operator-surface SHA here and in `docs/10-roadmap.md`.
+3. Continue Phase 7 only through bounded, evidenced slices; do not duplicate Agent Bridge runtime authority inside Platform.
+4. Keep public pricing deferred until the Cloud / Private Cloud / Self-Hosted resource and operating-cost profile is measured.
 
 ## Current blockers / Bloqueos actuales
 
-**None / Ninguno.** No known technical product blocker or catalog-publication blocker remains for Gestor de Trabajo / Work Manager. Phase 5 is closed, the catalog code is merged, and Hostinger deployment acceptance observed the exact publication revision in production.
+**No product-code blocker is known.** The current #70 implementation is waiting on the repository CI runner queue. A static review already corrected one relative-import defect before the valid CI head was evaluated.
 
 ## Operating rule
 
-Keep delivered runtime deterministic, explainable, auditable, workspace-isolated and independently releasable. Reopen Phase 5 only for a regression in an already-delivered Phase 5 contract; new capabilities require explicit future scope.
+Keep delivered runtime deterministic, explainable, auditable, workspace-isolated and independently releasable. Platform remains the control/governance plane; Agent Bridge remains the execution/data plane. New capabilities require an explicit bounded slice, negative security coverage where relevant, and a green acceptance boundary before merge.
