@@ -1,0 +1,84 @@
+name: Apply Agent Bridge signed PEM fix
+
+on:
+  push:
+    branches:
+      - fix/agent-bridge-signed-pem
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/agent-bridge-signed-pem
+          fetch-depth: 0
+
+      - name: Apply exact parser fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('apps/api/src/agent-bridge-control.ts')
+          text = path.read_text()
+          old = '''function multilineText(value: unknown, max: number): string | null {
+            if (typeof value !== 'string') return null;
+            const normalized = value.trim();
+            if (!normalized || normalized.length > max) return null;
+            for (const character of normalized) {
+              const code = character.charCodeAt(0);
+              if ((code <= 31 && code !== 10 && code !== 13) || code === 127) return null;
+            }
+            return normalized;
+          }'''
+          new = '''function multilineText(value: unknown, max: number): string | null {
+            if (typeof value !== 'string') return null;
+            const normalized = value.trim();
+            if (!normalized || value.length > max) return null;
+            for (const character of value) {
+              const code = character.charCodeAt(0);
+              if ((code <= 31 && code !== 10 && code !== 13) || code === 127) return null;
+            }
+            return value;
+          }'''
+          if old not in text:
+              raise SystemExit('expected multilineText implementation not found')
+          path.write_text(text.replace(old, new, 1))
+          PY
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.18.3
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Test Agent Bridge control routes
+        run: pnpm exec vitest run apps/api/test/agent-bridge-control.test.ts
+
+      - name: Typecheck API
+        run: pnpm --filter './packages/*' build && pnpm --filter @kcc/api typecheck
+
+      - name: Commit fix and remove temporary workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/apply-agent-bridge-signed-pem-fix.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add apps/api/src/agent-bridge-control.ts .github/workflows/apply-agent-bridge-signed-pem-fix.yml
+          git commit -m 'fix(agent-bridge): preserve signed PEM bytes'
+          git push origin HEAD:fix/agent-bridge-signed-pem
