@@ -26,12 +26,8 @@ jobs:
 
           route = Path('apps/api/src/agent-bridge-execution.ts')
           text = route.read_text()
-          old = """      if (error instanceof AgentBridgeApprovalSigningUnavailableError) {
-        return reply.code(503).send({ code: 'agent_bridge_mutating_approval_unavailable' });
-      }"""
-          new = """      if (error instanceof AgentBridgeApprovalSigningUnavailableError) {
-        return reply.code(409).send({ code: 'agent_bridge_read_tool_unavailable' });
-      }"""
+          old = "      if (error instanceof AgentBridgeApprovalSigningUnavailableError) {\n        return reply.code(503).send({ code: 'agent_bridge_mutating_approval_unavailable' });\n      }"
+          new = "      if (error instanceof AgentBridgeApprovalSigningUnavailableError) {\n        return reply.code(409).send({ code: 'agent_bridge_read_tool_unavailable' });\n      }"
           if old not in text:
               raise SystemExit('expected mutating signer fallback not found')
           route.write_text(text.replace(old, new, 1))
