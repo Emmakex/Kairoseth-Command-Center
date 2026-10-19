@@ -124,6 +124,7 @@ export function buildApp(options: ApplicationOptions = {}) {
       : {}),
   });
   registerAgentBridgeSecurityRoutes(app, {
+    ...(options.authProvider ? { authProvider: options.authProvider } : {}),
     ...(options.agentBridgeControlStore
       ? { controlStore: options.agentBridgeControlStore }
       : {}),
