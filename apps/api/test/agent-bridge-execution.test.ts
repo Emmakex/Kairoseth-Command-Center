@@ -73,6 +73,12 @@ class FakeExecutionStore implements AgentBridgeExecutionStore {
     return this.queued;
   }
 
+  async queueApprovedCommand(
+    _input: Parameters<AgentBridgeExecutionStore['queueApprovedCommand']>[0],
+  ) {
+    return null;
+  }
+
   async pullCommands(session: AgentBridgeRuntimeSession, limit: number) {
     expect(session).toEqual(runtimeSession);
     expect(limit).toBe(10);
