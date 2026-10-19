@@ -77,22 +77,107 @@ See [`47-phase-5-release-boundary.md`](47-phase-5-release-boundary.md) for objec
 
 **Status: complete. Technical release boundary CLOSED / CERRADA.**
 
-## After Phase 5 / Después de Fase 5
+## Phase 6 — Agent Bridge Platform integration / Integración de Agent Bridge en Platform
 
-The next product-level work is release/commercial packaging and catalog publication of:
+Purpose: make Kairoseth Platform the authoritative control/observability plane for Agent Bridge without moving runtime authority into the browser or duplicating the Agent Bridge execution core.
+
+Delivered:
+
+- authoritative Mongo-backed A2A task storage for clustered/shared runtimes (`4b2bfa241b8215658081fb11010190c332dfd62f`, PR #50);
+- tenant-scoped Agent Bridge observability foundation (`aa0e227baf0b83c42810c6d3f7d367cb0db46b41`, PR #52);
+- authoritative control store for enrollment/runtime state;
+- enrollment, control-session, heartbeat and authenticated runtime snapshot routes;
+- persistent control state and runtime health/connector/tool observability;
+- ES/EN operator surface under `/{locale}/ia/agent-bridge`;
+- real Agent Bridge control/observability acceptance, including the merged control-observability line in PR #54 (`b444c51bd6f41302d6abbd4d178a940336b23c82`).
+
+Security boundary:
+
+- Platform is control plane; Agent Bridge remains execution/data plane.
+- Runtime sessions are authenticated and scoped to tenant + installation + bridge instance.
+- Operator observability exposes reduced operational state only; secrets, raw tool inputs/outputs and runtime credentials stay hidden.
+
+**Status: complete for the control/observability foundation required by Phase 7 execution delivery.**
+
+## Phase 7 — Agent Bridge execution and security / Ejecución y seguridad de Agent Bridge
+
+Purpose: let Platform safely govern real Agent Bridge execution while keeping runtime policy, signed approval, audit and trust-chain boundaries explicit and verifiable.
+
+### Phase 7.2A — READ command delivery
+
+Delivered:
+
+- Mongo-backed READ command queue and durable lifecycle;
+- runtime-session-bound pull and acknowledgement;
+- deterministic action fingerprints;
+- real Agent Bridge control-session acceptance (`5006e21516e38c9798a651e8352980c04c01e603`);
+- hardening through the actual Agent Bridge `ProductionRuntime` and WooCommerce connector (`3f4b5c48879f09d2c3b83bb5462c432cde78675e`).
+
+**Status: complete.**
+
+### Phase 7.2B — Signed WRITE/CRITICAL execution + audit
+
+Delivered:
+
+- per-workspace Ed25519 approval signer;
+- private approval keys encrypted at rest through the existing integration-secret store;
+- exact-action signed approval tokens for WRITE/CRITICAL operations;
+- explicit operator mutation endpoint with no approval-token exposure in operator projections;
+- trusted public-key enrollment bootstrap and runtime key sync;
+- durable scope-checked runtime audit ingestion;
+- defensive audit secret redaction;
+- negative tests for tampering, token injection, TTL and scope failures;
+- real acceptance proving WRITE + CRITICAL signature verification, tamper rejection, ACK, key sync, encrypted signer persistence and sanitized audit delivery (`c3ce94a2e6cfde88e5b7676343138cde0288ab09` + hardening `6d348b6ecce118f3e13a045311acec2420c05014`).
+
+**Status: complete.**
+
+### Phase 7 trust-chain rotation
+
+Delivered:
+
+- per-workspace chained approval-key rotation;
+- explicit key generations and signed keyset synchronization;
+- per-installation generation acknowledgement;
+- safe `old -> [old,new] -> [new]` convergence;
+- fail-closed handling for runtimes reporting a generation ahead of Platform;
+- encrypted old-private-key retirement only after active runtimes converge;
+- operator GET/POST API for rotation status/start;
+- ProductionRuntime acceptance and the full post-merge workflow set green at `951e8d30f7d8680441123adf8d9a7d974394a596`.
+
+**Status: backend/trust-chain complete.**
+
+### Current Phase 7 slice — rotation operator UI
+
+In progress in PR #70:
+
+- show only safe rotation state in the ES/EN Agent Bridge operator page: generation, phase and trusted-key count;
+- never render key IDs, PEM material or tokens;
+- require `workspace.manage` to start rotation;
+- disable the control while the trust chain is already in `overlap` or `retiring`;
+- use a same-origin session-cookie proxy while keeping Platform authorization authoritative;
+- add defensive parsing and web tests.
+
+**Status: in progress; merge only after the full repository regression set is green.**
+
+## Commercial product boundary / Límite comercial
+
+The software product is published as:
 
 - **ES:** Gestor de Trabajo
 - **EN:** Work Manager
 - **Category:** Kairoseth Software
+- **Canonical catalog route:** `/products/work-manager`
 
-Do not silently extend Phase 5 with deferred features. New capabilities require an explicitly documented future phase or maintenance slice with their own product, security and acceptance contracts.
+Commercial publication is already complete. New Agent Bridge capabilities are technical/product evolution and do not reopen Phase 5.
 
 ## Operating principles
 
-- Keep phases small and releasable.
+- Keep phases small and independently releasable.
 - Do not open the next major integration/front while the current release boundary is red.
 - ES/EN is a product invariant, not a later translation task.
 - Portable/self-hosted operation must remain possible without hidden Kairoseth dependencies.
 - Authorization and tenant/private boundaries are server-enforced.
+- Platform remains control plane; Agent Bridge remains execution/data plane.
 - Every security-sensitive lifecycle must have negative tests and an auditable path.
+- Approval private keys and connector/runtime secrets must never be exposed through operator UI or durable audit text.
 - Deferred backlog is not release-blocking unless a future roadmap explicitly promotes it into scope.
