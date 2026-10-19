@@ -1,0 +1,152 @@
+name: Agent Bridge Mutation Security Acceptance
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  signed-mutating-command-delivery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout Platform
+        uses: actions/checkout@v4
+
+      - name: Checkout accepted Agent Bridge contract
+        uses: actions/checkout@v4
+        with:
+          repository: Emmakex/kairoseth-agent-bridge
+          ref: 7baa3674c91685c6007cc38421432624b4aa8b38
+          path: agent-bridge-source
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: agent-bridge-source/package-lock.json
+
+      - name: Build accepted Agent Bridge client
+        working-directory: agent-bridge-source
+        run: |
+          npm ci
+          npm run build
+
+      - name: Start Platform with encrypted integration secret store
+        shell: bash
+        run: |
+          set -euo pipefail
+          export KCC_AUTH_MODE=local
+          export KCC_LOCAL_ADMIN_EMAIL=agent-bridge-mutation-ci@kcc.local
+          export KCC_LOCAL_ADMIN_PASSWORD="agent-bridge-mutation-${GITHUB_RUN_ID}-valid"
+          export KCC_LOCAL_AUTH_SECRET="$(openssl rand -hex 32)"
+          export KCC_INTEGRATION_SECRET_KEY="$(openssl rand -hex 32)"
+          {
+            echo "KCC_AUTH_MODE=$KCC_AUTH_MODE"
+            echo "KCC_LOCAL_ADMIN_EMAIL=$KCC_LOCAL_ADMIN_EMAIL"
+            echo "KCC_LOCAL_ADMIN_PASSWORD=$KCC_LOCAL_ADMIN_PASSWORD"
+            echo "KCC_LOCAL_AUTH_SECRET=$KCC_LOCAL_AUTH_SECRET"
+            echo "KCC_INTEGRATION_SECRET_KEY=$KCC_INTEGRATION_SECRET_KEY"
+          } >> "$GITHUB_ENV"
+          docker compose up -d --build
+
+      - name: Wait for Platform readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in {1..60}; do
+            if curl --fail --silent http://localhost:4000/ready >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose ps
+          docker compose logs api mongo
+          exit 1
+
+      - name: Issue workspace enrollment token
+        shell: bash
+        run: |
+          set -euo pipefail
+          login_response="$(curl --fail --silent \
+            -X POST http://localhost:4000/v1/auth/local/login \
+            -H 'content-type: application/json' \
+            --data "{\"email\":\"$KCC_LOCAL_ADMIN_EMAIL\",\"password\":\"$KCC_LOCAL_ADMIN_PASSWORD\"}")"
+          operator_access_token="$(printf '%s' "$login_response" | python3 -c 'import json,sys; print(json.load(sys.stdin)["accessToken"])')"
+          echo "::add-mask::$operator_access_token"
+
+          session_response="$(curl --fail --silent \
+            http://localhost:4000/v1/session \
+            -H "authorization: Bearer $operator_access_token")"
+          workspace_id="$(printf '%s' "$session_response" | python3 -c 'import json,sys; print(json.load(sys.stdin)["activeWorkspaceId"])')"
+
+          enrollment_response="$(curl --fail --silent \
+            -X POST http://localhost:4000/v1/products/agent-bridge/enrollment-tokens \
+            -H "authorization: Bearer $operator_access_token")"
+          enrollment_token="$(printf '%s' "$enrollment_response" | python3 -c 'import json,sys; data=json.load(sys.stdin); assert data["version"] == "kcc.agent-bridge-enrollment-token.v1"; print(data["token"])')"
+          echo "::add-mask::$enrollment_token"
+
+          {
+            echo "OPERATOR_ACCESS_TOKEN=$operator_access_token"
+            echo "WORKSPACE_ID=$workspace_id"
+            echo "ENROLLMENT_TOKEN=$enrollment_token"
+          } >> "$GITHUB_ENV"
+
+      - name: Prove signed WRITE and CRITICAL boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/ci/agent-bridge-mutation-security-acceptance.mjs \
+            | tee /tmp/agent-bridge-mutation-security-evidence.json
+
+      - name: Verify encrypted signer boundary and sanitized durable audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          mongo_result="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval "
+            const commands=db.agent_bridge_commands.find({tenantId:'$WORKSPACE_ID'}).toArray();
+            const signers=db.agent_bridge_approval_signers.find({tenantId:'$WORKSPACE_ID'}).toArray();
+            const secrets=db.integration_secrets.find({'scope.workspaceId':'$WORKSPACE_ID'}).toArray();
+            const audits=db.agent_bridge_audit_events.find({tenantId:'$WORKSPACE_ID'}).toArray();
+            const signerText=JSON.stringify(signers);
+            const secretText=JSON.stringify(secrets);
+            const auditText=JSON.stringify(audits);
+            print(JSON.stringify({
+              commandCount:commands.length,
+              completedCount:commands.filter(c=>c.state==='completed').length,
+              signedCount:commands.filter(c=>typeof c.approvalToken==='string' && c.approvalToken.startsWith('kab1.')).length,
+              signerCount:signers.length,
+              signerHasSecretRef:signers.every(s=>typeof s.privateKeySecretRef==='string' && s.privateKeySecretRef.startsWith('sec_')),
+              signerContainsPrivatePem:signerText.includes('BEGIN PRIVATE KEY'),
+              encryptedSecretCount:secrets.length,
+              secretContainsPrivatePem:secretText.includes('BEGIN PRIVATE KEY'),
+              secretUsesAesGcm:secrets.every(s=>s.algorithm==='aes-256-gcm' && typeof s.ciphertext==='string' && typeof s.authTag==='string'),
+              auditCount:audits.length,
+              auditContainsBearerSecret:auditText.includes('must-not-persist') || auditText.includes('also-secret'),
+              auditContainsRedaction:auditText.includes('[REDACTED]')
+            }));
+          ")"
+          printf '%s' "$mongo_result" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["commandCount"]==2; assert d["completedCount"]==2; assert d["signedCount"]==2; assert d["signerCount"]==1; assert d["signerHasSecretRef"] is True; assert d["signerContainsPrivatePem"] is False; assert d["encryptedSecretCount"] >= 1; assert d["secretContainsPrivatePem"] is False; assert d["secretUsesAesGcm"] is True; assert d["auditCount"]==2; assert d["auditContainsBearerSecret"] is False; assert d["auditContainsRedaction"] is True'
+
+      - name: Upload safe Phase 7.2B evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-bridge-mutation-security-evidence
+          path: /tmp/agent-bridge-mutation-security-evidence.json
+          if-no-files-found: warn
+          retention-days: 1
+
+      - name: Show service state on failure
+        if: failure()
+        run: |
+          docker compose ps
+          docker compose logs api mongo
+
+      - name: Stop stack
+        if: always()
+        run: docker compose down -v
