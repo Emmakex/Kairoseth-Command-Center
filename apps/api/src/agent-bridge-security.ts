@@ -11,6 +11,10 @@ const MAX_ID = 512;
 const MAX_TEXT = 4096;
 const MAX_AUDIT_EVENTS = 500;
 
+type AuditProvenance = NonNullable<AgentBridgeAuditEvent['provenance']>;
+type AuditPrincipal = NonNullable<AuditProvenance['principal']>;
+type AuditProtocol = AuditProvenance['protocol'];
+
 function object(value: unknown): Record<string, unknown> | null {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -53,11 +57,7 @@ async function runtimeSession(
   return token && store ? store.resolveRuntimeSession(token) : null;
 }
 
-function principal(value: unknown): AgentBridgeAuditEvent['provenance'] extends infer P
-  ? P extends { principal?: infer R }
-    ? R | undefined | null
-    : never
-  : never {
+function principal(value: unknown): AuditPrincipal | undefined | null {
   if (value === undefined) return undefined;
   const item = object(value);
   if (!item) return null;
@@ -74,7 +74,7 @@ function principal(value: unknown): AgentBridgeAuditEvent['provenance'] extends 
   };
 }
 
-function provenance(value: unknown): AgentBridgeAuditEvent['provenance'] | undefined | null {
+function provenance(value: unknown): AuditProvenance | undefined | null {
   if (value === undefined) return undefined;
   const item = object(value);
   if (!item) return null;
@@ -93,11 +93,7 @@ function provenance(value: unknown): AgentBridgeAuditEvent['provenance'] | undef
   }
   return {
     version: 'kab.provenance.v1',
-    protocol: protocol as AgentBridgeAuditEvent['provenance'] extends infer P
-      ? P extends { protocol: infer R }
-        ? R
-        : never
-      : never,
+    protocol: protocol as AuditProtocol,
     rootCorrelationId,
     ...(parentCorrelationId ? { parentCorrelationId } : {}),
     ...(parsedPrincipal ? { principal: parsedPrincipal } : {}),
