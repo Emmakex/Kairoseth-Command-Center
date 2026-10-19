@@ -1,6 +1,9 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { Collection, Db } from 'mongodb';
+import type { AgentBridgeApprovalSigner } from './agent-bridge-approval-service';
 import type { AgentBridgeRuntimeSession } from './agent-bridge-control-store';
+
+export type AgentBridgeCommandRisk = 'READ' | 'WRITE' | 'CRITICAL';
 
 export type AgentBridgeCommandAckStatus =
   | 'executed'
@@ -42,6 +45,7 @@ export type AgentBridgeCommandEnvelope = {
   toolId: string;
   input: unknown;
   actionFingerprint: string;
+  approvalToken?: string;
   issuedAt: string;
   expiresAt: string;
 };
@@ -51,6 +55,7 @@ export type AgentBridgeQueuedCommand = {
   correlationId: string;
   installationId: string;
   toolId: string;
+  risk: AgentBridgeCommandRisk;
   state: 'queued' | 'delivered' | 'completed';
   issuedAt: string;
   expiresAt: string;
@@ -58,18 +63,21 @@ export type AgentBridgeQueuedCommand = {
   acknowledgement?: AgentBridgeCommandAcknowledgement;
 };
 
+type AgentBridgeQueueCommandInput = {
+  tenantId: string;
+  installationId: string;
+  toolId: string;
+  input: unknown;
+  actor: string;
+  createdBy: string;
+  correlationId?: string;
+  ttlSeconds?: number;
+};
+
 export interface AgentBridgeExecutionStore {
   ensureIndexes(): Promise<void>;
-  queueReadCommand(input: {
-    tenantId: string;
-    installationId: string;
-    toolId: string;
-    input: unknown;
-    actor: string;
-    createdBy: string;
-    correlationId?: string;
-    ttlSeconds?: number;
-  }): Promise<AgentBridgeQueuedCommand | null>;
+  queueReadCommand(input: AgentBridgeQueueCommandInput): Promise<AgentBridgeQueuedCommand | null>;
+  queueCommand(input: AgentBridgeQueueCommandInput): Promise<AgentBridgeQueuedCommand | null>;
   pullCommands(
     session: AgentBridgeRuntimeSession,
     limit: number,
@@ -79,6 +87,13 @@ export interface AgentBridgeExecutionStore {
     acknowledgement: AgentBridgeCommandAcknowledgement,
   ): Promise<boolean>;
   getCommand(tenantId: string, commandId: string): Promise<AgentBridgeQueuedCommand | null>;
+}
+
+export class AgentBridgeApprovalSigningUnavailableError extends Error {
+  constructor() {
+    super('Agent Bridge approval signing is not configured for mutating commands.');
+    this.name = 'AgentBridgeApprovalSigningUnavailableError';
+  }
 }
 
 type InstallationDocument = {
@@ -95,7 +110,7 @@ type RuntimeSnapshotDocument = {
     connectors: Array<{
       tools: Array<{
         runtimeToolId: string;
-        risk: 'READ' | 'WRITE' | 'CRITICAL';
+        risk: AgentBridgeCommandRisk;
       }>;
     }>;
   };
@@ -109,8 +124,10 @@ type CommandDocument = {
   correlationId: string;
   actor: string;
   toolId: string;
+  risk: AgentBridgeCommandRisk;
   input: unknown;
   actionFingerprint: string;
+  approvalToken?: string;
   issuedAt: string;
   expiresAt: string;
   createdAt: string;
@@ -132,7 +149,10 @@ export class MongoAgentBridgeExecutionStore implements AgentBridgeExecutionStore
   private readonly snapshots: Collection<RuntimeSnapshotDocument>;
   private readonly commands: Collection<CommandDocument>;
 
-  constructor(db: Db) {
+  constructor(
+    db: Db,
+    private readonly approvalSigner?: AgentBridgeApprovalSigner,
+  ) {
     this.installations = db.collection('agent_bridge_installations');
     this.snapshots = db.collection('agent_bridge_runtime_snapshots');
     this.commands = db.collection('agent_bridge_commands');
@@ -147,16 +167,22 @@ export class MongoAgentBridgeExecutionStore implements AgentBridgeExecutionStore
     ]);
   }
 
-  async queueReadCommand(input: {
-    tenantId: string;
-    installationId: string;
-    toolId: string;
-    input: unknown;
-    actor: string;
-    createdBy: string;
-    correlationId?: string;
-    ttlSeconds?: number;
-  }): Promise<AgentBridgeQueuedCommand | null> {
+  async queueReadCommand(
+    input: AgentBridgeQueueCommandInput,
+  ): Promise<AgentBridgeQueuedCommand | null> {
+    return this.queueValidatedCommand(input, false);
+  }
+
+  async queueCommand(
+    input: AgentBridgeQueueCommandInput,
+  ): Promise<AgentBridgeQueuedCommand | null> {
+    return this.queueValidatedCommand(input, true);
+  }
+
+  private async queueValidatedCommand(
+    input: AgentBridgeQueueCommandInput,
+    allowMutating: boolean,
+  ): Promise<AgentBridgeQueuedCommand | null> {
     const installation = await this.installations.findOne({
       tenantId: input.tenantId,
       installationId: input.installationId,
@@ -171,7 +197,7 @@ export class MongoAgentBridgeExecutionStore implements AgentBridgeExecutionStore
     const tool = snapshot?.snapshot.connectors
       .flatMap((connector) => connector.tools)
       .find((candidate) => candidate.runtimeToolId === input.toolId);
-    if (!tool || tool.risk !== 'READ') return null;
+    if (!tool || (!allowMutating && tool.risk !== 'READ')) return null;
 
     const canonicalInput = canonicalJson(input.input);
     if (Buffer.byteLength(canonicalInput, 'utf8') > MAX_INPUT_BYTES) {
@@ -196,6 +222,19 @@ export class MongoAgentBridgeExecutionStore implements AgentBridgeExecutionStore
       input: input.input,
     });
 
+    let approvalToken: string | undefined;
+    if (tool.risk !== 'READ') {
+      if (!this.approvalSigner) throw new AgentBridgeApprovalSigningUnavailableError();
+      approvalToken = this.approvalSigner.signApproval({
+        tenantId: input.tenantId,
+        installationId: input.installationId,
+        toolId: input.toolId,
+        correlationId,
+        actionFingerprint,
+        expiresAt,
+      });
+    }
+
     const document: CommandDocument = {
       tenantId: input.tenantId,
       installationId: input.installationId,
@@ -204,8 +243,10 @@ export class MongoAgentBridgeExecutionStore implements AgentBridgeExecutionStore
       correlationId,
       actor: input.actor,
       toolId: input.toolId,
+      risk: tool.risk,
       input: input.input,
       actionFingerprint,
+      ...(approvalToken ? { approvalToken } : {}),
       issuedAt,
       expiresAt,
       createdAt: issuedAt,
@@ -275,6 +316,7 @@ export class MongoAgentBridgeExecutionStore implements AgentBridgeExecutionStore
         toolId: command.toolId,
         input: command.input,
         actionFingerprint: command.actionFingerprint,
+        ...(command.approvalToken ? { approvalToken: command.approvalToken } : {}),
         issuedAt: command.issuedAt,
         expiresAt: command.expiresAt,
       })),
@@ -347,6 +389,7 @@ function projectCommand(document: CommandDocument): AgentBridgeQueuedCommand {
     correlationId: document.correlationId,
     installationId: document.installationId,
     toolId: document.toolId,
+    risk: document.risk,
     state: document.state,
     issuedAt: document.issuedAt,
     expiresAt: document.expiresAt,
