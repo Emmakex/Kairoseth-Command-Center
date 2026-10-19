@@ -43,7 +43,7 @@ jobs:
 
           options_old = "  options: {\n    controlStore?: AgentBridgeControlStore;\n    approvalService?: AgentBridgeApprovalService;\n    auditStore?: AgentBridgeAuditStore;\n  },\n): void {\n"
           options_new = "  options: {\n    authProvider?: AuthProvider;\n    controlStore?: AgentBridgeControlStore;\n    approvalService?: AgentBridgeApprovalService;\n    auditStore?: AgentBridgeAuditStore;\n  },\n): void {\n"
-          if "authProvider?: AuthProvider" not in text:
+          if "    authProvider?: AuthProvider;\n" not in text:
               if options_old not in text:
                   raise SystemExit('security options anchor missing')
               text = text.replace(options_old, options_new, 1)
@@ -72,6 +72,16 @@ jobs:
           elif new not in text:
               raise SystemExit('application security wiring anchor missing')
           application.write_text(text)
+
+          existing_test = Path('apps/api/test/agent-bridge-security.test.ts')
+          text = existing_test.read_text()
+          anchor = "  async generation() {\n    return 0;\n  },\n  async signApproval() {"
+          replacement = "  async generation() {\n    return 0;\n  },\n  async rotationStatus() {\n    return { generation: 0, phase: 'stable' as const, signingKeyId: 'unused', trustedKeyIds: [] };\n  },\n  async beginRotation() {\n    return { generation: 1, phase: 'overlap' as const, signingKeyId: 'unused', trustedKeyIds: [] };\n  },\n  async syncApprovalKeys() {\n    return {\n      update: null,\n      status: { generation: 0, phase: 'stable' as const, signingKeyId: 'unused', trustedKeyIds: [] },\n    };\n  },\n  async signApproval() {"
+          if anchor in text:
+              text = text.replace(anchor, replacement, 1)
+          elif "async rotationStatus()" not in text:
+              raise SystemExit('existing security test approval service anchor missing')
+          existing_test.write_text(text)
           PY
 
       - uses: pnpm/action-setup@v4
@@ -88,8 +98,8 @@ jobs:
       - name: Build packages
         run: pnpm --filter './packages/*' build
 
-      - name: Lint API
-        run: pnpm --filter @kcc/api lint
+      - name: Lint
+        run: pnpm lint
 
       - name: Typecheck API
         run: pnpm --filter @kcc/api typecheck
@@ -101,11 +111,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if git diff --quiet -- apps/api/src/agent-bridge-security.ts apps/api/src/application.ts; then
+          if git diff --quiet -- apps/api/src/agent-bridge-security.ts apps/api/src/application.ts apps/api/test/agent-bridge-security.test.ts; then
             exit 0
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add apps/api/src/agent-bridge-security.ts apps/api/src/application.ts
+          git add apps/api/src/agent-bridge-security.ts apps/api/src/application.ts apps/api/test/agent-bridge-security.test.ts
           git commit -m 'feat(agent-bridge): wire approval-key rotation routes'
           git push origin HEAD:phase7/agent-bridge-approval-key-rotation-clean
