@@ -5,11 +5,12 @@ import type {
   AgentBridgeControlStore,
   AgentBridgeRuntimeSession,
 } from '../src/agent-bridge-control-store';
-import type {
-  AgentBridgeCommandAcknowledgement,
-  AgentBridgeCommandEnvelope,
-  AgentBridgeExecutionStore,
-  AgentBridgeQueuedCommand,
+import {
+  AgentBridgeApprovalSigningUnavailableError,
+  type AgentBridgeCommandAcknowledgement,
+  type AgentBridgeCommandEnvelope,
+  type AgentBridgeExecutionStore,
+  type AgentBridgeQueuedCommand,
 } from '../src/agent-bridge-execution-store';
 
 const operator: SessionContext = {
@@ -52,19 +53,37 @@ const controlStore = {
 
 class FakeExecutionStore implements AgentBridgeExecutionStore {
   queued: AgentBridgeQueuedCommand | null = null;
-  lastQueueInput: Parameters<AgentBridgeExecutionStore['queueReadCommand']>[0] | null = null;
+  lastQueueInput: Parameters<AgentBridgeExecutionStore['queueCommand']>[0] | null = null;
   lastAck: AgentBridgeCommandAcknowledgement | null = null;
 
   async ensureIndexes(): Promise<void> {}
 
   async queueReadCommand(input: Parameters<AgentBridgeExecutionStore['queueReadCommand']>[0]) {
-    this.lastQueueInput = input;
     if (input.toolId !== 'woocommerce.store.orders.list') return null;
+    return this.queueObserved(input, 'READ');
+  }
+
+  async queueCommand(input: Parameters<AgentBridgeExecutionStore['queueCommand']>[0]) {
+    this.lastQueueInput = input;
+    if (input.toolId === 'woocommerce.store.orders.list') {
+      return this.queueObserved(input, 'READ');
+    }
+    if (input.toolId === 'woocommerce.store.orders.update-status') {
+      throw new AgentBridgeApprovalSigningUnavailableError();
+    }
+    return null;
+  }
+
+  private queueObserved(
+    input: Parameters<AgentBridgeExecutionStore['queueCommand']>[0],
+    risk: AgentBridgeQueuedCommand['risk'],
+  ): AgentBridgeQueuedCommand {
     this.queued = {
       commandId: 'command-1',
       correlationId: input.correlationId ?? 'correlation-1',
       installationId: input.installationId,
       toolId: input.toolId,
+      risk,
       state: 'queued',
       issuedAt: '2026-10-19T13:00:00.000Z',
       expiresAt: '2099-01-01T00:00:00.000Z',
@@ -118,7 +137,7 @@ class FakeExecutionStore implements AgentBridgeExecutionStore {
 }
 
 describe('Agent Bridge execution routes', () => {
-  it('queues only an observed READ command for the active workspace', async () => {
+  it('queues observed READ commands and keeps mutating commands closed without a signer', async () => {
     const executionStore = new FakeExecutionStore();
     const app = buildApp({
       authProvider,
@@ -162,8 +181,8 @@ describe('Agent Bridge execution routes', () => {
         input: { orderId: 42, status: 'completed' },
       },
     });
-    expect(writeAttempt.statusCode).toBe(409);
-    expect(writeAttempt.json()).toEqual({ code: 'agent_bridge_read_tool_unavailable' });
+    expect(writeAttempt.statusCode).toBe(503);
+    expect(writeAttempt.json()).toEqual({ code: 'agent_bridge_mutating_approval_unavailable' });
 
     const injectedApproval = await app.inject({
       method: 'POST',
@@ -252,6 +271,7 @@ describe('Agent Bridge execution routes', () => {
         correlationId: 'correlation-1',
         installationId: 'installation-1',
         toolId: 'woocommerce.store.orders.list',
+        risk: 'READ',
         state: 'completed',
         issuedAt: '2026-10-19T13:00:00.000Z',
         expiresAt: '2099-01-01T00:00:00.000Z',
