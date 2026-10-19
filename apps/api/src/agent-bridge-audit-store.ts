@@ -127,7 +127,9 @@ export class MongoAgentBridgeAuditStore implements AgentBridgeAuditStore {
 }
 
 function sameEvent(left: AuditDocument, right: AgentBridgeAuditEvent): boolean {
-  const { receivedAt: _receivedAt, ...stored } = left;
+  const stored = structuredClone(left) as unknown as Record<string, unknown>;
+  delete stored._id;
+  delete stored.receivedAt;
   return canonicalJson(stored) === canonicalJson(right);
 }
 
