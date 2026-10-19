@@ -7,6 +7,8 @@ import { MongoIntegrationSyncJobStore } from '@kcc/persistence/integration-sync-
 import { MongoPrioritizationWeightPolicyStore } from '@kcc/persistence/prioritization-weight-policies';
 import { MongoSignalAlertRulePolicyStore } from '@kcc/persistence/signal-alert-rule-policies';
 import { MongoAgentBridgeA2AStore } from './agent-bridge-a2a-store';
+import { MongoAgentBridgeApprovalService } from './agent-bridge-approval-store';
+import { MongoAgentBridgeAuditStore } from './agent-bridge-audit-store';
 import { MongoAgentBridgeControlStore } from './agent-bridge-control-store';
 import { MongoAgentBridgeExecutionStore } from './agent-bridge-execution-store';
 import { buildApp } from './application';
@@ -24,37 +26,45 @@ import { MongoTaskReminderStore } from './task-reminder-store';
 
 const config = loadApiConfig();
 const mongo = new MongoClient(config.MONGODB_URI, { serverSelectionTimeoutMS: 3000 });
-const operationalStore = new MongoOperationalStore(mongo.db());
-const operationalAuditStore = new MongoOperationalAuditStore(mongo, mongo.db());
-const decisionLifecycleStore = new MongoDecisionLifecycleStore(mongo, mongo.db());
-const taskDependencyStore = new MongoTaskDependencyStore(mongo, mongo.db());
-const taskRecurrenceStore = new MongoTaskRecurrenceStore(mongo, mongo.db());
-const taskReminderStore = new MongoTaskReminderStore(mongo, mongo.db());
-const agentBridgeA2AStore = new MongoAgentBridgeA2AStore(mongo.db());
-const agentBridgeControlStore = new MongoAgentBridgeControlStore(mongo.db());
-const agentBridgeExecutionStore = new MongoAgentBridgeExecutionStore(mongo.db());
-const integrationSignalStore = new MongoIntegrationSignalStore(mongo.db());
-const integrationSyncJobStore = new MongoIntegrationSyncJobStore(mongo.db());
-const signalAlertRulePolicyStore = new MongoSignalAlertRulePolicyStore(mongo, mongo.db());
-const prioritizationWeightPolicyStore = new MongoPrioritizationWeightPolicyStore(mongo, mongo.db());
-const githubRepositoryStore = new MongoGitHubRepositoryStore(mongo, mongo.db());
+const db = mongo.db();
+const operationalStore = new MongoOperationalStore(db);
+const operationalAuditStore = new MongoOperationalAuditStore(mongo, db);
+const decisionLifecycleStore = new MongoDecisionLifecycleStore(mongo, db);
+const taskDependencyStore = new MongoTaskDependencyStore(mongo, db);
+const taskRecurrenceStore = new MongoTaskRecurrenceStore(mongo, db);
+const taskReminderStore = new MongoTaskReminderStore(mongo, db);
+const agentBridgeA2AStore = new MongoAgentBridgeA2AStore(db);
+const agentBridgeControlStore = new MongoAgentBridgeControlStore(db);
+const agentBridgeAuditStore = new MongoAgentBridgeAuditStore(db);
+const integrationSignalStore = new MongoIntegrationSignalStore(db);
+const integrationSyncJobStore = new MongoIntegrationSyncJobStore(db);
+const signalAlertRulePolicyStore = new MongoSignalAlertRulePolicyStore(mongo, db);
+const prioritizationWeightPolicyStore = new MongoPrioritizationWeightPolicyStore(mongo, db);
+const githubRepositoryStore = new MongoGitHubRepositoryStore(mongo, db);
 const githubProviderClient = new GitHubRestClient(config.KCC_GITHUB_API_BASE_URL);
 const integrationSecretStore = config.KCC_INTEGRATION_SECRET_KEY
-  ? new MongoEncryptedIntegrationSecretStore(mongo.db(), config.KCC_INTEGRATION_SECRET_KEY)
+  ? new MongoEncryptedIntegrationSecretStore(db, config.KCC_INTEGRATION_SECRET_KEY)
   : undefined;
+const agentBridgeApprovalService = integrationSecretStore
+  ? new MongoAgentBridgeApprovalService(db, integrationSecretStore)
+  : undefined;
+const agentBridgeExecutionStore = new MongoAgentBridgeExecutionStore(
+  db,
+  agentBridgeApprovalService,
+);
 const githubConnectionStore = integrationSecretStore
-  ? new MongoGitHubConnectionStore(mongo, mongo.db(), integrationSecretStore)
+  ? new MongoGitHubConnectionStore(mongo, db, integrationSecretStore)
   : undefined;
 const githubWebhookStore = integrationSecretStore
-  ? new MongoGitHubWebhookStore(mongo, mongo.db(), integrationSecretStore)
+  ? new MongoGitHubWebhookStore(mongo, db, integrationSecretStore)
   : undefined;
-const localIdentityStore = new MongoLocalIdentityStore(mongo, mongo.db());
+const localIdentityStore = new MongoLocalIdentityStore(mongo, db);
 let mongoReady = false;
 let localAuthProvider: PersistentLocalAuthProvider | undefined;
 
 try {
   await mongo.connect();
-  await mongo.db().command({ ping: 1 });
+  await db.command({ ping: 1 });
   await Promise.all([
     operationalStore.ensureIndexes(),
     decisionLifecycleStore.ensureIndexes(),
@@ -64,6 +74,8 @@ try {
     agentBridgeA2AStore.ensureIndexes(),
     agentBridgeControlStore.ensureIndexes(),
     agentBridgeExecutionStore.ensureIndexes(),
+    agentBridgeAuditStore.ensureIndexes(),
+    ...(agentBridgeApprovalService ? [agentBridgeApprovalService.ensureIndexes()] : []),
     integrationSignalStore.ensureIndexes(),
     integrationSyncJobStore.ensureIndexes(),
     signalAlertRulePolicyStore.ensureIndexes(),
@@ -115,6 +127,8 @@ const app = buildApp({
   agentBridgeA2AStore,
   agentBridgeControlStore,
   agentBridgeExecutionStore,
+  agentBridgeAuditStore,
+  ...(agentBridgeApprovalService ? { agentBridgeApprovalService } : {}),
   integrationSignalStore,
   integrationSyncJobStore,
   signalAlertRulePolicyStore,
@@ -133,7 +147,7 @@ const app = buildApp({
   readinessCheck: async () => {
     if (!mongoReady) {
       try {
-        await mongo.db().command({ ping: 1 });
+        await db.command({ ping: 1 });
         mongoReady = true;
       } catch {
         mongoReady = false;

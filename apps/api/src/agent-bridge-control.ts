@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { authorize, type AuthProvider, type SessionContext } from '@kcc/auth';
+import type { AgentBridgeApprovalService } from './agent-bridge-approval-store';
 import type {
   AgentBridgeControlStore,
   AgentBridgeHeartbeat,
@@ -380,6 +381,7 @@ export function registerAgentBridgeControlRoutes(
   options: {
     authProvider?: AuthProvider;
     controlStore?: AgentBridgeControlStore;
+    approvalService?: AgentBridgeApprovalService;
   },
 ): void {
   const store = options.controlStore;
@@ -430,11 +432,14 @@ export function registerAgentBridgeControlRoutes(
     }
     const binding = await store.registerInstallation(token, proof);
     if (!binding) return reply.code(401).send({ code: 'registration_rejected' });
+    const trustedApprovalKeys = options.approvalService
+      ? await options.approvalService.trustedApprovalKeys(binding.tenantId)
+      : [];
     return {
       binding: {
         version: 'kab.installation-binding.v1',
         ...binding,
-        trustedApprovalKeys: [],
+        trustedApprovalKeys,
       },
     };
   });

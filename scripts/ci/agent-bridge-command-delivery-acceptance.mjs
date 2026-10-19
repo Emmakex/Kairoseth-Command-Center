@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict';
 import { Buffer } from 'node:buffer';
 import console from 'node:console';
-import { generateKeyPairSync } from 'node:crypto';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import process from 'node:process';
@@ -24,10 +23,12 @@ const {
 
 const baseUrl = process.env.PLATFORM_BASE_URL ?? 'http://127.0.0.1:4000';
 const readToolId = connectorRuntimeToolId('woocommerce', 'store', 'orders.list');
-const correlationId = 'phase7-2a-real-read';
+const writeToolId = connectorRuntimeToolId('woocommerce', 'store', 'orders.update-status');
+const readCorrelationId = 'phase7-2b-real-read';
+const writeCorrelationId = 'phase7-2b-real-write';
 const connectorCalls = [];
 const recoverableErrors = [];
-const stateDir = await mkdtemp(join(tmpdir(), 'kab-platform-7-2a-'));
+const stateDir = await mkdtemp(join(tmpdir(), 'kab-platform-7-2b-'));
 
 function json(payload, status = 200) {
   return new globalThis.Response(JSON.stringify(payload), {
@@ -67,39 +68,16 @@ async function waitFor(check, message, timeoutMs = 45_000) {
   throw new Error(message);
 }
 
-async function bootstrapReadOnlyApprovalTrust(binding) {
-  assert.deepEqual(
-    binding.trustedApprovalKeys,
-    [],
-    'Phase 7.2A must not silently enable Platform-signed WRITE approvals.',
-  );
-
-  const { publicKey } = generateKeyPairSync('ed25519');
-  const publicKeyPem = publicKey.export({ type: 'spki', format: 'pem' });
-  const securityDir = join(stateDir, 'security');
-  await mkdir(securityDir, { recursive: true, mode: 0o700 });
-  await writeFile(
-    join(securityDir, 'approval-keyset.json'),
-    `${JSON.stringify(
-      {
-        version: 'kab.approval-keyset-state.v1',
-        tenantId: binding.tenantId,
-        installationId: binding.installationId,
-        bridgeInstanceId: binding.bridgeInstanceId,
-        generation: 0,
-        keys: [
-          {
-            keyId: 'phase7-2a-read-only-bootstrap',
-            publicKeyPem,
-          },
-        ],
-        updatedAt: new Date().toISOString(),
-      },
-      null,
-      2,
-    )}\n`,
-    { encoding: 'utf8', mode: 0o600 },
-  );
+async function waitForAuditDrain() {
+  const outboxPath = join(stateDir, 'audit', 'outbox.json');
+  await waitFor(async () => {
+    try {
+      const parsed = JSON.parse(await readFile(outboxPath, 'utf8'));
+      return parsed?.version === 'kab.audit-outbox.v1' && parsed.events?.length === 0;
+    } catch {
+      return false;
+    }
+  }, 'Agent Bridge audit outbox did not drain to Platform.');
 }
 
 const connectorHttp = {
@@ -111,13 +89,18 @@ const connectorHttp = {
     const url = new URL(input);
     const method = init.method ?? 'GET';
     const headers = new globalThis.Headers(init.headers);
-    const expectedBasic = Buffer.from('ck_phase7_2a:cs_phase7_2a', 'utf8').toString('base64');
+    const body = String(init.body ?? '');
+    const expectedBasic = Buffer.from('ck_phase7_2b:cs_phase7_2b', 'utf8').toString('base64');
     assert.equal(headers.get('authorization'), `Basic ${expectedBasic}`);
-    connectorCalls.push({ method, path: url.pathname, query: url.search });
+    connectorCalls.push({ method, path: url.pathname, query: url.search, body });
 
     if (method === 'GET' && url.pathname === '/wp-json/wc/v3/orders') {
       assert.equal(url.searchParams.get('per_page'), '1');
       return json([{ id: 42, status: 'processing' }]);
+    }
+    if (method === 'PUT' && url.pathname === '/wp-json/wc/v3/orders/42') {
+      assert.deepEqual(JSON.parse(body), { status: 'completed' });
+      return json({ id: 42, status: 'completed' });
     }
     return json({ code: 'unexpected_woocommerce_endpoint' }, 404);
   },
@@ -133,8 +116,8 @@ const connector = {
   secrets: {
     async getSecret(requirementId, fieldId) {
       if (requirementId !== 'woocommerce_api') return null;
-      if (fieldId === 'consumer_key') return 'ck_phase7_2a';
-      if (fieldId === 'consumer_secret') return 'cs_phase7_2a';
+      if (fieldId === 'consumer_key') return 'ck_phase7_2b';
+      if (fieldId === 'consumer_secret') return 'cs_phase7_2b';
       return null;
     },
   },
@@ -143,7 +126,7 @@ const connector = {
 const runtime = new ProductionRuntime({
   platformBaseUrl: baseUrl,
   stateDir,
-  runtimeVersion: '0.1.0-phase7-2a',
+  runtimeVersion: '0.1.0-phase7-2b',
   deploymentMode: 'local',
   connectorInstances: [connector],
   allowInsecureHttp: true,
@@ -160,7 +143,9 @@ try {
   assert.equal(binding.tenantId, process.env.WORKSPACE_ID);
   assert.ok(binding.installationId);
   assert.ok(binding.bridgeInstanceId);
-  await bootstrapReadOnlyApprovalTrust(binding);
+  assert.equal(binding.trustedApprovalKeys.length, 1);
+  assert.ok(binding.trustedApprovalKeys[0]?.keyId);
+  assert.match(binding.trustedApprovalKeys[0]?.publicKeyPem ?? '', /BEGIN PUBLIC KEY/);
   console.log('E2E_STAGE=enrollment:ok');
 
   controller = new globalThis.AbortController();
@@ -173,59 +158,101 @@ try {
     const installation = body.summary.installations.find(
       (row) => row.installationId === binding.installationId,
     );
-    return installation?.connectivity === 'connected' && installation?.tools?.total >= 1;
-  }, 'Real Agent Bridge runtime did not publish a usable snapshot.');
+    return installation?.connectivity === 'connected' && installation?.tools?.total >= 2;
+  }, 'Real Agent Bridge runtime did not publish the WooCommerce READ/WRITE inventory.');
   console.log('E2E_STAGE=snapshot:ok');
 
-  console.log('E2E_STAGE=queue:start');
-  const queued = await operatorRequest(
+  console.log('E2E_STAGE=read:start');
+  const queuedRead = await operatorRequest(
     `/v1/products/agent-bridge/installations/${encodeURIComponent(binding.installationId)}/commands`,
     {
       method: 'POST',
       body: JSON.stringify({
         toolId: readToolId,
         input: { perPage: 1 },
-        correlationId,
+        correlationId: readCorrelationId,
       }),
     },
   );
-  assert.equal(queued.response.status, 201, JSON.stringify(queued.body));
-  assert.equal(queued.body?.version, 'kcc.agent-bridge-command.v1');
-  assert.equal(queued.body?.command?.state, 'queued');
-  assert.equal(queued.body?.command?.toolId, readToolId);
-  const commandId = queued.body.command.commandId;
-  assert.ok(commandId);
-  console.log('E2E_STAGE=queue:ok');
+  assert.equal(queuedRead.response.status, 201, JSON.stringify(queuedRead.body));
+  const readCommandId = queuedRead.body?.command?.commandId;
+  assert.ok(readCommandId);
 
-  console.log('E2E_STAGE=execution:start');
-  const completed = await waitFor(async () => {
+  const completedRead = await waitFor(async () => {
     const result = await operatorRequest(
-      `/v1/products/agent-bridge/commands/${encodeURIComponent(commandId)}`,
+      `/v1/products/agent-bridge/commands/${encodeURIComponent(readCommandId)}`,
     );
-    if (!result.response.ok) return false;
-    return result.body?.command?.state === 'completed' ? result.body.command : false;
-  }, 'Real Agent Bridge runtime did not execute and acknowledge the queued READ command.');
+    return result.response.ok && result.body?.command?.state === 'completed'
+      ? result.body.command
+      : false;
+  }, 'Real Agent Bridge runtime did not execute the queued READ command.');
+  assert.equal(completedRead.deliveryAttempt, 1);
+  assert.equal(completedRead.acknowledgement?.status, 'executed');
+  assert.equal(completedRead.acknowledgement?.correlationId, readCorrelationId);
+  assert.match(JSON.stringify(completedRead.acknowledgement?.output), /"id":42/);
+  console.log('E2E_STAGE=read:ok');
 
-  assert.equal(completed.deliveryAttempt, 1);
-  assert.equal(completed.acknowledgement?.status, 'executed');
-  assert.equal(completed.acknowledgement?.correlationId, correlationId);
-  assert.match(JSON.stringify(completed.acknowledgement?.output), /"id":42/);
-  assert.deepEqual(connectorCalls.map((call) => [call.method, call.path]), [
-    ['GET', '/wp-json/wc/v3/orders'],
-  ]);
-  console.log('E2E_STAGE=execution:ok');
+  console.log('E2E_STAGE=write:start');
+  const queuedWrite = await operatorRequest(
+    `/v1/products/agent-bridge/installations/${encodeURIComponent(binding.installationId)}/approved-commands`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        toolId: writeToolId,
+        input: { orderId: 42, status: 'completed' },
+        correlationId: writeCorrelationId,
+        ttlSeconds: 120,
+      }),
+    },
+  );
+  assert.equal(queuedWrite.response.status, 201, JSON.stringify(queuedWrite.body));
+  assert.equal(queuedWrite.body?.approval, 'signed');
+  assert.equal(queuedWrite.body?.command?.toolId, writeToolId);
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(queuedWrite.body?.command ?? {}, 'approvalToken'),
+    false,
+    'Operator projection must never expose the signed approval token.',
+  );
+  const writeCommandId = queuedWrite.body?.command?.commandId;
+  assert.ok(writeCommandId);
+
+  const completedWrite = await waitFor(async () => {
+    const result = await operatorRequest(
+      `/v1/products/agent-bridge/commands/${encodeURIComponent(writeCommandId)}`,
+    );
+    return result.response.ok && result.body?.command?.state === 'completed'
+      ? result.body.command
+      : false;
+  }, 'Real Agent Bridge runtime did not execute the signed WRITE command.');
+  assert.equal(completedWrite.deliveryAttempt, 1);
+  assert.equal(completedWrite.acknowledgement?.status, 'executed');
+  assert.equal(completedWrite.acknowledgement?.correlationId, writeCorrelationId);
+  assert.match(JSON.stringify(completedWrite.acknowledgement?.output), /"status":"completed"/);
+  console.log('E2E_STAGE=write:ok');
+
+  await waitForAuditDrain();
+  assert.deepEqual(
+    connectorCalls.map((call) => [call.method, call.path]),
+    [
+      ['GET', '/wp-json/wc/v3/orders'],
+      ['PUT', '/wp-json/wc/v3/orders/42'],
+    ],
+  );
 
   console.log(JSON.stringify({
-    version: 'phase7.2a-command-delivery-evidence.v1',
+    version: 'phase7.2b-command-delivery-evidence.v1',
     installationId: binding.installationId,
     bridgeInstanceId: binding.bridgeInstanceId,
-    commandId,
-    toolId: readToolId,
-    commandState: completed.state,
-    acknowledgementStatus: completed.acknowledgement.status,
-    deliveryAttempt: completed.deliveryAttempt,
+    readCommandId,
+    writeCommandId,
+    readToolId,
+    writeToolId,
+    readStatus: completedRead.acknowledgement.status,
+    writeStatus: completedWrite.acknowledgement.status,
+    readDeliveryAttempt: completedRead.deliveryAttempt,
+    writeDeliveryAttempt: completedWrite.deliveryAttempt,
+    trustedApprovalKeyCount: binding.trustedApprovalKeys.length,
     connectorCalls: connectorCalls.length,
-    approvalTrustMode: 'acceptance-read-only-bootstrap',
     recoverableSources: [...new Set(recoverableErrors.map((item) => item.source))].sort(),
   }));
 } finally {

@@ -25,6 +25,7 @@ export KCC_AUTH_MODE=local
 export KCC_LOCAL_ADMIN_EMAIL="agent-bridge-command-ci@kcc.local"
 export KCC_LOCAL_ADMIN_PASSWORD="agent-bridge-command-${GITHUB_RUN_ID:-local}-valid"
 export KCC_LOCAL_AUTH_SECRET="$(openssl rand -hex 32)"
+export KCC_INTEGRATION_SECRET_KEY="$(openssl rand -hex 32)"
 
 docker compose up -d --build
 for attempt in {1..45}; do
@@ -66,23 +67,59 @@ export ENROLLMENT_TOKEN="$(printf '%s' "$enrollment_response" | node -e 'let s="
 node scripts/ci/agent-bridge-command-delivery-acceptance.mjs | tee /tmp/agent-bridge-command-delivery-acceptance.json
 
 mongo_result="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval "
-  const command=db.agent_bridge_commands.findOne({tenantId:'$WORKSPACE_ID',correlationId:'phase7-2a-real-read'});
+  const readCommand=db.agent_bridge_commands.findOne({tenantId:'$WORKSPACE_ID',correlationId:'phase7-2b-real-read'});
+  const writeCommand=db.agent_bridge_commands.findOne({tenantId:'$WORKSPACE_ID',correlationId:'phase7-2b-real-write'});
+  const signer=db.agent_bridge_approval_signers.findOne({tenantId:'$WORKSPACE_ID'});
+  const secret=signer ? db.integration_secrets.findOne({id:signer.privateKeySecretRef,'scope.workspaceId':'$WORKSPACE_ID'}) : null;
+  const audits=db.agent_bridge_audit_events.find({tenantId:'$WORKSPACE_ID',correlationId:'phase7-2b-real-write'}).sort({occurredAt:1}).toArray();
   print(JSON.stringify({
-    exists:Boolean(command),
-    state:command && command.state,
-    deliveryAttempt:command && command.deliveryAttempt,
-    ackStatus:command && command.acknowledgement && command.acknowledgement.status,
-    hasApprovalToken:command && Object.prototype.hasOwnProperty.call(command,'approvalToken')
+    read:{
+      exists:Boolean(readCommand),
+      state:readCommand && readCommand.state,
+      deliveryAttempt:readCommand && readCommand.deliveryAttempt,
+      ackStatus:readCommand && readCommand.acknowledgement && readCommand.acknowledgement.status,
+      hasApprovalToken:readCommand && Object.prototype.hasOwnProperty.call(readCommand,'approvalToken')
+    },
+    write:{
+      exists:Boolean(writeCommand),
+      state:writeCommand && writeCommand.state,
+      deliveryAttempt:writeCommand && writeCommand.deliveryAttempt,
+      ackStatus:writeCommand && writeCommand.acknowledgement && writeCommand.acknowledgement.status,
+      hasApprovalToken:writeCommand && typeof writeCommand.approvalToken === 'string' && writeCommand.approvalToken.startsWith('kab1.')
+    },
+    signer:{
+      exists:Boolean(signer),
+      generation:signer && signer.generation,
+      hasPublicKey:signer && typeof signer.publicKeyPem === 'string' && signer.publicKeyPem.includes('BEGIN PUBLIC KEY'),
+      hasPrivateKeyField:signer && Object.prototype.hasOwnProperty.call(signer,'privateKeyPem'),
+      hasSecretRef:signer && typeof signer.privateKeySecretRef === 'string'
+    },
+    secret:{
+      exists:Boolean(secret),
+      algorithm:secret && secret.algorithm,
+      hasCiphertext:secret && typeof secret.ciphertext === 'string' && secret.ciphertext.length > 0,
+      hasPlaintext:secret && Object.prototype.hasOwnProperty.call(secret,'plaintext')
+    },
+    audit:{
+      count:audits.length,
+      risks:[...new Set(audits.map(event=>event.risk))],
+      types:audits.map(event=>event.type),
+      outcomes:audits.map(event=>event.outcome).filter(Boolean)
+    }
   }));
 ")"
 printf '%s' "$mongo_result" | node -e '
 let s="";
 process.stdin.on("data",d=>s+=d).on("end",()=>{
   const data=JSON.parse(s);
-  const expected={exists:true,state:"completed",deliveryAttempt:1,ackStatus:"executed",hasApprovalToken:false};
-  if (JSON.stringify(data)!==JSON.stringify(expected)) {
-    console.error(data);
-    process.exit(1);
+  const fail=(message)=>{console.error(message, JSON.stringify(data));process.exit(1)};
+  if (JSON.stringify(data.read)!==JSON.stringify({exists:true,state:"completed",deliveryAttempt:1,ackStatus:"executed",hasApprovalToken:false})) fail("READ evidence mismatch");
+  if (JSON.stringify(data.write)!==JSON.stringify({exists:true,state:"completed",deliveryAttempt:1,ackStatus:"executed",hasApprovalToken:true})) fail("WRITE evidence mismatch");
+  if (!data.signer.exists || data.signer.generation!==0 || !data.signer.hasPublicKey || data.signer.hasPrivateKeyField || !data.signer.hasSecretRef) fail("Approval signer evidence mismatch");
+  if (!data.secret.exists || data.secret.algorithm!=="aes-256-gcm" || !data.secret.hasCiphertext || data.secret.hasPlaintext) fail("Encrypted private key evidence mismatch");
+  for (const type of ["INVOCATION_RECEIVED","POLICY_EVALUATED","EXECUTION_STARTED","EXECUTION_SUCCEEDED"]) {
+    if (!data.audit.types.includes(type)) fail(`Missing WRITE audit event ${type}`);
   }
+  if (data.audit.count < 4 || data.audit.risks.some(risk=>risk!=="WRITE") || !data.audit.outcomes.includes("ALLOW")) fail("WRITE audit evidence mismatch");
 });
 '
