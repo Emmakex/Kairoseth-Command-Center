@@ -1,0 +1,35 @@
+name: Agent Bridge Approval-Key Rotation Acceptance
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  chained-rotation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout Platform
+        uses: actions/checkout@v4
+
+      - name: Run real Agent Bridge approval-key rotation
+        run: bash scripts/ci/run-agent-bridge-approval-key-rotation-acceptance.sh
+
+      - name: Upload safe rotation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-bridge-approval-key-rotation-evidence
+          path: /tmp/agent-bridge-approval-key-rotation-acceptance.json
+          if-no-files-found: warn
+          retention-days: 1
+
+      - name: Show service state on failure
+        if: failure()
+        run: |
+          docker compose ps
+          docker compose logs --no-color
