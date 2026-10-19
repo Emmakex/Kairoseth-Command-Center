@@ -81,6 +81,7 @@ jobs:
               text = text.replace(anchor, replacement, 1)
           elif "async rotationStatus()" not in text:
               raise SystemExit('existing security test approval service anchor missing')
+          text = text.replace("code: 'approval_key_generation_mismatch',", "code: 'approval_key_generation_ahead',", 1)
           existing_test.write_text(text)
           PY
 
