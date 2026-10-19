@@ -7,6 +7,8 @@ import { MongoIntegrationSyncJobStore } from '@kcc/persistence/integration-sync-
 import { MongoPrioritizationWeightPolicyStore } from '@kcc/persistence/prioritization-weight-policies';
 import { MongoSignalAlertRulePolicyStore } from '@kcc/persistence/signal-alert-rule-policies';
 import { MongoAgentBridgeA2AStore } from './agent-bridge-a2a-store';
+import { AgentBridgeApprovalService } from './agent-bridge-approval-service';
+import { MongoAgentBridgeAuditStore } from './agent-bridge-audit-store';
 import { MongoAgentBridgeControlStore } from './agent-bridge-control-store';
 import { MongoAgentBridgeExecutionStore } from './agent-bridge-execution-store';
 import { buildApp } from './application';
@@ -32,7 +34,14 @@ const taskRecurrenceStore = new MongoTaskRecurrenceStore(mongo, mongo.db());
 const taskReminderStore = new MongoTaskReminderStore(mongo, mongo.db());
 const agentBridgeA2AStore = new MongoAgentBridgeA2AStore(mongo.db());
 const agentBridgeControlStore = new MongoAgentBridgeControlStore(mongo.db());
-const agentBridgeExecutionStore = new MongoAgentBridgeExecutionStore(mongo.db());
+const agentBridgeApprovalService = config.KCC_AGENT_BRIDGE_APPROVAL_PRIVATE_KEY_PEM
+  ? new AgentBridgeApprovalService(config.KCC_AGENT_BRIDGE_APPROVAL_PRIVATE_KEY_PEM)
+  : undefined;
+const agentBridgeExecutionStore = new MongoAgentBridgeExecutionStore(
+  mongo.db(),
+  agentBridgeApprovalService,
+);
+const agentBridgeAuditStore = new MongoAgentBridgeAuditStore(mongo.db());
 const integrationSignalStore = new MongoIntegrationSignalStore(mongo.db());
 const integrationSyncJobStore = new MongoIntegrationSyncJobStore(mongo.db());
 const signalAlertRulePolicyStore = new MongoSignalAlertRulePolicyStore(mongo, mongo.db());
@@ -64,6 +73,7 @@ try {
     agentBridgeA2AStore.ensureIndexes(),
     agentBridgeControlStore.ensureIndexes(),
     agentBridgeExecutionStore.ensureIndexes(),
+    agentBridgeAuditStore.ensureIndexes(),
     integrationSignalStore.ensureIndexes(),
     integrationSyncJobStore.ensureIndexes(),
     signalAlertRulePolicyStore.ensureIndexes(),
@@ -115,6 +125,8 @@ const app = buildApp({
   agentBridgeA2AStore,
   agentBridgeControlStore,
   agentBridgeExecutionStore,
+  agentBridgeAuditStore,
+  ...(agentBridgeApprovalService ? { agentBridgeApprovalService } : {}),
   integrationSignalStore,
   integrationSyncJobStore,
   signalAlertRulePolicyStore,
