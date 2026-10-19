@@ -27,6 +27,13 @@ const controlStore = {
   },
 } as unknown as AgentBridgeControlStore;
 
+const stableRotationStatus = {
+  generation: 0,
+  phase: 'stable' as const,
+  signingKeyId: 'approval-key-1',
+  trustedKeyIds: ['approval-key-1'],
+};
+
 const approvalService: AgentBridgeApprovalService = {
   async ensureIndexes() {},
   async trustedApprovalKeys() {
@@ -34,6 +41,15 @@ const approvalService: AgentBridgeApprovalService = {
   },
   async generation() {
     return 0;
+  },
+  async rotationStatus() {
+    return stableRotationStatus;
+  },
+  async beginRotation() {
+    return stableRotationStatus;
+  },
+  async syncApprovalKeys() {
+    return { update: null, status: stableRotationStatus };
   },
   async signApproval() {
     return 'unused';
@@ -109,15 +125,15 @@ describe('Agent Bridge approval-key sync and runtime audit security', () => {
     });
     expect(current.statusCode).toBe(204);
 
-    const mismatch = await app.inject({
+    const future = await app.inject({
       method: 'POST',
       url: '/api/products/agent-bridge/approval-keys/sync',
       headers: { authorization: 'Bearer runtime-token' },
       payload: { sessionId: 'session-1', currentGeneration: 1 },
     });
-    expect(mismatch.statusCode).toBe(409);
-    expect(mismatch.json()).toEqual({
-      code: 'approval_key_generation_mismatch',
+    expect(future.statusCode).toBe(409);
+    expect(future.json()).toEqual({
+      code: 'approval_key_generation_ahead',
       currentGeneration: 0,
     });
 
