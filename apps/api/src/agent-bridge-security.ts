@@ -10,6 +10,15 @@ import type { AgentBridgeControlStore, AgentBridgeRuntimeSession } from './agent
 const MAX_ID = 512;
 const MAX_TEXT = 4096;
 const MAX_AUDIT_EVENTS = 500;
+const MAX_AUDIT_MESSAGE = 512;
+
+const SECRET_PATTERNS: readonly RegExp[] = [
+  /kab1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g,
+  /kabd1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g,
+  /Bearer\s+[A-Za-z0-9._~+\x2F-]+/gi,
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g,
+  /\b(api[_-]?key|access[_-]?token|refresh[_-]?token|token|password|secret|authorization)\b\s*[:=]\s*[^\s,;]+/gi,
+];
 
 type AuditProvenance = NonNullable<AgentBridgeAuditEvent['provenance']>;
 type AuditPrincipal = NonNullable<AuditProvenance['principal']>;
@@ -100,6 +109,23 @@ function provenance(value: unknown): AuditProvenance | undefined | null {
   };
 }
 
+function auditMessage(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  let sanitized = Array.from(value, (character) => {
+    const codePoint = character.codePointAt(0) ?? 0;
+    const isAllowedWhitespace = codePoint === 0x09 || codePoint === 0x0a || codePoint === 0x0d;
+    return isAllowedWhitespace || (codePoint >= 0x20 && codePoint !== 0x7f) ? character : '';
+  }).join('');
+  for (const pattern of SECRET_PATTERNS) {
+    sanitized = sanitized.replace(pattern, (_match, secretName?: string) =>
+      typeof secretName === 'string' && secretName.length > 0
+        ? `${secretName}=[REDACTED]`
+        : '[REDACTED]',
+    );
+  }
+  return sanitized.slice(0, MAX_AUDIT_MESSAGE);
+}
+
 function auditEvent(value: unknown): AgentBridgeAuditEvent | null {
   const item = object(value);
   if (!item) return null;
@@ -111,7 +137,7 @@ function auditEvent(value: unknown): AgentBridgeAuditEvent | null {
   const toolId = text(item.toolId);
   const actor = text(item.actor, MAX_TEXT);
   const occurredAt = timestamp(item.occurredAt);
-  const message = optionalText(item.message, MAX_TEXT);
+  const message = item.message === undefined ? undefined : auditMessage(item.message);
   const parsedProvenance = provenance(item.provenance);
   const type = item.type;
   const risk = item.risk;
