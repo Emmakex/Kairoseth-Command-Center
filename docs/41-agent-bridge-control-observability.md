@@ -1,6 +1,6 @@
 # Agent Bridge control + runtime observability / Control + observabilidad runtime de Agent Bridge
 
-Status: **implemented pending CI acceptance / implementado pendiente de aceptación CI**
+Status: **accepted and merged / aceptado y fusionado**
 
 This slice closes the insecure gap between the Agent Bridge runtime contracts and Kairoseth Platform. Runtime heartbeat and health snapshots are accepted only through a short-lived runtime session cryptographically bound to the enrolled installation.
 
@@ -112,10 +112,10 @@ requires an authenticated Platform session, active workspace and `agent-bridge` 
 
 It never returns enrollment tokens, runtime access tokens, public keys, key IDs, raw task data, inputs, outputs or probe details.
 
-The ES/EN Platform surface at `/{locale}/ia/agent-bridge` now shows this runtime state alongside A2A task observability.
+The ES/EN Platform surface at `/{locale}/ia/agent-bridge` shows this runtime state alongside A2A task observability.
 
-## Remaining boundary / Límite pendiente
+## Acceptance closure / Cierre de aceptación
 
-This slice establishes the full authenticated telemetry path needed by Platform observability. Before the Agent Bridge Phase 6 observability checks are marked complete, the cross-repository acceptance must be green and the Agent Bridge roadmap/evidence must be synchronized with the merged Platform commit.
+The cross-repository control/observability acceptance is green and the Platform implementation was merged through the Phase 6 Agent Bridge line, including PR #54 (`b444c51bd6f41302d6abbd4d178a940336b23c82`). Subsequent Phase 7 command-delivery and mutation-security acceptance continues to exercise the same authenticated enrollment/session/heartbeat/snapshot path, so this telemetry boundary is no longer pending.
 
-Esta microfase establece la ruta autenticada completa de telemetría necesaria para observabilidad. Antes de marcar los checks de Fase 6 como completados, la aceptación cross-repository debe quedar verde y el roadmap/evidencia de Agent Bridge debe sincronizarse con el commit mergeado de Platform.
+La aceptación cross-repository de control/observabilidad está en verde y la implementación de Platform quedó fusionada dentro de la línea de Fase 6 de Agent Bridge, incluida la PR #54 (`b444c51bd6f41302d6abbd4d178a940336b23c82`). Las aceptaciones posteriores de Fase 7 para entrega de comandos y seguridad de mutaciones siguen ejercitando la misma ruta autenticada de enrolamiento/sesión/heartbeat/snapshot, por lo que este límite de telemetría ya no está pendiente.
