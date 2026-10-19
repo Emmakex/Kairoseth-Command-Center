@@ -43,7 +43,7 @@ jobs:
           export KCC_LOCAL_AUTH_SECRET="$(openssl rand -hex 32)"
           {
             echo "KCC_AUTH_MODE=$KCC_AUTH_MODE"
-            echo "KCC_LOCAL_ADMIN_EMAIL=$KCC_LOCAL_ADMIN_ADMIN_EMAIL"
+            echo "KCC_LOCAL_ADMIN_EMAIL=$KCC_LOCAL_ADMIN_EMAIL"
             echo "KCC_LOCAL_ADMIN_PASSWORD=$KCC_LOCAL_ADMIN_PASSWORD"
             echo "KCC_LOCAL_AUTH_SECRET=$KCC_LOCAL_AUTH_SECRET"
           } >> "$GITHUB_ENV"
