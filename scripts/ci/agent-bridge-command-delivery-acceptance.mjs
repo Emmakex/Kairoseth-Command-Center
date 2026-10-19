@@ -26,9 +26,11 @@ const readToolId = connectorRuntimeToolId('woocommerce', 'store', 'orders.list')
 const writeToolId = connectorRuntimeToolId('woocommerce', 'store', 'orders.update-status');
 const readCorrelationId = 'phase7-2b-real-read';
 const writeCorrelationId = 'phase7-2b-real-write';
+const rotatedWriteCorrelationId = 'phase7-rotation-real-write';
 const connectorCalls = [];
 const recoverableErrors = [];
-const stateDir = await mkdtemp(join(tmpdir(), 'kab-platform-7-2b-'));
+const stateDir = await mkdtemp(join(tmpdir(), 'kab-platform-rotation-'));
+const approvalKeyStatePath = join(stateDir, 'security', 'approval-keyset.json');
 
 function json(payload, status = 200) {
   return new globalThis.Response(JSON.stringify(payload), {
@@ -68,6 +70,14 @@ async function waitFor(check, message, timeoutMs = 45_000) {
   throw new Error(message);
 }
 
+async function readApprovalKeyState() {
+  try {
+    return JSON.parse(await readFile(approvalKeyStatePath, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
 async function waitForAuditDrain() {
   const outboxPath = join(stateDir, 'audit', 'outbox.json');
   await waitFor(async () => {
@@ -99,8 +109,9 @@ const connectorHttp = {
       return json([{ id: 42, status: 'processing' }]);
     }
     if (method === 'PUT' && url.pathname === '/wp-json/wc/v3/orders/42') {
-      assert.deepEqual(JSON.parse(body), { status: 'completed' });
-      return json({ id: 42, status: 'completed' });
+      const payload = JSON.parse(body);
+      assert.ok(['completed', 'processing'].includes(payload.status));
+      return json({ id: 42, status: payload.status });
     }
     return json({ code: 'unexpected_woocommerce_endpoint' }, 404);
   },
@@ -123,20 +134,39 @@ const connector = {
   },
 };
 
-const runtime = new ProductionRuntime({
-  platformBaseUrl: baseUrl,
-  stateDir,
-  runtimeVersion: '0.1.0-phase7-2b',
-  deploymentMode: 'local',
-  connectorInstances: [connector],
-  allowInsecureHttp: true,
-  onRecoverableError(source, retryDelayMs) {
-    recoverableErrors.push({ source, retryDelayMs });
-  },
-});
+function createRuntime() {
+  return new ProductionRuntime({
+    platformBaseUrl: baseUrl,
+    stateDir,
+    runtimeVersion: '0.1.0-phase7-rotation',
+    deploymentMode: 'local',
+    connectorInstances: [connector],
+    allowInsecureHttp: true,
+    onRecoverableError(source, retryDelayMs) {
+      recoverableErrors.push({ source, retryDelayMs });
+    },
+  });
+}
 
+let runtime = createRuntime();
 let controller;
 let runPromise;
+
+async function startRuntime() {
+  assert.equal(controller, undefined, 'Runtime is already started.');
+  controller = new globalThis.AbortController();
+  runPromise = runtime.run(controller.signal);
+}
+
+async function stopRuntime() {
+  if (!controller) return;
+  controller.abort();
+  if (runPromise) await runPromise;
+  controller = undefined;
+  runPromise = undefined;
+  runtime = createRuntime();
+}
+
 try {
   console.log('E2E_STAGE=enrollment:start');
   const binding = await runtime.enroll(process.env.ENROLLMENT_TOKEN);
@@ -146,10 +176,10 @@ try {
   assert.equal(binding.trustedApprovalKeys.length, 1);
   assert.ok(binding.trustedApprovalKeys[0]?.keyId);
   assert.match(binding.trustedApprovalKeys[0]?.publicKeyPem ?? '', /BEGIN PUBLIC KEY/);
+  const initialApprovalKeyId = binding.trustedApprovalKeys[0].keyId;
   console.log('E2E_STAGE=enrollment:ok');
 
-  controller = new globalThis.AbortController();
-  runPromise = runtime.run(controller.signal);
+  await startRuntime();
 
   console.log('E2E_STAGE=snapshot:start');
   await waitFor(async () => {
@@ -231,32 +261,131 @@ try {
   console.log('E2E_STAGE=write:ok');
 
   await waitForAuditDrain();
+
+  console.log('E2E_STAGE=rotation:start');
+  const rotation = await operatorRequest('/v1/products/agent-bridge/approval-keys/rotate', {
+    method: 'POST',
+  });
+  assert.equal(rotation.response.status, 202, JSON.stringify(rotation.body));
+  assert.equal(rotation.body?.status?.generation, 1);
+  assert.equal(rotation.body?.status?.phase, 'overlap');
+  assert.equal(rotation.body?.status?.signingKeyId, initialApprovalKeyId);
+  assert.equal(rotation.body?.status?.trustedKeyIds?.length, 2);
+  const rotatedApprovalKeyId = rotation.body.status.trustedKeyIds.find(
+    (keyId) => keyId !== initialApprovalKeyId,
+  );
+  assert.ok(rotatedApprovalKeyId);
+
+  await stopRuntime();
+  await startRuntime();
+  const overlapState = await waitFor(async () => {
+    const state = await readApprovalKeyState();
+    return state?.generation === 1 && state?.keys?.length === 2 ? state : false;
+  }, 'Agent Bridge runtime did not apply approval-key overlap generation 1.');
+  assert.deepEqual(
+    new Set(overlapState.keys.map((key) => key.keyId)),
+    new Set([initialApprovalKeyId, rotatedApprovalKeyId]),
+  );
+
+  await stopRuntime();
+  await startRuntime();
+  const rotatedState = await waitFor(async () => {
+    const state = await readApprovalKeyState();
+    return state?.generation === 2 && state?.keys?.length === 1 ? state : false;
+  }, 'Agent Bridge runtime did not promote the new approval key to generation 2.');
+  assert.equal(rotatedState.keys[0]?.keyId, rotatedApprovalKeyId);
+  console.log('E2E_STAGE=rotation:keyset-ok');
+
+  console.log('E2E_STAGE=rotated-write:start');
+  const queuedRotatedWrite = await operatorRequest(
+    `/v1/products/agent-bridge/installations/${encodeURIComponent(binding.installationId)}/approved-commands`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        toolId: writeToolId,
+        input: { orderId: 42, status: 'processing' },
+        correlationId: rotatedWriteCorrelationId,
+        ttlSeconds: 120,
+      }),
+    },
+  );
+  assert.equal(
+    queuedRotatedWrite.response.status,
+    201,
+    JSON.stringify(queuedRotatedWrite.body),
+  );
+  assert.equal(queuedRotatedWrite.body?.approval, 'signed');
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(queuedRotatedWrite.body?.command ?? {}, 'approvalToken'),
+    false,
+  );
+  const rotatedWriteCommandId = queuedRotatedWrite.body?.command?.commandId;
+  assert.ok(rotatedWriteCommandId);
+
+  const completedRotatedWrite = await waitFor(async () => {
+    const result = await operatorRequest(
+      `/v1/products/agent-bridge/commands/${encodeURIComponent(rotatedWriteCommandId)}`,
+    );
+    return result.response.ok && result.body?.command?.state === 'completed'
+      ? result.body.command
+      : false;
+  }, 'Real Agent Bridge runtime did not execute WRITE signed by the rotated key.');
+  assert.equal(completedRotatedWrite.deliveryAttempt, 1);
+  assert.equal(completedRotatedWrite.acknowledgement?.status, 'executed');
+  assert.equal(completedRotatedWrite.acknowledgement?.correlationId, rotatedWriteCorrelationId);
+  assert.match(
+    JSON.stringify(completedRotatedWrite.acknowledgement?.output),
+    /"status":"processing"/,
+  );
+  await waitForAuditDrain();
+  console.log('E2E_STAGE=rotated-write:ok');
+
+  await stopRuntime();
+  await startRuntime();
+  const stableRotation = await waitFor(async () => {
+    const result = await operatorRequest('/v1/products/agent-bridge/approval-keys/rotation');
+    return result.response.ok &&
+      result.body?.status?.generation === 2 &&
+      result.body?.status?.phase === 'stable'
+      ? result.body.status
+      : false;
+  }, 'Platform did not retire the old approval key after generation 2 acknowledgement.');
+  assert.equal(stableRotation.signingKeyId, rotatedApprovalKeyId);
+  assert.deepEqual(stableRotation.trustedKeyIds, [rotatedApprovalKeyId]);
+  console.log('E2E_STAGE=rotation:stable');
+
   assert.deepEqual(
     connectorCalls.map((call) => [call.method, call.path]),
     [
       ['GET', '/wp-json/wc/v3/orders'],
       ['PUT', '/wp-json/wc/v3/orders/42'],
+      ['PUT', '/wp-json/wc/v3/orders/42'],
     ],
   );
 
   console.log(JSON.stringify({
-    version: 'phase7.2b-command-delivery-evidence.v1',
+    version: 'phase7.approval-key-rotation-evidence.v1',
     installationId: binding.installationId,
     bridgeInstanceId: binding.bridgeInstanceId,
     readCommandId,
     writeCommandId,
+    rotatedWriteCommandId,
     readToolId,
     writeToolId,
     readStatus: completedRead.acknowledgement.status,
     writeStatus: completedWrite.acknowledgement.status,
+    rotatedWriteStatus: completedRotatedWrite.acknowledgement.status,
     readDeliveryAttempt: completedRead.deliveryAttempt,
     writeDeliveryAttempt: completedWrite.deliveryAttempt,
-    trustedApprovalKeyCount: binding.trustedApprovalKeys.length,
+    rotatedWriteDeliveryAttempt: completedRotatedWrite.deliveryAttempt,
+    initialApprovalKeyId,
+    rotatedApprovalKeyId,
+    approvalKeyGeneration: stableRotation.generation,
+    approvalKeyPhase: stableRotation.phase,
     connectorCalls: connectorCalls.length,
     recoverableSources: [...new Set(recoverableErrors.map((item) => item.source))].sort(),
   }));
 } finally {
-  controller?.abort();
-  if (runPromise) await runPromise;
+  await stopRuntime();
   await rm(stateDir, { recursive: true, force: true });
 }
