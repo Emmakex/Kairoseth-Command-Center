@@ -101,9 +101,9 @@ export class MongoAgentBridgeAuditStore implements AgentBridgeAuditStore {
 }
 
 function sameEvent(document: AgentBridgeAuditDocument, event: AgentBridgeAuditEvent): boolean {
-  const { receivedAt: _receivedAt, _id: _id, ...stored } = document as AgentBridgeAuditDocument & {
-    _id?: unknown;
-  };
+  const stored = Object.fromEntries(
+    Object.entries(document).filter(([key]) => key !== 'receivedAt' && key !== '_id'),
+  );
   return canonicalJson(stored) === canonicalJson(event);
 }
 

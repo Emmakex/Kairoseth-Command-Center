@@ -14,7 +14,7 @@ const MAX_CLOCK_SKEW_MS = 5 * 60 * 1000;
 const SECRET_PATTERNS: readonly RegExp[] = [
   /kab1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g,
   /kabd1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g,
-  /Bearer\s+[A-Za-z0-9._~+\/-]+/gi,
+  /Bearer\s+[A-Za-z0-9._~+\x2F-]+/gi,
   /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g,
   /\b(api[_-]?key|access[_-]?token|refresh[_-]?token|token|password|secret|authorization)\b\s*[:=]\s*[^\s,;]+/gi,
 ];
@@ -273,7 +273,11 @@ function timestamp(value: unknown): string | null {
 
 function auditMessage(value: unknown): string | null {
   if (typeof value !== 'string') return null;
-  let sanitized = value.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '');
+  let sanitized = Array.from(value, (character) => {
+    const codePoint = character.codePointAt(0) ?? 0;
+    const isAllowedWhitespace = codePoint === 0x09 || codePoint === 0x0a || codePoint === 0x0d;
+    return isAllowedWhitespace || (codePoint >= 0x20 && codePoint !== 0x7f) ? character : '';
+  }).join('');
   for (const pattern of SECRET_PATTERNS) {
     sanitized = sanitized.replace(pattern, (_match, secretName?: string) =>
       typeof secretName === 'string' && secretName.length > 0
