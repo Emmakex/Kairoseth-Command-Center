@@ -1,0 +1,327 @@
+name: Agent Bridge Command Delivery Acceptance
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  read-command-delivery:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Platform
+        uses: actions/checkout@v4
+
+      - name: Checkout accepted Agent Bridge contract
+        uses: actions/checkout@v4
+        with:
+          repository: Emmakex/kairoseth-agent-bridge
+          ref: 7baa3674c91685c6007cc38421432624b4aa8b38
+          path: agent-bridge-source
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: agent-bridge-source/package-lock.json
+
+      - name: Build Agent Bridge client
+        working-directory: agent-bridge-source
+        run: |
+          npm ci
+          npm run build
+
+      - name: Build and start Platform stack
+        run: |
+          export KCC_AUTH_MODE=local
+          export KCC_LOCAL_ADMIN_EMAIL=agent-bridge-command-ci@kcc.local
+          export KCC_LOCAL_ADMIN_PASSWORD="agent-bridge-command-${GITHUB_RUN_ID}-valid"
+          export KCC_LOCAL_AUTH_SECRET="$(openssl rand -hex 32)"
+          {
+            echo "KCC_AUTH_MODE=$KCC_AUTH_MODE"
+            echo "KCC_LOCAL_ADMIN_EMAIL=$KCC_LOCAL_ADMIN_EMAIL"
+            echo "KCC_LOCAL_ADMIN_PASSWORD=$KCC_LOCAL_ADMIN_PASSWORD"
+            echo "KCC_LOCAL_AUTH_SECRET=$KCC_LOCAL_AUTH_SECRET"
+          } >> "$GITHUB_ENV"
+          docker compose up -d --build
+
+      - name: Wait for Platform readiness
+        run: |
+          for attempt in {1..45}; do
+            if curl --fail --silent http://localhost:4000/ready >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose ps
+          docker compose logs api mongo
+          exit 1
+
+      - name: Issue workspace enrollment token
+        run: |
+          login_response="$(curl --fail --silent \
+            -X POST http://localhost:4000/v1/auth/local/login \
+            -H 'content-type: application/json' \
+            --data "{\"email\":\"$KCC_LOCAL_ADMIN_EMAIL\",\"password\":\"$KCC_LOCAL_ADMIN_PASSWORD\"}")"
+          operator_access_token="$(printf '%s' "$login_response" | python3 -c 'import json,sys; print(json.load(sys.stdin)["accessToken"])')"
+          echo "::add-mask::$operator_access_token"
+
+          session_response="$(curl --fail --silent \
+            http://localhost:4000/v1/session \
+            -H "authorization: Bearer $operator_access_token")"
+          workspace_id="$(printf '%s' "$session_response" | python3 -c 'import json,sys; print(json.load(sys.stdin)["activeWorkspaceId"])')"
+
+          enrollment_response="$(curl --fail --silent \
+            -X POST http://localhost:4000/v1/products/agent-bridge/enrollment-tokens \
+            -H "authorization: Bearer $operator_access_token")"
+          enrollment_token="$(printf '%s' "$enrollment_response" | python3 -c 'import json,sys; data=json.load(sys.stdin); assert data["version"] == "kcc.agent-bridge-enrollment-token.v1"; print(data["token"])')"
+          echo "::add-mask::$enrollment_token"
+
+          {
+            echo "OPERATOR_ACCESS_TOKEN=$operator_access_token"
+            echo "WORKSPACE_ID=$workspace_id"
+            echo "ENROLLMENT_TOKEN=$enrollment_token"
+          } >> "$GITHUB_ENV"
+
+      - name: Prove READ command delivery over real runtime session
+        run: |
+          set -euo pipefail
+          cat > agent-bridge-command-acceptance.mjs <<'NODE'
+          import assert from 'node:assert/strict';
+          import { BridgeIdentityManager, InMemoryBridgeIdentityStore } from './agent-bridge-source/dist/src/identity/installation-identity.js';
+          import { InstallationEnrollmentClient } from './agent-bridge-source/dist/src/control-channel/enrollment.js';
+          import { HttpEnrollmentTransport } from './agent-bridge-source/dist/src/control-channel/http-enrollment-transport.js';
+          import { ControlSessionClient } from './agent-bridge-source/dist/src/control-channel/session.js';
+          import { HttpSessionTransport } from './agent-bridge-source/dist/src/control-channel/http-session-transport.js';
+          import { HttpRuntimeSnapshotTransport } from './agent-bridge-source/dist/src/control-channel/http-runtime-snapshot-transport.js';
+
+          const baseUrl = 'http://127.0.0.1:4000';
+          const runtimeVersion = '0.1.0-dev.0';
+          const identityManager = new BridgeIdentityManager(new InMemoryBridgeIdentityStore());
+
+          const enrollmentClient = new InstallationEnrollmentClient(
+            identityManager,
+            new HttpEnrollmentTransport({ baseUrl, allowInsecureHttp: true }),
+            { runtimeVersion, deploymentMode: 'local', capabilities: ['files'] },
+          );
+          const binding = await enrollmentClient.enroll(process.env.ENROLLMENT_TOKEN);
+          assert.equal(binding.version, 'kab.installation-binding.v1');
+          assert.equal(binding.tenantId, process.env.WORKSPACE_ID);
+
+          const sessionClient = new ControlSessionClient(
+            identityManager,
+            new HttpSessionTransport({ baseUrl, allowInsecureHttp: true }),
+            { runtimeVersion, capabilities: ['files'] },
+          );
+          const controlSession = await sessionClient.open(binding);
+          await controlSession.heartbeat('ready');
+
+          const snapshot = {
+            version: 'kab.runtime-snapshot.v1',
+            snapshotId: 'ci-command-delivery-snapshot',
+            generatedAt: new Date().toISOString(),
+            connectors: [{
+              connectorId: 'files',
+              connectorInstanceId: 'ci-files',
+              name: 'Files',
+              version: '1.0.0',
+              description: 'Command delivery acceptance connector',
+              capabilities: ['files'],
+              tools: [
+                {
+                  toolId: 'read-file',
+                  runtimeToolId: 'files.ci-files.read-file',
+                  name: 'Read file',
+                  description: 'Read an allowed file',
+                  risk: 'READ',
+                },
+                {
+                  toolId: 'write-file',
+                  runtimeToolId: 'files.ci-files.write-file',
+                  name: 'Write file',
+                  description: 'Write an allowed file',
+                  risk: 'WRITE',
+                },
+              ],
+            }],
+            health: [{
+              connectorId: 'files',
+              connectorInstanceId: 'ci-files',
+              status: 'healthy',
+              checkedAt: new Date().toISOString(),
+              tools: [
+                {
+                  toolId: 'read-file',
+                  runtimeToolId: 'files.ci-files.read-file',
+                  availability: 'available',
+                },
+                {
+                  toolId: 'write-file',
+                  runtimeToolId: 'files.ci-files.write-file',
+                  availability: 'available',
+                },
+              ],
+            }],
+          };
+          const snapshotTransport = new HttpRuntimeSnapshotTransport({ baseUrl, allowInsecureHttp: true });
+          const snapshotAck = await snapshotTransport.report(controlSession.credential.accessToken, snapshot);
+          assert.equal(snapshotAck.snapshotId, snapshot.snapshotId);
+
+          const operatorHeaders = {
+            authorization: `Bearer ${process.env.OPERATOR_ACCESS_TOKEN}`,
+            'content-type': 'application/json',
+          };
+          const runtimeHeaders = {
+            authorization: `Bearer ${controlSession.credential.accessToken}`,
+            'content-type': 'application/json',
+          };
+
+          const writeAttempt = await fetch(
+            `${baseUrl}/v1/products/agent-bridge/installations/${binding.installationId}/commands`,
+            {
+              method: 'POST',
+              headers: operatorHeaders,
+              body: JSON.stringify({
+                toolId: 'files.ci-files.write-file',
+                input: { path: '/safe/rejected.txt', content: 'must-not-run' },
+                correlationId: `ci-write-rejected-${process.env.GITHUB_RUN_ID}`,
+              }),
+            },
+          );
+          assert.equal(writeAttempt.status, 409);
+          const writeError = await writeAttempt.json();
+          assert.equal(writeError.code, 'agent_bridge_read_tool_unavailable');
+
+          const correlationId = `ci-read-${process.env.GITHUB_RUN_ID}`;
+          const queueResponse = await fetch(
+            `${baseUrl}/v1/products/agent-bridge/installations/${binding.installationId}/commands`,
+            {
+              method: 'POST',
+              headers: operatorHeaders,
+              body: JSON.stringify({
+                toolId: 'files.ci-files.read-file',
+                input: { path: '/safe/readme.txt' },
+                correlationId,
+              }),
+            },
+          );
+          assert.equal(queueResponse.status, 201);
+          const queued = await queueResponse.json();
+          assert.equal(queued.version, 'kcc.agent-bridge-command.v1');
+          assert.equal(queued.command.state, 'queued');
+          assert.equal(queued.command.deliveryAttempt, 0);
+          assert.equal(queued.command.correlationId, correlationId);
+          const commandId = queued.command.commandId;
+
+          const pullResponse = await fetch(`${baseUrl}/api/products/agent-bridge/commands/pull`, {
+            method: 'POST',
+            headers: runtimeHeaders,
+            body: JSON.stringify({ sessionId: controlSession.credential.sessionId, limit: 10 }),
+          });
+          assert.equal(pullResponse.status, 200);
+          const pulled = await pullResponse.json();
+          assert.equal(pulled.batch.version, 'kab.command-batch.v1');
+          assert.equal(pulled.batch.sessionId, controlSession.credential.sessionId);
+          assert.equal(pulled.batch.commands.length, 1);
+          const command = pulled.batch.commands[0];
+          assert.equal(command.version, 'kab.command.v1');
+          assert.equal(command.commandId, commandId);
+          assert.equal(command.deliveryAttempt, 1);
+          assert.equal(command.tenantId, process.env.WORKSPACE_ID);
+          assert.equal(command.installationId, binding.installationId);
+          assert.equal(command.bridgeInstanceId, binding.bridgeInstanceId);
+          assert.equal(command.correlationId, correlationId);
+          assert.equal(command.toolId, 'files.ci-files.read-file');
+          assert.deepEqual(command.input, { path: '/safe/readme.txt' });
+          assert.equal(typeof command.actionFingerprint, 'string');
+          assert.ok(command.actionFingerprint.length > 0);
+
+          const completedAt = new Date().toISOString();
+          const ackResponse = await fetch(`${baseUrl}/api/products/agent-bridge/commands/ack`, {
+            method: 'POST',
+            headers: runtimeHeaders,
+            body: JSON.stringify({
+              acknowledgement: {
+                version: 'kab.command-ack.v1',
+                commandId,
+                deliveryAttempt: command.deliveryAttempt,
+                sessionId: controlSession.credential.sessionId,
+                correlationId,
+                status: 'executed',
+                completedAt,
+                output: { content: 'accepted-read-result' },
+              },
+            }),
+          });
+          assert.equal(ackResponse.status, 204);
+
+          const statusResponse = await fetch(`${baseUrl}/v1/products/agent-bridge/commands/${commandId}`, {
+            headers: { authorization: `Bearer ${process.env.OPERATOR_ACCESS_TOKEN}` },
+          });
+          assert.equal(statusResponse.status, 200);
+          const status = await statusResponse.json();
+          assert.equal(status.version, 'kcc.agent-bridge-command.v1');
+          assert.equal(status.command.state, 'completed');
+          assert.equal(status.command.deliveryAttempt, 1);
+          assert.equal(status.command.acknowledgement.status, 'executed');
+          assert.deepEqual(status.command.acknowledgement.output, { content: 'accepted-read-result' });
+
+          const emptyPullResponse = await fetch(`${baseUrl}/api/products/agent-bridge/commands/pull`, {
+            method: 'POST',
+            headers: runtimeHeaders,
+            body: JSON.stringify({ sessionId: controlSession.credential.sessionId, limit: 10 }),
+          });
+          assert.equal(emptyPullResponse.status, 200);
+          const emptyPull = await emptyPullResponse.json();
+          assert.deepEqual(emptyPull.batch.commands, []);
+
+          console.log(JSON.stringify({
+            result: 'agent-bridge-read-command-delivery-accepted',
+            installationId: binding.installationId,
+            commandId,
+            deliveryAttempt: command.deliveryAttempt,
+            writeRejected: true,
+          }));
+          NODE
+
+          node agent-bridge-command-acceptance.mjs | tee /tmp/agent-bridge-command-acceptance.json
+
+      - name: Verify Mongo command lifecycle and secret boundary
+        run: |
+          mongo_result="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval "
+            const command=db.agent_bridge_commands.findOne({tenantId:'$WORKSPACE_ID'});
+            print(JSON.stringify({
+              count:db.agent_bridge_commands.countDocuments({tenantId:'$WORKSPACE_ID'}),
+              state:command && command.state,
+              deliveryAttempt:command && command.deliveryAttempt,
+              ackStatus:command && command.acknowledgement && command.acknowledgement.status,
+              toolId:command && command.toolId,
+              hasActionFingerprint:Boolean(command && command.actionFingerprint),
+              hasAccessToken:Boolean(command && Object.prototype.hasOwnProperty.call(command,'accessToken')),
+              hasEnrollmentToken:Boolean(command && Object.prototype.hasOwnProperty.call(command,'enrollmentToken'))
+            }));
+          ")"
+          printf '%s' "$mongo_result" | python3 -c 'import json,sys; data=json.load(sys.stdin); assert data == {"count":1,"state":"completed","deliveryAttempt":1,"ackStatus":"executed","toolId":"files.ci-files.read-file","hasActionFingerprint":True,"hasAccessToken":False,"hasEnrollmentToken":False}'
+
+      - name: Upload safe command-delivery evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-bridge-command-delivery-evidence
+          path: /tmp/agent-bridge-command-acceptance.json
+          if-no-files-found: warn
+          retention-days: 1
+
+      - name: Show service state on failure
+        if: failure()
+        run: |
+          docker compose ps
+          docker compose logs api mongo
+
+      - name: Stop stack
+        if: always()
+        run: docker compose down -v
