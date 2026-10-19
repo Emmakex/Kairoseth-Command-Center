@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import console from 'node:console';
 import process from 'node:process';
 
 import {
@@ -108,7 +109,7 @@ const operatorHeaders = {
 };
 
 async function queueApproved(toolId, input, correlationId) {
-  const response = await fetch(
+  const response = await globalThis.fetch(
     `${baseUrl}/v1/products/agent-bridge/installations/${binding.installationId}/approved-commands`,
     {
       method: 'POST',
@@ -192,7 +193,7 @@ for (const command of batch.commands) {
 }
 
 for (const queued of [queuedWrite, queuedCritical]) {
-  const statusResponse = await fetch(
+  const statusResponse = await globalThis.fetch(
     `${baseUrl}/v1/products/agent-bridge/commands/${queued.commandId}`,
     { headers: { authorization: `Bearer ${process.env.OPERATOR_ACCESS_TOKEN}` } },
   );
