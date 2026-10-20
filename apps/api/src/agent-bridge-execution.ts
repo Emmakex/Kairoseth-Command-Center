@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { authorize, type AuthProvider, type SessionContext } from '@kcc/auth';
+import { projectAgentBridgeOperatorCommand } from './agent-bridge-command-projection';
 import type { AgentBridgeControlStore, AgentBridgeRuntimeSession } from './agent-bridge-control-store';
 import type {
   AgentBridgeCommandAcknowledgement,
@@ -181,7 +182,7 @@ export function registerAgentBridgeExecutionRoutes(
       }
       return reply.code(201).send({
         version: 'kcc.agent-bridge-command.v1',
-        command,
+        command: projectAgentBridgeOperatorCommand(command),
       });
     } catch (error) {
       request.log.warn({ err: error }, 'Agent Bridge command queue rejected input');
@@ -208,7 +209,7 @@ export function registerAgentBridgeExecutionRoutes(
     if (!command) return reply.code(404).send({ code: 'agent_bridge_command_not_found' });
     return {
       version: 'kcc.agent-bridge-command.v1',
-      command,
+      command: projectAgentBridgeOperatorCommand(command),
     };
   });
 
