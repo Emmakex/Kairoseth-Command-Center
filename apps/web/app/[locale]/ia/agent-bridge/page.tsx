@@ -6,6 +6,14 @@ import {
   parseAgentBridgeApprovalRotationResponse,
   type AgentBridgeApprovalRotationStatus,
 } from '../../../../lib/agent-bridge-rotation';
+import {
+  parseAgentBridgeCommandResponse,
+  type AgentBridgeOperatorCommand,
+} from '../../../../lib/agent-bridge-command';
+import {
+  parseAgentBridgeToolInventoryResponse,
+  type AgentBridgeToolInventory,
+} from '../../../../lib/agent-bridge-tools';
 import { isLocale } from '../../../../lib/i18n';
 
 export const dynamic = 'force-dynamic';
@@ -52,7 +60,7 @@ const copy = {
   es: {
     breadcrumb: 'Command Center · IA · Agent Bridge',
     eyebrow: 'Kairoseth Platform · IA',
-    subtitle: 'Visibilidad operativa del backend autoritativo y los runtimes de Agent Bridge.',
+    subtitle: 'Visibilidad operativa y ejecución gobernada sobre los runtimes de Agent Bridge.',
     back: 'Volver a Today',
     available: 'Observabilidad disponible',
     unavailable: 'Observabilidad no disponible',
@@ -66,7 +74,7 @@ const copy = {
     backendUnavailable: 'No se pudo cargar el resumen A2A de Agent Bridge. Comprueba la API y MongoDB.',
     runtimeUnavailable: 'No se pudo cargar el estado de runtimes de Agent Bridge.',
     privacy:
-      'Esta vista muestra solo estado operativo seguro: no expone inputs de herramientas, correlaciones, huellas de acciones, claves ni tokens.',
+      'La interfaz no expone sesiones runtime, correlaciones, huellas de acciones, claves ni tokens. Los resultados se proyectan y redactan antes de mostrarse.',
     runtimeTitle: 'Runtimes',
     runtimeHelp: 'Conectividad autoritativa por heartbeat y salud reducida de conectores mediante snapshots autenticados.',
     connected: 'Conectados',
@@ -93,6 +101,58 @@ const copy = {
     rotateAction: 'Iniciar rotación segura',
     rotationInProgress: 'La rotación ya está en curso y avanzará cuando los runtimes activos confirmen la nueva generación.',
     rotationRequiresManage: 'Se requiere permiso de gestión del espacio de trabajo para controlar la rotación.',
+    executionTitle: 'Consola de ejecución',
+    executionHelp:
+      'Ejecuta solo herramientas anunciadas por el runtime. Platform decide el riesgo y deriva READ o aprobación firmada; el navegador no puede elegirlo.',
+    executionRequiresManage: 'Se requiere permiso de gestión del espacio de trabajo para ejecutar herramientas.',
+    inventoryUnavailable: 'No hay inventario seguro disponible para los runtimes actuales.',
+    inputLabel: 'Entrada JSON',
+    executeRead: 'Ejecutar lectura',
+    executeMutation: 'Firmar y ejecutar',
+    risk: 'Riesgo',
+    availability: 'Disponibilidad',
+    commandTitle: 'Último comando',
+    commandState: 'Estado',
+    commandStatus: 'Resultado',
+    commandAttempt: 'Intentos de entrega',
+    commandReason: 'Detalle',
+    commandOutput: 'Salida saneada',
+    refreshCommand: 'Actualizar estado',
+    commandUnavailable: 'No se pudo cargar el comando solicitado.',
+    availabilityValues: {
+      available: 'Disponible',
+      degraded: 'Degradada',
+      blocked: 'Bloqueada',
+    },
+    commandStates: {
+      queued: 'En cola',
+      delivered: 'Entregado al runtime',
+      completed: 'Completado',
+    },
+    commandStatuses: {
+      executed: 'Ejecutado',
+      approval_required: 'Requiere aprobación',
+      denied: 'Denegado',
+      failed: 'Fallido',
+      rejected: 'Rechazado',
+      expired: 'Caducado',
+      duplicate: 'Duplicado',
+      indeterminate: 'Indeterminado',
+    },
+    executionResults: {
+      queued: 'Comando encolado con el flujo de seguridad correspondiente.',
+      forbidden: 'No tienes permiso para ejecutar herramientas de Agent Bridge.',
+      inventory_missing: 'No existe un inventario runtime válido para esa instalación.',
+      invalid_inventory: 'Platform rechazó el inventario runtime por no cumplir el contrato seguro.',
+      tool_missing: 'La herramienta ya no está anunciada por el runtime.',
+      tool_blocked: 'La herramienta no está disponible para ejecución.',
+      invalid_input: 'La entrada debe ser JSON válido.',
+      input_too_large: 'La entrada supera el límite seguro de 64 KiB.',
+      unavailable: 'El servicio de ejecución no está disponible.',
+      invalid: 'La solicitud de ejecución fue rechazada.',
+      invalid_response: 'Platform devolvió una respuesta de comando no válida.',
+      error: 'No se pudo ejecutar la solicitud.',
+    },
     phaseValues: {
       stable: 'Estable',
       overlap: 'Solape seguro',
@@ -132,7 +192,7 @@ const copy = {
   en: {
     breadcrumb: 'Command Center · AI · Agent Bridge',
     eyebrow: 'Kairoseth Platform · AI',
-    subtitle: 'Operational visibility for the authoritative Agent Bridge backend and runtimes.',
+    subtitle: 'Operational visibility and governed execution across Agent Bridge runtimes.',
     back: 'Back to Today',
     available: 'Observability available',
     unavailable: 'Observability unavailable',
@@ -146,7 +206,7 @@ const copy = {
     backendUnavailable: 'The Agent Bridge A2A summary could not be loaded. Check the API and MongoDB.',
     runtimeUnavailable: 'The Agent Bridge runtime status could not be loaded.',
     privacy:
-      'This view exposes safe operational state only: tool inputs, correlations, action fingerprints, keys and tokens are not exposed.',
+      'The interface does not expose runtime sessions, correlations, action fingerprints, keys or tokens. Results are projected and redacted before display.',
     runtimeTitle: 'Runtimes',
     runtimeHelp: 'Authoritative heartbeat connectivity and reduced connector health from authenticated snapshots.',
     connected: 'Connected',
@@ -173,6 +233,58 @@ const copy = {
     rotateAction: 'Start safe rotation',
     rotationInProgress: 'Rotation is already in progress and advances as active runtimes acknowledge the new generation.',
     rotationRequiresManage: 'Workspace management permission is required to control key rotation.',
+    executionTitle: 'Execution console',
+    executionHelp:
+      'Execute only tools advertised by the runtime. Platform derives READ versus signed approval from authoritative risk; the browser cannot choose it.',
+    executionRequiresManage: 'Workspace management permission is required to execute Agent Bridge tools.',
+    inventoryUnavailable: 'No safe tool inventory is available for the current runtimes.',
+    inputLabel: 'JSON input',
+    executeRead: 'Execute read',
+    executeMutation: 'Sign and execute',
+    risk: 'Risk',
+    availability: 'Availability',
+    commandTitle: 'Latest command',
+    commandState: 'State',
+    commandStatus: 'Result',
+    commandAttempt: 'Delivery attempts',
+    commandReason: 'Detail',
+    commandOutput: 'Sanitized output',
+    refreshCommand: 'Refresh status',
+    commandUnavailable: 'The requested command could not be loaded.',
+    availabilityValues: {
+      available: 'Available',
+      degraded: 'Degraded',
+      blocked: 'Blocked',
+    },
+    commandStates: {
+      queued: 'Queued',
+      delivered: 'Delivered to runtime',
+      completed: 'Completed',
+    },
+    commandStatuses: {
+      executed: 'Executed',
+      approval_required: 'Approval required',
+      denied: 'Denied',
+      failed: 'Failed',
+      rejected: 'Rejected',
+      expired: 'Expired',
+      duplicate: 'Duplicate',
+      indeterminate: 'Indeterminate',
+    },
+    executionResults: {
+      queued: 'Command queued through the appropriate security flow.',
+      forbidden: 'You do not have permission to execute Agent Bridge tools.',
+      inventory_missing: 'No valid runtime inventory exists for that installation.',
+      invalid_inventory: 'Platform rejected the runtime inventory because it did not match the safe contract.',
+      tool_missing: 'The runtime no longer advertises that tool.',
+      tool_blocked: 'The tool is not available for execution.',
+      invalid_input: 'Input must be valid JSON.',
+      input_too_large: 'Input exceeds the safe 64 KiB limit.',
+      unavailable: 'The execution service is unavailable.',
+      invalid: 'The execution request was rejected.',
+      invalid_response: 'Platform returned an invalid command response.',
+      error: 'The execution request could not be completed.',
+    },
     phaseValues: {
       stable: 'Stable',
       overlap: 'Safe overlap',
@@ -256,6 +368,47 @@ async function getApprovalRotation(token: string): Promise<AgentBridgeApprovalRo
   }
 }
 
+async function getToolInventory(
+  token: string,
+  installationId: string,
+): Promise<AgentBridgeToolInventory | null> {
+  try {
+    const response = await fetch(
+      `${apiBaseUrl()}/v1/products/agent-bridge/installations/${encodeURIComponent(installationId)}/tools`,
+      {
+        headers: { authorization: `Bearer ${token}` },
+        cache: 'no-store',
+        signal: AbortSignal.timeout(6000),
+      },
+    );
+    if (!response.ok) return null;
+    const parsed = parseAgentBridgeToolInventoryResponse(await response.json());
+    return parsed?.inventory.installationId === installationId ? parsed.inventory : null;
+  } catch {
+    return null;
+  }
+}
+
+async function getCommand(
+  token: string,
+  commandId: string,
+): Promise<AgentBridgeOperatorCommand | null> {
+  try {
+    const response = await fetch(
+      `${apiBaseUrl()}/v1/products/agent-bridge/commands/${encodeURIComponent(commandId)}`,
+      {
+        headers: { authorization: `Bearer ${token}` },
+        cache: 'no-store',
+        signal: AbortSignal.timeout(6000),
+      },
+    );
+    if (!response.ok) return null;
+    return parseAgentBridgeCommandResponse(await response.json())?.command ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function formatTimestamp(value: string | null, locale: 'es' | 'en', timeZone: string): string | null {
   if (!value) return null;
   const date = new Date(value);
@@ -272,12 +425,31 @@ function formatTimestamp(value: string | null, locale: 'es' | 'en', timeZone: st
   }
 }
 
+function safeQueryText(value: string | string[] | undefined, max = 512): string | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim();
+  return normalized && normalized.length <= max ? normalized : null;
+}
+
+function outputText(value: unknown): string | null {
+  if (value === undefined) return null;
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return null;
+  }
+}
+
 export default async function AgentBridgeObservabilityPage({
   params,
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ rotation?: string | string[] }>;
+  searchParams: Promise<{
+    rotation?: string | string[];
+    execution?: string | string[];
+    command?: string | string[];
+  }>;
 }) {
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
@@ -292,21 +464,47 @@ export default async function AgentBridgeObservabilityPage({
   }
 
   const canManageAgentBridge = session.capabilities.includes('workspace.manage');
-  const [summary, runtimeSummary, rotationStatus] = await Promise.all([
+  const [summary, runtimeSummary, rotationStatus, query] = await Promise.all([
     getObservability(token),
     getRuntimeObservability(token),
     canManageAgentBridge ? getApprovalRotation(token) : Promise.resolve(null),
+    searchParams,
   ]);
-  const query = await searchParams;
+  const commandId = safeQueryText(query.command);
+  const [inventoryEntries, command] = await Promise.all([
+    canManageAgentBridge && runtimeSummary
+      ? Promise.all(
+          runtimeSummary.installations.map(async (runtime) => [
+            runtime.installationId,
+            await getToolInventory(token, runtime.installationId),
+          ] as const),
+        )
+      : Promise.resolve([] as Array<readonly [string, AgentBridgeToolInventory | null]>),
+    canManageAgentBridge && commandId ? getCommand(token, commandId) : Promise.resolve(null),
+  ]);
+  const inventories = new Map(inventoryEntries);
   const text = copy[locale];
   const otherLocale = locale === 'es' ? 'en' : 'es';
   const latestActivity = formatTimestamp(summary?.latestUpdatedAt ?? null, locale, session.user.timezone);
   const authRequired = summary?.states.TASK_STATE_AUTH_REQUIRED ?? null;
-  const rotationResult = typeof query.rotation === 'string' ? query.rotation : null;
+  const rotationResult = safeQueryText(query.rotation, 64);
   const rotationNotice =
     rotationResult && rotationResult in text.rotationResults
       ? text.rotationResults[rotationResult as keyof typeof text.rotationResults]
       : null;
+  const executionResult = safeQueryText(query.execution, 64);
+  const executionNotice =
+    executionResult && executionResult in text.executionResults
+      ? text.executionResults[executionResult as keyof typeof text.executionResults]
+      : null;
+  const executionRows =
+    canManageAgentBridge && runtimeSummary
+      ? runtimeSummary.installations.flatMap((runtime) => {
+          const inventory = inventories.get(runtime.installationId);
+          return (inventory?.tools ?? []).map((tool) => ({ runtime, tool }));
+        })
+      : [];
+  const commandOutput = outputText(command?.acknowledgement?.output);
 
   return (
     <main className="shell dashboard-shell">
@@ -350,6 +548,8 @@ export default async function AgentBridgeObservabilityPage({
       {!runtimeSummary ? <div className="notice">{text.runtimeUnavailable}</div> : null}
       {canManageAgentBridge && !rotationStatus ? <div className="notice">{text.rotationUnavailable}</div> : null}
       {rotationNotice ? <div className="notice">{rotationNotice}</div> : null}
+      {executionNotice ? <div className="notice">{executionNotice}</div> : null}
+      {commandId && !command ? <div className="notice">{text.commandUnavailable}</div> : null}
 
       <section className="metric-grid" aria-label={text.subtitle}>
         <Card title={text.totalTasks}>{summary?.totalTasks ?? '—'}</Card>
@@ -366,6 +566,104 @@ export default async function AgentBridgeObservabilityPage({
       </section>
 
       <section className="management-grid">
+        <article className="panel management-panel">
+          <div className="panel-heading management-heading">
+            <div>
+              <h2>{text.executionTitle}</h2>
+              <p>{text.executionHelp}</p>
+            </div>
+          </div>
+          {canManageAgentBridge ? (
+            executionRows.length ? (
+              <div className="item-list">
+                {executionRows.map(({ runtime, tool }) => {
+                  const localized = tool.localizations?.[locale];
+                  const usable = tool.availability === 'available';
+                  return (
+                    <form
+                      action="/api/agent-bridge/execute"
+                      className="item-row"
+                      method="post"
+                      key={`${runtime.installationId}:${tool.executionToolId}`}
+                    >
+                      <input type="hidden" name="locale" value={locale} />
+                      <input type="hidden" name="installationId" value={runtime.installationId} />
+                      <input type="hidden" name="executionToolId" value={tool.executionToolId} />
+                      <div className="item-copy">
+                        <strong>{localized?.name ?? tool.name}</strong>
+                        <span>{localized?.description ?? tool.description}</span>
+                        <span>
+                          {runtime.installationId} · {tool.connector.name} {tool.connector.version} ·{' '}
+                          {text.risk}: {tool.risk} · {text.availability}:{' '}
+                          {text.availabilityValues[tool.availability]}
+                        </span>
+                        <label>
+                          <span>{text.inputLabel}</span>
+                          <textarea name="input" rows={4} defaultValue="{}" spellCheck={false} />
+                        </label>
+                      </div>
+                      <button className="primary-button" type="submit" disabled={!usable}>
+                        {tool.risk === 'READ' ? text.executeRead : text.executeMutation}
+                      </button>
+                    </form>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="empty-state">{text.inventoryUnavailable}</p>
+            )
+          ) : (
+            <p className="empty-state">{text.executionRequiresManage}</p>
+          )}
+        </article>
+
+        {canManageAgentBridge && command ? (
+          <article className="panel management-panel">
+            <div className="panel-heading management-heading">
+              <div>
+                <h2>{text.commandTitle}</h2>
+                <p>{command.commandId}</p>
+              </div>
+              <Link href={`/${locale}/ia/agent-bridge?command=${encodeURIComponent(command.commandId)}`}>
+                {text.refreshCommand}
+              </Link>
+            </div>
+            <div className="item-list">
+              <div className="item-row">
+                <div className="item-copy">
+                  <strong>{command.toolId}</strong>
+                  <span>{command.installationId}</span>
+                </div>
+                <strong>{text.commandStates[command.state]}</strong>
+              </div>
+              <div className="item-row">
+                <div className="item-copy">
+                  <strong>{text.commandAttempt}</strong>
+                  <span>{text.commandState}: {text.commandStates[command.state]}</span>
+                </div>
+                <strong>{command.deliveryAttempt}</strong>
+              </div>
+              {command.acknowledgement ? (
+                <div className="item-row">
+                  <div className="item-copy">
+                    <strong>{text.commandStatus}</strong>
+                    <span>{text.commandStatuses[command.acknowledgement.status]}</span>
+                    {command.acknowledgement.reason ? (
+                      <span>{text.commandReason}: {command.acknowledgement.reason}</span>
+                    ) : null}
+                    {commandOutput ? (
+                      <>
+                        <span>{text.commandOutput}</span>
+                        <pre>{commandOutput}</pre>
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </article>
+        ) : null}
+
         <article className="panel management-panel">
           <div className="panel-heading management-heading">
             <div>
