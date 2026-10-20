@@ -131,7 +131,7 @@ describe('Agent Bridge command projection', () => {
   it('bounds deeply nested and long output', () => {
     const value = {
       text: 'x'.repeat(5000),
-      nested: { a: { b: { c: { d: { e: { f: { g: 'too-deep' } } } } } } } },
+      nested: { a: { b: { c: { d: { e: { f: { g: 'too-deep' } } } } } } },
     };
     const sanitized = sanitizeAgentBridgeOutput(value);
     expect(JSON.stringify(sanitized)).toContain('[truncated]');
