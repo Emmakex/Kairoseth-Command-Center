@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { apiBaseUrl, SESSION_COOKIE } from '../../../../lib/api';
+import { parseAgentBridgeCommandResponse } from '../../../../lib/agent-bridge-command';
 import { planAgentBridgeExecution } from '../../../../lib/agent-bridge-execution';
 import { parseAgentBridgeToolInventoryResponse } from '../../../../lib/agent-bridge-tools';
 
@@ -41,21 +42,6 @@ function clearSession(response: NextResponse) {
     expires: new Date(0),
   });
   return response;
-}
-
-function commandId(value: unknown, installationId: string, executionToolId: string): string | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-  const body = value as Record<string, unknown>;
-  if (body.version !== 'kcc.agent-bridge-command.v1') return null;
-  const command =
-    body.command && typeof body.command === 'object' && !Array.isArray(body.command)
-      ? (body.command as Record<string, unknown>)
-      : null;
-  if (!command) return null;
-  if (command.installationId !== installationId || command.toolId !== executionToolId) return null;
-  return typeof command.commandId === 'string' && command.commandId.trim().length > 0
-    ? command.commandId.trim()
-    : null;
 }
 
 export async function POST(request: NextRequest) {
@@ -124,10 +110,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.redirect(agentBridgeUrl(request, locale, result), 303);
     }
 
-    const path =
-      planned.plan.endpointKind === 'read'
-        ? 'commands'
-        : 'approved-commands';
+    const path = planned.plan.endpointKind === 'read' ? 'commands' : 'approved-commands';
     const executionResponse = await fetch(
       `${apiBaseUrl()}/v1/products/agent-bridge/installations/${encodeURIComponent(installationId)}/${path}`,
       {
@@ -163,16 +146,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.redirect(agentBridgeUrl(request, locale, result), 303);
     }
 
-    const queuedCommandId = commandId(
-      await executionResponse.json(),
-      installationId,
-      executionToolId,
-    );
-    if (!queuedCommandId) {
+    const queued = parseAgentBridgeCommandResponse(await executionResponse.json());
+    if (
+      !queued ||
+      queued.command.installationId !== installationId ||
+      queued.command.toolId !== executionToolId
+    ) {
       return NextResponse.redirect(agentBridgeUrl(request, locale, 'invalid_response'), 303);
     }
 
-    return NextResponse.redirect(agentBridgeUrl(request, locale, 'queued', queuedCommandId), 303);
+    return NextResponse.redirect(
+      agentBridgeUrl(request, locale, 'queued', queued.command.commandId),
+      303,
+    );
   } catch {
     return NextResponse.redirect(agentBridgeUrl(request, locale, 'error'), 303);
   }
