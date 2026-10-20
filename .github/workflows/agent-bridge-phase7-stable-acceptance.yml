@@ -1,0 +1,67 @@
+name: Agent Bridge Phase 7 Stable Acceptance
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/ops/run-agent-bridge-phase7-stable-acceptance.sh"
+      - ".github/workflows/agent-bridge-phase7-stable-acceptance.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/ops/run-agent-bridge-phase7-stable-acceptance.sh"
+      - ".github/workflows/agent-bridge-phase7-stable-acceptance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agent-bridge-phase7-stable-acceptance-live
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate acceptance runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          script="scripts/ops/run-agent-bridge-phase7-stable-acceptance.sh"
+          bash -n "$script"
+          grep -Fq 'BRIDGE_VERSION="0.1.1"' "$script"
+          grep -Fq 'BRIDGE_COMMIT_SHORT="929acb5ee07f"' "$script"
+          grep -Fq 'BRIDGE_SHA256="04193f06dbedc7555198eb2b5f92b69cd807b223f066002bf81c772c354431af"' "$script"
+          grep -Fq 'KAB_ACCEPTANCE_OPERATOR_TOKEN_FILE=/secrets/operator-token' "$script"
+          grep -Fq 'KAB_ACCEPTANCE_WC_CONSUMER_KEY_FILE=/secrets/wc-consumer-key' "$script"
+          grep -Fq 'KAB_ACCEPTANCE_WC_CONSUMER_SECRET_FILE=/secrets/wc-consumer-secret' "$script"
+          if grep -Eq 'KAB_ACCEPTANCE_(OPERATOR_TOKEN|WC_CONSUMER_KEY|WC_CONSUMER_SECRET)=' "$script"; then
+            echo "Phase 7 acceptance secrets must only be passed by file." >&2
+            exit 1
+          fi
+
+  live-stable-acceptance:
+    needs: validate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, Linux, X64, kairoseth-ci]
+    timeout-minutes: 45
+    steps:
+      - name: Checkout accepted main
+        uses: actions/checkout@v4
+
+      - name: Run exact v0.1.1 stable acceptance
+        shell: bash
+        run: bash scripts/ops/run-agent-bridge-phase7-stable-acceptance.sh
+
+      - name: Upload sanitized Phase 7.3 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-bridge-phase7-stable-acceptance-${{ github.sha }}
+          path: ${{ env.KAB_PHASE7_EVIDENCE_PATH }}
+          if-no-files-found: error
+          retention-days: 90
