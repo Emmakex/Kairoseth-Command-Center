@@ -5,6 +5,7 @@ bridge_ref="f9bf4d550d60b4b2941e8e2be02b1baef84987e0"
 bridge_source="${RUNNER_TEMP:-/tmp}/kairoseth-agent-bridge-${GITHUB_RUN_ID:-local}"
 export AGENT_BRIDGE_SOURCE="$bridge_source"
 export PLATFORM_BASE_URL="http://127.0.0.1:4000"
+export PLATFORM_WEB_BASE_URL="http://127.0.0.1:3000"
 
 cleanup() {
   docker compose down -v >/dev/null 2>&1 || true
@@ -40,6 +41,18 @@ for attempt in {1..45}; do
   sleep 2
 done
 
+for attempt in {1..45}; do
+  if curl --fail --silent --output /dev/null "$PLATFORM_WEB_BASE_URL/es/login"; then
+    break
+  fi
+  if [[ "$attempt" == 45 ]]; then
+    docker compose ps
+    docker compose logs web api
+    exit 1
+  fi
+  sleep 2
+done
+
 login_response="$(curl --fail --silent \
   -X POST "$PLATFORM_BASE_URL/v1/auth/local/login" \
   -H 'content-type: application/json' \
@@ -65,6 +78,13 @@ enrollment_response="$(curl --fail --silent \
 export ENROLLMENT_TOKEN="$(printf '%s' "$enrollment_response" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const d=JSON.parse(s);if(d.version!=="kcc.agent-bridge-enrollment-token.v1")process.exit(1);process.stdout.write(d.token)})')"
 
 node scripts/ci/agent-bridge-command-delivery-acceptance.mjs | tee /tmp/agent-bridge-command-delivery-acceptance.json
+
+console_enrollment_response="$(curl --fail --silent \
+  -X POST "$PLATFORM_BASE_URL/v1/products/agent-bridge/enrollment-tokens" \
+  -H "authorization: Bearer $OPERATOR_ACCESS_TOKEN")"
+export ENROLLMENT_TOKEN="$(printf '%s' "$console_enrollment_response" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const d=JSON.parse(s);if(d.version!=="kcc.agent-bridge-enrollment-token.v1")process.exit(1);process.stdout.write(d.token)})')"
+
+node scripts/ci/agent-bridge-operator-console-acceptance.mjs | tee /tmp/agent-bridge-operator-console-acceptance.json
 
 mongo_result="$(docker compose exec -T mongo mongosh --quiet kairoseth_command_center --eval "
   const readCommand=db.agent_bridge_commands.findOne({tenantId:'$WORKSPACE_ID',correlationId:'phase7-2b-real-read'});
