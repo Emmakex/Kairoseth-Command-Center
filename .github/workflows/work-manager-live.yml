@@ -1,0 +1,170 @@
+name: Work Manager Live Preview
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "deployment/live/**"
+      - ".github/workflows/work-manager-live.yml"
+      - "docs/49-phase-8-live-preview.md"
+      - "docs/10-roadmap.md"
+      - "STATUS.md"
+  push:
+    branches: [main]
+    paths:
+      - "deployment/live/**"
+      - ".github/workflows/work-manager-live.yml"
+      - "docs/49-phase-8-live-preview.md"
+      - "docs/10-roadmap.md"
+      - "STATUS.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: work-manager-live-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  live-topology-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare isolated acceptance environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          ENV_FILE="$RUNNER_TEMP/work-manager-live.env"
+          cat > "$ENV_FILE" <<EOF
+          KCC_LOCAL_ADMIN_EMAIL=live-acceptance@kcc.local
+          KCC_LOCAL_ADMIN_PASSWORD=live-acceptance-${GITHUB_RUN_ID}-valid
+          KCC_LOCAL_AUTH_SECRET=$(openssl rand -hex 48)
+          KCC_INTEGRATION_SECRET_KEY=$(openssl rand -hex 32)
+          KCC_LOCAL_ADMIN_DISPLAY_NAME=Acceptance Owner
+          KCC_LOCAL_LOCALE=es
+          KCC_LOCAL_TIMEZONE=Europe/Madrid
+          KCC_LOCAL_USER_ID=acceptance-owner
+          KCC_LOCAL_WORKSPACE_ID=acceptance-workspace
+          KCC_LOCAL_WORKSPACE_NAME=Work Manager Acceptance
+          KCC_LIVE_MONGO_IMAGE=mongo:7.0.43
+          EOF
+          chmod 600 "$ENV_FILE"
+          echo "KCC_LIVE_ACCEPTANCE_ENV=$ENV_FILE" >> "$GITHUB_ENV"
+          docker network inspect kairoseth-public-edge >/dev/null 2>&1 || docker network create kairoseth-public-edge >/dev/null
+
+      - name: Validate live Compose contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose \
+            -p work-manager-live-acceptance \
+            --env-file "$KCC_LIVE_ACCEPTANCE_ENV" \
+            -f deployment/live/docker-compose.yml \
+            config > "$RUNNER_TEMP/work-manager-live-compose.yml"
+
+          if grep -Eq 'published:|host_ip:' "$RUNNER_TEMP/work-manager-live-compose.yml"; then
+            echo "live services must not publish host ports" >&2
+            exit 1
+          fi
+          grep -Fq 'name: kairoseth-public-edge' "$RUNNER_TEMP/work-manager-live-compose.yml"
+          grep -Fq 'work-manager-edge' "$RUNNER_TEMP/work-manager-live-compose.yml"
+          grep -Fq 'KCC_AUTH_MODE: local' "$RUNNER_TEMP/work-manager-live-compose.yml"
+
+      - name: Validate internal Caddy configuration
+        shell: bash
+        run: |
+          docker run --rm \
+            -v "$PWD/deployment/live/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2-alpine \
+            caddy validate --config /etc/caddy/Caddyfile
+
+      - name: Build and start isolated live topology
+        shell: bash
+        run: |
+          set -euo pipefail
+          compose() {
+            docker compose \
+              -p work-manager-live-acceptance \
+              --env-file "$KCC_LIVE_ACCEPTANCE_ENV" \
+              -f deployment/live/docker-compose.yml \
+              "$@"
+          }
+          trap 'compose logs --no-color --tail=120 || true; compose down -v --remove-orphans || true' EXIT
+          export KCC_DEPLOYMENT_REVISION="acceptance-${GITHUB_RUN_ID}"
+          compose up -d --build
+
+          for service in mongo api web; do
+            cid="$(compose ps -q "$service")"
+            [[ -n "$cid" ]]
+            healthy=false
+            for _ in $(seq 1 60); do
+              status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$cid")"
+              if [[ "$status" == healthy ]]; then
+                healthy=true
+                break
+              fi
+              if [[ "$status" == unhealthy || "$status" == exited || "$status" == dead ]]; then
+                docker logs "$cid" >&2 || true
+                exit 1
+              fi
+              sleep 2
+            done
+            [[ "$healthy" == true ]]
+          done
+
+          docker run --rm --network kairoseth-public-edge curlimages/curl:8.16.0 \
+            --retry 15 --retry-delay 2 --retry-connrefused --max-time 60 -fsS \
+            http://work-manager-edge/es/login >/dev/null
+
+          for service in mongo api worker web edge; do
+            cid="$(compose ps -q "$service")"
+            [[ -n "$cid" ]]
+            if [[ -n "$(docker port "$cid" 2>/dev/null)" ]]; then
+              echo "service unexpectedly publishes a host port: $service" >&2
+              exit 1
+            fi
+          done
+
+          compose down -v --remove-orphans
+          trap - EXIT
+
+  deploy-live-reference:
+    needs: live-topology-acceptance
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, Linux, X64, kairoseth-ci]
+    timeout-minutes: 45
+    env:
+      KCC_BOOTSTRAP_ADMIN_EMAIL: ${{ secrets.WORK_MANAGER_LIVE_ADMIN_EMAIL }}
+      KCC_BOOTSTRAP_ADMIN_PASSWORD: ${{ secrets.WORK_MANAGER_LIVE_ADMIN_PASSWORD }}
+      KCC_PUBLIC_PROBE_REQUIRED: "0"
+    steps:
+      - name: Checkout accepted main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Deploy accepted main to Work Manager live reference
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
+          command -v flock >/dev/null
+          export KCC_DEPLOYMENT_REVISION="${GITHUB_SHA::12}"
+          flock -w 1200 /tmp/work-manager-live-deploy.lock \
+            bash deployment/live/deploy-live.sh
+
+      - name: Publish live deployment summary
+        shell: bash
+        run: |
+          {
+            echo "## Work Manager live reference deployed"
+            echo
+            echo "- revision: \`$GITHUB_SHA\`"
+            echo "- canonical host: https://work-manager.kairoseth.com"
+            echo "- ES login: https://work-manager.kairoseth.com/es/login"
+            echo "- EN login: https://work-manager.kairoseth.com/en/login"
+          } >> "$GITHUB_STEP_SUMMARY"
