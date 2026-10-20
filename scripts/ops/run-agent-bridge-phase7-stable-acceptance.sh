@@ -114,10 +114,8 @@ docker run --rm \
   "$NODE_IMAGE" \
   npm ci --omit=dev --no-audit --no-fund >/dev/null
 
-set -a
 # shellcheck disable=SC1090
 . "$LIVE_ENV_FILE"
-set +a
 : "${KCC_LOCAL_ADMIN_EMAIL:?KCC_LOCAL_ADMIN_EMAIL missing from live environment}"
 : "${KCC_LOCAL_ADMIN_PASSWORD:?KCC_LOCAL_ADMIN_PASSWORD missing from live environment}"
 
@@ -134,7 +132,8 @@ login_response="$(printf '%s' "$login_payload" | docker run --rm -i \
   -H 'content-type: application/json' \
   --data-binary @-)"
 operator_token="$(printf '%s' "$login_response" | python3 -c 'import json,sys; print(json.load(sys.stdin)["accessToken"])')"
-unset login_payload login_response KCC_LOCAL_ADMIN_PASSWORD
+unset login_payload login_response KCC_LOCAL_ADMIN_EMAIL KCC_LOCAL_ADMIN_PASSWORD
+unset KCC_LOCAL_AUTH_SECRET KCC_INTEGRATION_SECRET_KEY || true
 printf '%s' "$operator_token" > "$secrets_dir/operator-token"
 chmod 600 "$secrets_dir/operator-token"
 unset operator_token
