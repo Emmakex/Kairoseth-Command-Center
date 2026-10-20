@@ -22,9 +22,22 @@ export type AgentBridgeOperatorCommand = {
   };
 };
 
+export type AgentBridgeCommandHistoryPage = {
+  installationId: string;
+  commands: AgentBridgeOperatorCommand[];
+  nextCursor?: string;
+};
+
 type AgentBridgeCommandResponse = {
   version: 'kcc.agent-bridge-command.v1';
   command: AgentBridgeOperatorCommand;
+};
+
+type AgentBridgeCommandHistoryResponse = {
+  version: 'kcc.agent-bridge-command-history.v1';
+  installationId: string;
+  commands: AgentBridgeOperatorCommand[];
+  nextCursor?: string;
 };
 
 const STATES = new Set(['queued', 'delivered', 'completed']);
@@ -45,6 +58,8 @@ const KEY_MATERIAL = /-----BEGIN(?: [A-Z0-9]+)? (?:PUBLIC|PRIVATE) KEY-----[\s\S
 const MAX_OUTPUT_DEPTH = 6;
 const MAX_OUTPUT_ITEMS = 50;
 const MAX_OUTPUT_TEXT = 2048;
+const MAX_HISTORY_ITEMS = 50;
+const MAX_HISTORY_CURSOR = 1024;
 
 function record(value: unknown): Record<string, unknown> | null {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -166,5 +181,43 @@ export function parseAgentBridgeCommandResponse(value: unknown): AgentBridgeComm
       deliveryAttempt: Number(deliveryAttempt),
       ...(acknowledgement ? { acknowledgement } : {}),
     },
+  };
+}
+
+export function parseAgentBridgeCommandHistoryResponse(
+  value: unknown,
+): AgentBridgeCommandHistoryResponse | null {
+  const body = record(value);
+  if (body?.version !== 'kcc.agent-bridge-command-history.v1') return null;
+
+  const installationId = safeText(body.installationId, 512);
+  const rawCommands = body.commands;
+  const nextCursor = body.nextCursor === undefined
+    ? undefined
+    : safeText(body.nextCursor, MAX_HISTORY_CURSOR);
+  if (
+    !installationId ||
+    !Array.isArray(rawCommands) ||
+    rawCommands.length > MAX_HISTORY_ITEMS ||
+    (body.nextCursor !== undefined && !nextCursor)
+  ) {
+    return null;
+  }
+
+  const commands: AgentBridgeOperatorCommand[] = [];
+  for (const rawCommand of rawCommands) {
+    const parsed = parseAgentBridgeCommandResponse({
+      version: 'kcc.agent-bridge-command.v1',
+      command: rawCommand,
+    });
+    if (!parsed || parsed.command.installationId !== installationId) return null;
+    commands.push(parsed.command);
+  }
+
+  return {
+    version: 'kcc.agent-bridge-command-history.v1',
+    installationId,
+    commands,
+    ...(nextCursor ? { nextCursor } : {}),
   };
 }
