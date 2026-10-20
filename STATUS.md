@@ -1,14 +1,14 @@
 # Project status / Estado del proyecto
 
-**Current phase:** Phase 7 — Governed Agent Bridge execution and security — **CLOSED / CERRADA**  
-**Next phase:** not declared; future scope must be promoted explicitly.  
+**Current phase:** Phase 8 — Work Manager live preview and dogfooding — **IN PROGRESS / EN CURSO**  
+**Previous phase:** Phase 7 — Governed Agent Bridge execution and security — **CLOSED / CERRADA**  
 **Technical/internal project:** Kairoseth Command Center  
 **Commercial names:** Gestor de Trabajo (ES) / Work Manager (EN)  
 **Category:** Kairoseth Software  
-**Current validated `main` boundary:** `39871f5ef662b8b5b44d14ac3a3363a48eabd4f3`, full 18-workflow post-merge regression green after PR #79.  
-**Latest Phase 7 product slice:** safe paginated Agent Bridge execution history — backend PR #78 merged as `1db7699f77bbda85b56008d82c36373dd03a72cd`; ES/EN UI PR #79 merged as `39871f5ef662b8b5b44d14ac3a3363a48eabd4f3`.  
-**Formal Phase 5 closure:** merged `main` `f327c584be4bc55deec710dc6e61d0746ae57958`.  
-**Phase 7 closure evidence:** `docs/48-phase-7-release-boundary.md`.  
+**Current validated Phase 7 runtime boundary:** `39871f5ef662b8b5b44d14ac3a3363a48eabd4f3`, full 18-workflow post-merge regression green after PR #79.  
+**Current `main` after formal Phase 7 closure:** `a5f0507bba08c630d53ed62098ae0dedd449723c`.  
+**Phase 8 target:** persistent live reference at `https://work-manager.kairoseth.com`, using the existing product runtime rather than adding new product scope.  
+**Phase 8 specification:** `docs/49-phase-8-live-preview.md`.  
 **Commercial catalog publication:** Kairoseth Platform PR #507 merged as `0d07c14894560096053498a32a4e14d12ec3f1ae` and deployed to Hostinger; later deployed platform revisions retain it in their ancestry.
 
 ## Naming rule / Regla de naming
@@ -135,13 +135,37 @@ Delivered:
 
 ### Phase 7 release boundary / Cierre de Fase 7
 
-The delivered boundary now includes governed READ and signed mutation execution, approval-key lifecycle, safe tool inventory, bilingual operator console, safe command projection and bounded paginated execution history. Retry/cancel is not part of the closed boundary and remains a separately scoped future capability.
+The delivered boundary includes governed READ and signed mutation execution, approval-key lifecycle, safe tool inventory, bilingual operator console, safe command projection and bounded paginated execution history. Retry/cancel is not part of the closed boundary and remains a separately scoped future capability.
 
-No Phase 8 scope is declared by this closure. A next phase must be selected and documented explicitly rather than inferred from deferred backlog items.
+### Phase 8 — Live preview and dogfooding / Vista live y uso real
+
+Promoted explicitly after Phase 7 closure so the already-built product is deployed and used before more feature scope is added.
+
+Current implementation on branch `phase8/live-preview-dogfooding`:
+
+- [x] Persistent live topology defined for MongoDB, API, worker, web and internal Caddy edge.
+- [x] Application/database services expose no host ports.
+- [x] Dedicated edge alias `work-manager-edge` joins the existing `kairoseth-public-edge` network.
+- [x] Canonical reference host selected: `work-manager.kairoseth.com`.
+- [x] Protected first-deploy bootstrap generates auth and integration encryption secrets server-side.
+- [x] Runtime env defaults to `/srv/kairoseth/apps/work-manager/shared/runtime.env` and must remain mode `0600`.
+- [x] CI live-topology acceptance defined with an isolated stack and Mongo compatibility override for GitHub-hosted runners.
+- [x] Guarded shared-edge route fragment/installer defined with backup, Caddy validation and rollback.
+- [x] Phase 8 scope and live acceptance checklist documented in `docs/49-phase-8-live-preview.md`.
+- [ ] Phase 8 implementation PR merged into `main`.
+- [ ] Actual Kairoseth live runtime deployed from accepted `main`.
+- [ ] Shared HTTPS edge serving `/es/login` and `/en/login` publicly.
+- [ ] Real owner login and persistent Today/dashboard accepted.
+- [ ] Real project/task/Quick Capture and automation path exercised.
+- [ ] GitHub integration and available Agent Bridge operator flow exercised against persistent data.
+- [ ] Restart persistence and backup acceptance proven.
+- [ ] CPU/RAM/disk/container footprint captured for later commercial cost modelling.
+
+**Phase 8 status: IN PROGRESS / EN CURSO.**
 
 ## Deliberately deferred / Diferido expresamente
 
-These are future roadmap candidates and do **not** block the closed Phase 7 boundary:
+These are future roadmap candidates and do **not** block the current Phase 8 live-reference scope:
 
 - [ ] Pre-deadline warning windows and configurable deadline severity.
 - [ ] Monthly/calendar/weekday/local-wall-clock recurrence semantics.
@@ -156,6 +180,7 @@ These are future roadmap candidates and do **not** block the closed Phase 7 boun
 - [ ] AI-generated rules, weights, thresholds, dependencies, reminders, recurrence or silent priority changes.
 - [ ] GitHub App/OAuth and additional providers.
 - [ ] Agent Bridge retry/cancel command semantics until a dedicated lifecycle, concurrency and idempotency contract is defined.
+- [ ] Kairoseth Identity/OIDC for the live reference; local standalone auth is the Phase 8 starting boundary.
 
 ## Security and correctness invariants
 
@@ -183,20 +208,24 @@ These are future roadmap candidates and do **not** block the closed Phase 7 boun
 22. Safe web sanitization is defense in depth; the API projection is the primary operator data boundary.
 23. Agent Bridge execution-history queries remain tenant + installation scoped and bounded; history cursors expose no tenant, runtime-session, approval or credential material.
 24. Cross-installation history entries are rejected at the web defensive parsing boundary.
+25. Phase 8 live credentials and encryption keys remain outside Git and deployment logs.
+26. Work Manager application/database services do not publish host ports; public access goes through the Kairoseth edge path.
+27. The Kairoseth-operated live reference does not create a hidden dependency for Self-Hosted operation.
 
 ## Next / Siguiente
 
-1. Keep Phase 5, commercial publication, Phase 6 and Phase 7 as closed boundaries.
-2. Do not infer a Phase 8 from deferred backlog; the next product phase requires explicit scope and acceptance criteria.
-3. Keep Agent Bridge retry/cancel deferred until a dedicated lifecycle, race, idempotency and authorization contract is defined.
-4. Preserve the 18-workflow full regression boundary for future security-sensitive Agent Bridge changes.
-5. Keep public pricing deferred until the Cloud / Private Cloud / Self-Hosted resource and operating-cost profile is measured.
-6. Any new capability must enter a separately documented phase or explicitly scoped maintenance slice.
+1. Validate the Phase 8 topology through PR CI and keep Phase 7 regression green.
+2. Merge the live-reference deployment only with green acceptance evidence.
+3. Deploy accepted `main` to the Kairoseth runner and verify the exact deployed revision.
+4. Complete shared-edge/DNS/TLS acceptance for `work-manager.kairoseth.com`.
+5. Enter through the real login and dogfood projects, tasks, Quick Capture, alerts, automation, GitHub and Agent Bridge against persistent data.
+6. Exercise restart + backup and capture the resource footprint before closing Phase 8.
+7. Keep public pricing deferred until Cloud / Private Cloud / Self-Hosted operating-cost evidence exists.
 
 ## Current blockers / Bloqueos actuales
 
-**None / Ninguno.** Phase 7 is closed at validated `main` `39871f5ef662b8b5b44d14ac3a3363a48eabd4f3`; the full 18-workflow post-merge regression is green, and no open issue or pull request remained when the closure boundary was prepared.
+Phase 8 is not yet blocked by a confirmed runtime fault. The immediate gates are PR CI, accepted-main deployment, live bootstrap credentials supplied out-of-band, and public shared-edge/DNS/TLS acceptance. These are Phase 8 acceptance steps, not Phase 7 regressions.
 
 ## Operating rule
 
-Keep delivered runtime deterministic, explainable, auditable, workspace-isolated and independently releasable. Agent Bridge execution must remain server-governed: browser requests may express tool + input, but tenant scope, runtime identity, risk classification, approval policy and operator-safe result projection remain authoritative server concerns. Closed phases reopen only for regressions in already-delivered contracts; new capabilities require explicit scope and acceptance evidence.
+Keep delivered runtime deterministic, explainable, auditable, workspace-isolated and independently releasable. Agent Bridge execution must remain server-governed: browser requests may express tool + input, but tenant scope, runtime identity, risk classification, approval policy and operator-safe result projection remain authoritative server concerns. Closed phases reopen only for regressions in already-delivered contracts; Phase 8 changes deployment/acceptance, not the closed Phase 7 product contract.
