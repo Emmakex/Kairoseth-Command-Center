@@ -11,6 +11,8 @@ permissions:
 jobs:
   standalone-release:
     runs-on: ubuntu-latest
+    env:
+      KCC_STANDALONE_MONGO_IMAGE: mongo:7.0.43
     steps:
       - name: Checkout
         uses: actions/checkout@v4
