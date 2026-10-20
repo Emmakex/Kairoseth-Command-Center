@@ -4,7 +4,16 @@ on:
   pull_request:
     branches: [main]
     paths:
+      - "apps/api/**"
+      - "apps/web/**"
+      - "apps/worker/**"
+      - "packages/**"
+      - "deployment/docker/**"
       - "deployment/live/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "tsconfig.base.json"
       - ".github/workflows/work-manager-live.yml"
       - "docs/49-phase-8-live-preview.md"
       - "docs/10-roadmap.md"
@@ -12,7 +21,16 @@ on:
   push:
     branches: [main]
     paths:
+      - "apps/api/**"
+      - "apps/web/**"
+      - "apps/worker/**"
+      - "packages/**"
+      - "deployment/docker/**"
       - "deployment/live/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "tsconfig.base.json"
       - ".github/workflows/work-manager-live.yml"
       - "docs/49-phase-8-live-preview.md"
       - "docs/10-roadmap.md"
@@ -48,7 +66,7 @@ jobs:
           KCC_LOCAL_LOCALE=es
           KCC_LOCAL_TIMEZONE=Europe/Madrid
           KCC_LOCAL_USER_ID=acceptance-owner
-          KCC_LOCAL_WORKSPACE_ID=acceptance-workspace
+          KCC_LOCAL_WORKSPACE_ID=work-manager-live
           KCC_LOCAL_WORKSPACE_NAME=Work Manager Acceptance
           KCC_LIVE_MONGO_IMAGE=mongo:7.0.43
           EOF
