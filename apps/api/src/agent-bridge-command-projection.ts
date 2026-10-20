@@ -14,13 +14,16 @@ const MAX_REASON_TEXT = 4096;
 
 export type AgentBridgeOperatorAcknowledgement = Omit<
   AgentBridgeCommandAcknowledgement,
-  'sessionId' | 'reason' | 'output'
+  'sessionId' | 'correlationId' | 'reason' | 'output'
 > & {
   reason?: string;
   output?: unknown;
 };
 
-export type AgentBridgeOperatorCommand = Omit<AgentBridgeQueuedCommand, 'acknowledgement'> & {
+export type AgentBridgeOperatorCommand = Omit<
+  AgentBridgeQueuedCommand,
+  'correlationId' | 'acknowledgement'
+> & {
   acknowledgement?: AgentBridgeOperatorAcknowledgement;
 };
 
@@ -72,7 +75,6 @@ function projectAcknowledgement(
     version: acknowledgement.version,
     commandId: acknowledgement.commandId,
     deliveryAttempt: acknowledgement.deliveryAttempt,
-    correlationId: acknowledgement.correlationId,
     status: acknowledgement.status,
     completedAt: acknowledgement.completedAt,
     ...(acknowledgement.originalOutcome
@@ -97,7 +99,6 @@ export function projectAgentBridgeOperatorCommand(
 ): AgentBridgeOperatorCommand {
   return {
     commandId: command.commandId,
-    correlationId: command.correlationId,
     installationId: command.installationId,
     toolId: command.toolId,
     state: command.state,
