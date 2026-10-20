@@ -38,8 +38,8 @@ const ACK_STATUSES = new Set([
   'duplicate',
   'indeterminate',
 ]);
-const SECRET_KEY = /(?:token|secret|password|credential|authorization|cookie|private[_-]?key|api[_-]?key|access[_-]?key)/i;
-const SECRET_ASSIGNMENT = /\b(token|secret|password|credential|authorization|cookie|private[_-]?key|api[_-]?key|access[_-]?key)\b\s*[:=]\s*([^\s,;]+)/gi;
+const SECRET_KEY = /(?:token|secret|password|credential|authorization|cookie|session[_-]?id|runtime[_-]?session|action[_-]?fingerprint|public[_-]?key|private[_-]?key|key[_-]?id|api[_-]?key|access[_-]?key)/i;
+const SECRET_ASSIGNMENT = /\b(token|secret|password|credential|authorization|cookie|session[_-]?id|runtime[_-]?session|action[_-]?fingerprint|public[_-]?key|private[_-]?key|key[_-]?id|api[_-]?key|access[_-]?key)\b\s*[:=]\s*([^\s,;]+)/gi;
 const BEARER = /\bBearer\s+[A-Za-z0-9._~+/=-]+/gi;
 const PRIVATE_KEY = /-----BEGIN(?: [A-Z0-9]+)? PRIVATE KEY-----[\s\S]*?-----END(?: [A-Z0-9]+)? PRIVATE KEY-----/gi;
 const MAX_OUTPUT_DEPTH = 6;
