@@ -6,7 +6,7 @@ import type {
 const SECRET_KEY = /(?:token|secret|password|credential|authorization|cookie|session[_-]?id|runtime[_-]?session|action[_-]?fingerprint|public[_-]?key|private[_-]?key|key[_-]?id|api[_-]?key|access[_-]?key)/i;
 const SECRET_ASSIGNMENT = /\b(token|secret|password|credential|authorization|cookie|session[_-]?id|runtime[_-]?session|action[_-]?fingerprint|public[_-]?key|private[_-]?key|key[_-]?id|api[_-]?key|access[_-]?key)\b\s*[:=]\s*([^\s,;]+)/gi;
 const BEARER = /\bBearer\s+[A-Za-z0-9._~+/=-]+/gi;
-const PRIVATE_KEY = /-----BEGIN(?: [A-Z0-9]+)? PRIVATE KEY-----[\s\S]*?-----END(?: [A-Z0-9]+)? PRIVATE KEY-----/gi;
+const KEY_MATERIAL = /-----BEGIN(?: [A-Z0-9]+)? (?:PUBLIC|PRIVATE) KEY-----[\s\S]*?-----END(?: [A-Z0-9]+)? (?:PUBLIC|PRIVATE) KEY-----/gi;
 const MAX_OUTPUT_DEPTH = 6;
 const MAX_OUTPUT_ITEMS = 50;
 const MAX_OUTPUT_TEXT = 2048;
@@ -35,7 +35,7 @@ export function sanitizeAgentBridgeOperatorText(
   max = MAX_OUTPUT_TEXT,
 ): string {
   const redacted = value
-    .replace(PRIVATE_KEY, '[redacted-private-key]')
+    .replace(KEY_MATERIAL, '[redacted-key-material]')
     .replace(BEARER, 'Bearer [redacted]')
     .replace(SECRET_ASSIGNMENT, '$1=[redacted]');
   return redacted.length > max ? `${redacted.slice(0, max)}…` : redacted;
