@@ -28,6 +28,9 @@ describe('Agent Bridge command projection', () => {
           output: {
             count: 2,
             accessToken: 'must-not-render',
+            sessionId: 'nested-runtime-session',
+            actionFingerprint: 'nested-fingerprint',
+            publicKeyPem: 'nested-public-key',
             message: 'authorization=another-secret',
             nested: { password: 'must-not-render', ok: true },
           },
@@ -52,6 +55,9 @@ describe('Agent Bridge command projection', () => {
           output: {
             count: 2,
             accessToken: '[redacted]',
+            sessionId: '[redacted]',
+            actionFingerprint: '[redacted]',
+            publicKeyPem: '[redacted]',
             message: 'authorization=[redacted]',
             nested: { password: '[redacted]', ok: true },
           },
@@ -63,6 +69,9 @@ describe('Agent Bridge command projection', () => {
     expect(JSON.stringify(parsed)).not.toContain('must-not-render');
     expect(JSON.stringify(parsed)).not.toContain('plain-secret');
     expect(JSON.stringify(parsed)).not.toContain('another-secret');
+    expect(JSON.stringify(parsed)).not.toContain('nested-runtime-session');
+    expect(JSON.stringify(parsed)).not.toContain('nested-fingerprint');
+    expect(JSON.stringify(parsed)).not.toContain('nested-public-key');
   });
 
   it('rejects malformed command state, lifecycle and acknowledgement status', () => {
