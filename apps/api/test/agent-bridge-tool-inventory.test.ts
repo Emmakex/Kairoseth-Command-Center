@@ -25,7 +25,7 @@ const viewer: SessionContext = {
   ...operator,
   user: { ...operator.user, id: 'viewer-1', email: 'viewer@example.com' },
   membershipId: 'membership-2',
-  role: 'viewer',
+  role: 'member',
   capabilities: [],
 };
 
