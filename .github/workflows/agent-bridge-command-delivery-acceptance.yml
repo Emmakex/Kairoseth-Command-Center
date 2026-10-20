@@ -16,7 +16,7 @@ jobs:
       - name: Checkout Platform
         uses: actions/checkout@v4
 
-      - name: Run real Agent Bridge READ command delivery
+      - name: Run real Agent Bridge READ command delivery and operator console
         run: bash scripts/ci/run-agent-bridge-command-delivery-acceptance.sh
 
       - name: Upload safe command-delivery evidence
@@ -24,7 +24,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: agent-bridge-command-delivery-evidence
-          path: /tmp/agent-bridge-command-delivery-acceptance.json
+          path: |
+            /tmp/agent-bridge-command-delivery-acceptance.json
+            /tmp/agent-bridge-operator-console-acceptance.json
           if-no-files-found: warn
           retention-days: 1
 

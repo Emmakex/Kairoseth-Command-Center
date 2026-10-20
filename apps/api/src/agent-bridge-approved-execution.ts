@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { authorize, type AuthProvider, type SessionContext } from '@kcc/auth';
+import { projectAgentBridgeOperatorCommand } from './agent-bridge-command-projection';
 import type { AgentBridgeExecutionStore } from './agent-bridge-execution-store';
 
 const MAX_ID = 512;
@@ -95,7 +96,7 @@ export function registerAgentBridgeApprovedExecutionRoutes(
         return reply.code(201).send({
           version: 'kcc.agent-bridge-command.v1',
           approval: 'signed',
-          command,
+          command: projectAgentBridgeOperatorCommand(command),
         });
       } catch (error) {
         request.log.warn({ err: error }, 'Agent Bridge approved command queue rejected input');
