@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  parseAgentBridgeCommandHistoryResponse,
   parseAgentBridgeCommandResponse,
   sanitizeAgentBridgeOutput,
 } from '../lib/agent-bridge-command';
@@ -124,6 +125,88 @@ describe('Agent Bridge command projection', () => {
             completedAt: '2026-10-20T06:00:01.000Z',
           },
         },
+      }),
+    ).toBeNull();
+  });
+
+  it('parses bounded command history and preserves only safe operator fields', () => {
+    const parsed = parseAgentBridgeCommandHistoryResponse({
+      version: 'kcc.agent-bridge-command-history.v1',
+      installationId: 'installation-1',
+      nextCursor: 'opaque-cursor',
+      commands: [
+        {
+          commandId: 'command-2',
+          correlationId: 'private-correlation',
+          installationId: 'installation-1',
+          toolId: 'woocommerce.main.orders.update-status',
+          state: 'completed',
+          issuedAt: '2026-10-20T06:01:00.000Z',
+          expiresAt: '2026-10-20T06:06:00.000Z',
+          deliveryAttempt: 1,
+          acknowledgement: {
+            status: 'executed',
+            completedAt: '2026-10-20T06:01:02.000Z',
+            sessionId: 'runtime-session-private',
+            correlationId: 'private-correlation',
+            reason: 'token=must-not-render',
+            output: { ok: true, password: 'must-not-render' },
+          },
+        },
+        {
+          commandId: 'command-1',
+          installationId: 'installation-1',
+          toolId: 'woocommerce.main.orders.list',
+          state: 'queued',
+          issuedAt: '2026-10-20T06:00:00.000Z',
+          expiresAt: '2026-10-20T06:05:00.000Z',
+          deliveryAttempt: 0,
+        },
+      ],
+    });
+
+    expect(parsed?.installationId).toBe('installation-1');
+    expect(parsed?.nextCursor).toBe('opaque-cursor');
+    expect(parsed?.commands.map((command) => command.commandId)).toEqual(['command-2', 'command-1']);
+    expect(parsed?.commands[0]?.acknowledgement?.reason).toBe('token=[redacted]');
+    expect(parsed?.commands[0]?.acknowledgement?.output).toEqual({
+      ok: true,
+      password: '[redacted]',
+    });
+    const serialized = JSON.stringify(parsed);
+    expect(serialized).not.toContain('private-correlation');
+    expect(serialized).not.toContain('runtime-session-private');
+    expect(serialized).not.toContain('must-not-render');
+  });
+
+  it('rejects cross-installation and oversized history pages', () => {
+    const command = {
+      commandId: 'command-1',
+      installationId: 'installation-2',
+      toolId: 'tool-1',
+      state: 'queued',
+      issuedAt: '2026-10-20T06:00:00.000Z',
+      expiresAt: '2026-10-20T06:05:00.000Z',
+      deliveryAttempt: 0,
+    };
+
+    expect(
+      parseAgentBridgeCommandHistoryResponse({
+        version: 'kcc.agent-bridge-command-history.v1',
+        installationId: 'installation-1',
+        commands: [command],
+      }),
+    ).toBeNull();
+
+    expect(
+      parseAgentBridgeCommandHistoryResponse({
+        version: 'kcc.agent-bridge-command-history.v1',
+        installationId: 'installation-1',
+        commands: Array.from({ length: 51 }, (_, index) => ({
+          ...command,
+          commandId: `command-${index}`,
+          installationId: 'installation-1',
+        })),
       }),
     ).toBeNull();
   });
