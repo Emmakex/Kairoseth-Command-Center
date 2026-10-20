@@ -65,7 +65,7 @@ describe('Agent Bridge command projection', () => {
     expect(JSON.stringify(parsed)).not.toContain('another-secret');
   });
 
-  it('rejects malformed command state and acknowledgement status', () => {
+  it('rejects malformed command state, lifecycle and acknowledgement status', () => {
     const base = {
       version: 'kcc.agent-bridge-command.v1',
       command: {
@@ -78,11 +78,29 @@ describe('Agent Bridge command projection', () => {
         deliveryAttempt: 0,
       },
     };
+    const acknowledgement = {
+      status: 'executed',
+      completedAt: '2026-10-20T06:00:01.000Z',
+    };
 
     expect(
       parseAgentBridgeCommandResponse({
         ...base,
         command: { ...base.command, state: 'unknown' },
+      }),
+    ).toBeNull();
+
+    expect(
+      parseAgentBridgeCommandResponse({
+        ...base,
+        command: { ...base.command, state: 'completed' },
+      }),
+    ).toBeNull();
+
+    expect(
+      parseAgentBridgeCommandResponse({
+        ...base,
+        command: { ...base.command, acknowledgement },
       }),
     ).toBeNull();
 
