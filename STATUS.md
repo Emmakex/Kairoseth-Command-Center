@@ -82,8 +82,10 @@ Delivered on merged `main`:
 - [x] Chained approval-key rotation using `old -> [old,new] -> [new]`, runtime generation acknowledgements and encrypted old-key retirement.
 - [x] Current API exposes workspace-authorized rotation status/start while remaining fail-closed on generation mismatch.
 - [x] PR #70 — ES/EN approval-key rotation controls merged as `3968f1d768f8e3d06f4a67dfdf1e923c5487e301`; the UI exposes only generation, phase and trusted-key count and never renders key material or tokens.
+- [x] The full 18-workflow post-merge regression set for `3968f1d7...` completed successfully.
+- [x] Hosted-runner MongoDB kernel incompatibility discovered during the following documentation validation was isolated from product code and fixed in PR #72 without changing the standalone MongoDB 8.x profile.
 
-**Current validation:** the 18-workflow post-merge regression set for `3968f1d7...` is running. No failure has been observed at the time of this status update.
+**Current validation:** Phase 7 rotation/UI boundary is green. No delivered Agent Bridge regression is open.
 
 ## Current gap / Hueco actual
 
@@ -91,12 +93,11 @@ The execution backend is ahead of the operator UX. Platform can already queue an
 
 ## Next / Siguiente
 
-1. Close the post-merge regression for `3968f1d7...` with all workflows green.
-2. Build the **Agent Bridge operator execution console** as the next Phase 7 microphase.
-3. The console must use only tools advertised by the selected runtime snapshot and derive risk from Platform/runtime data; the browser must never invent risk, scope or approval tokens.
-4. READ actions may use the existing READ queue path; WRITE/CRITICAL actions must use the existing signed approval endpoint and retain exact fingerprint binding.
-5. Show command lifecycle/status and sanitized result/error projection without exposing approval tokens, runtime session tokens, PEM material or integration secrets.
-6. Keep ES/EN parity and add negative tests plus ProductionRuntime acceptance before merging.
+1. Build the **Agent Bridge operator execution console** as the next Phase 7 microphase.
+2. The console must use only tools advertised by the selected runtime snapshot and derive risk from Platform/runtime data; the browser must never invent risk, scope or approval tokens.
+3. READ actions may use the existing READ queue path; WRITE/CRITICAL actions must use the existing signed approval endpoint and retain exact fingerprint binding.
+4. Show command lifecycle/status and sanitized result/error projection without exposing approval tokens, runtime session tokens, PEM material or integration secrets.
+5. Keep ES/EN parity and add negative tests plus ProductionRuntime acceptance before merging.
 
 ## Deliberately deferred / Diferido expresamente
 
@@ -131,7 +132,7 @@ These remain future candidates and do not reopen closed Phase 5 boundaries:
 
 ## Current blockers / Bloqueos actuales
 
-**No known technical blocker.** The only active gate is completion of the post-merge regression for the new rotation UI boundary. The next development slice is already identified and does not require redesign of the execution backend.
+**None / Ninguno.** The Phase 7 rotation/UI boundary is green, the hosted-runner compatibility issue is fixed, and the next development slice has a defined execution/security contract.
 
 ## Operating rule
 
