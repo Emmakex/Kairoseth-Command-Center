@@ -122,9 +122,25 @@ Retry/cancel command semantics remain deliberately deferred. They require a sepa
 
 **Status: complete. Technical release boundary CLOSED / CERRADA.**
 
-## Next phase / Siguiente fase
+## Phase 8 — Live preview and dogfooding
 
-No Phase 8 scope is declared by the Phase 7 closure. The next product phase must be selected and documented explicitly, with its own goals, security boundary and acceptance criteria. Deferred backlog items do not automatically become the next phase.
+Phase 8 is explicitly promoted to put the already-delivered product into a persistent Kairoseth-operated reference instance and use it before adding more product scope.
+
+Goals:
+
+- deploy the existing web + API + worker + MongoDB runtime persistently;
+- expose it through the shared Kairoseth HTTPS edge without publishing application/database host ports;
+- use `work-manager.kairoseth.com` as the canonical live reference host;
+- bootstrap a protected owner login without committing runtime/session/integration secrets;
+- exercise real ES/EN project, task, alert, automation, GitHub and Agent Bridge flows against persistent data;
+- prove restart/backup behavior;
+- capture CPU/RAM/disk/container footprint to support evidence-based Cloud / Private Cloud / Self-Hosted pricing later.
+
+The initial live reference uses the already-validated local standalone authentication path. Kairoseth Identity/OIDC remains a separate future integration so the product keeps its no-lock-in/self-hosted boundary.
+
+See [`49-phase-8-live-preview.md`](49-phase-8-live-preview.md) for topology, protected bootstrap, CI acceptance and live closure criteria.
+
+**Status: IN PROGRESS / EN CURSO.**
 
 ## Commercial publication boundary
 
@@ -135,7 +151,7 @@ The initial Kairoseth Software catalog publication remains complete:
 - **Category:** Kairoseth Software
 - **Canonical route:** `/products/work-manager`
 
-Public pricing remains deferred until the Cloud / Private Cloud / Self-Hosted resource and operating-cost profile is measured.
+Public pricing remains deferred until the Cloud / Private Cloud / Self-Hosted resource and operating-cost profile is measured. Phase 8 is intended to produce part of that evidence.
 
 ## Operating principles
 
@@ -150,3 +166,4 @@ Public pricing remains deferred until the Cloud / Private Cloud / Self-Hosted re
 - Execution history remains tenant + installation scoped, bounded and cursor-based.
 - Closed phases reopen only for regressions in delivered contracts.
 - Deferred backlog is not release-blocking and does not become active scope unless a future roadmap explicitly promotes it.
+- Phase 8 is a deployment/dogfooding phase; it does not silently promote retry/cancel or other deferred feature backlog.

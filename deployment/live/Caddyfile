@@ -1,0 +1,15 @@
+:80 {
+  encode zstd gzip
+
+  handle {
+    reverse_proxy web:3000
+  }
+
+  header {
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "DENY"
+    Referrer-Policy "strict-origin-when-cross-origin"
+    Permissions-Policy "camera=(), microphone=(), geolocation=()"
+    -Server
+  }
+}
