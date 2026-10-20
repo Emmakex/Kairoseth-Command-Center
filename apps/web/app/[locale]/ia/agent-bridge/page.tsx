@@ -7,7 +7,9 @@ import {
   type AgentBridgeApprovalRotationStatus,
 } from '../../../../lib/agent-bridge-rotation';
 import {
+  parseAgentBridgeCommandHistoryResponse,
   parseAgentBridgeCommandResponse,
+  type AgentBridgeCommandHistoryPage,
   type AgentBridgeOperatorCommand,
 } from '../../../../lib/agent-bridge-command';
 import {
@@ -119,6 +121,16 @@ const copy = {
     commandOutput: 'Salida saneada',
     refreshCommand: 'Actualizar estado',
     commandUnavailable: 'No se pudo cargar el comando solicitado.',
+    historyTitle: 'Historial de ejecuciones',
+    historyHelp:
+      'Historial paginado por instalación. Solo muestra la proyección operativa saneada; nunca entrada, correlaciones, sesiones runtime ni material de aprobación.',
+    historyUnavailable: 'No se pudo cargar el historial de ejecuciones de esta instalación.',
+    historyEmpty: 'Todavía no hay ejecuciones registradas para esta instalación.',
+    historyInstallation: 'Instalación',
+    historyIssuedAt: 'Creado',
+    historyOlder: 'Más antiguas',
+    historyNewest: 'Más recientes',
+    viewCommand: 'Ver detalle',
     availabilityValues: {
       available: 'Disponible',
       degraded: 'Degradada',
@@ -251,6 +263,16 @@ const copy = {
     commandOutput: 'Sanitized output',
     refreshCommand: 'Refresh status',
     commandUnavailable: 'The requested command could not be loaded.',
+    historyTitle: 'Execution history',
+    historyHelp:
+      'Paginated history by installation. It only displays the sanitized operator projection; never input, correlations, runtime sessions or approval material.',
+    historyUnavailable: 'The execution history for this installation could not be loaded.',
+    historyEmpty: 'No executions have been recorded for this installation yet.',
+    historyInstallation: 'Installation',
+    historyIssuedAt: 'Created',
+    historyOlder: 'Older',
+    historyNewest: 'Newest',
+    viewCommand: 'View detail',
     availabilityValues: {
       available: 'Available',
       degraded: 'Degraded',
@@ -409,6 +431,35 @@ async function getCommand(
   }
 }
 
+async function getCommandHistory(
+  token: string,
+  installationId: string,
+  cursor: string | null,
+): Promise<AgentBridgeCommandHistoryPage | null> {
+  try {
+    const query = new URLSearchParams({ limit: '10' });
+    if (cursor) query.set('cursor', cursor);
+    const response = await fetch(
+      `${apiBaseUrl()}/v1/products/agent-bridge/installations/${encodeURIComponent(installationId)}/commands?${query.toString()}`,
+      {
+        headers: { authorization: `Bearer ${token}` },
+        cache: 'no-store',
+        signal: AbortSignal.timeout(6000),
+      },
+    );
+    if (!response.ok) return null;
+    const parsed = parseAgentBridgeCommandHistoryResponse(await response.json());
+    if (!parsed || parsed.installationId !== installationId) return null;
+    return {
+      installationId: parsed.installationId,
+      commands: parsed.commands,
+      ...(parsed.nextCursor ? { nextCursor: parsed.nextCursor } : {}),
+    };
+  } catch {
+    return null;
+  }
+}
+
 function formatTimestamp(value: string | null, locale: 'es' | 'en', timeZone: string): string | null {
   if (!value) return null;
   const date = new Date(value);
@@ -449,6 +500,8 @@ export default async function AgentBridgeObservabilityPage({
     rotation?: string | string[];
     execution?: string | string[];
     command?: string | string[];
+    historyInstallation?: string | string[];
+    historyCursor?: string | string[];
   }>;
 }) {
   const { locale } = await params;
@@ -471,7 +524,14 @@ export default async function AgentBridgeObservabilityPage({
     searchParams,
   ]);
   const commandId = safeQueryText(query.command);
-  const [inventoryEntries, command] = await Promise.all([
+  const requestedHistoryInstallation = safeQueryText(query.historyInstallation);
+  const historyCursor = safeQueryText(query.historyCursor, 1024);
+  const runtimeInstallationIds = runtimeSummary?.installations.map((runtime) => runtime.installationId) ?? [];
+  const historyInstallationId =
+    requestedHistoryInstallation && runtimeInstallationIds.includes(requestedHistoryInstallation)
+      ? requestedHistoryInstallation
+      : (runtimeInstallationIds[0] ?? null);
+  const [inventoryEntries, command, history] = await Promise.all([
     canManageAgentBridge && runtimeSummary
       ? Promise.all(
           runtimeSummary.installations.map(async (runtime) => [
@@ -481,6 +541,9 @@ export default async function AgentBridgeObservabilityPage({
         )
       : Promise.resolve([] as Array<readonly [string, AgentBridgeToolInventory | null]>),
     canManageAgentBridge && commandId ? getCommand(token, commandId) : Promise.resolve(null),
+    canManageAgentBridge && historyInstallationId
+      ? getCommandHistory(token, historyInstallationId, historyCursor)
+      : Promise.resolve(null),
   ]);
   const inventories = new Map(inventoryEntries);
   const text = copy[locale];
@@ -550,6 +613,9 @@ export default async function AgentBridgeObservabilityPage({
       {rotationNotice ? <div className="notice">{rotationNotice}</div> : null}
       {executionNotice ? <div className="notice">{executionNotice}</div> : null}
       {commandId && !command ? <div className="notice">{text.commandUnavailable}</div> : null}
+      {canManageAgentBridge && historyInstallationId && !history ? (
+        <div className="notice">{text.historyUnavailable}</div>
+      ) : null}
 
       <section className="metric-grid" aria-label={text.subtitle}>
         <Card title={text.totalTasks}>{summary?.totalTasks ?? '—'}</Card>
@@ -611,6 +677,89 @@ export default async function AgentBridgeObservabilityPage({
               </div>
             ) : (
               <p className="empty-state">{text.inventoryUnavailable}</p>
+            )
+          ) : (
+            <p className="empty-state">{text.executionRequiresManage}</p>
+          )}
+        </article>
+
+        <article className="panel management-panel">
+          <div className="panel-heading management-heading">
+            <div>
+              <h2>{text.historyTitle}</h2>
+              <p>{text.historyHelp}</p>
+            </div>
+          </div>
+          {canManageAgentBridge ? (
+            historyInstallationId ? (
+              <>
+                <div className="item-list">
+                  <div className="item-row">
+                    <div className="item-copy">
+                      <strong>{text.historyInstallation}</strong>
+                      <span>{historyInstallationId}</span>
+                    </div>
+                    <div className="topbar-actions">
+                      {runtimeInstallationIds.map((installationId) => (
+                        <Link
+                          href={`/${locale}/ia/agent-bridge?historyInstallation=${encodeURIComponent(installationId)}`}
+                          key={installationId}
+                        >
+                          {installationId === historyInstallationId ? `✓ ${installationId}` : installationId}
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                  {history?.commands.length ? (
+                    history.commands.map((historyCommand) => (
+                      <div className="item-row" key={historyCommand.commandId}>
+                        <div className="item-copy">
+                          <strong>{historyCommand.toolId}</strong>
+                          <span>
+                            {text.commandState}: {text.commandStates[historyCommand.state]} ·{' '}
+                            {text.commandAttempt}: {historyCommand.deliveryAttempt}
+                          </span>
+                          <span>
+                            {text.historyIssuedAt}:{' '}
+                            {formatTimestamp(historyCommand.issuedAt, locale, session.user.timezone) ?? '—'}
+                            {historyCommand.acknowledgement
+                              ? ` · ${text.commandStatus}: ${text.commandStatuses[historyCommand.acknowledgement.status]}`
+                              : ''}
+                          </span>
+                          {historyCommand.acknowledgement?.reason ? (
+                            <span>{text.commandReason}: {historyCommand.acknowledgement.reason}</span>
+                          ) : null}
+                        </div>
+                        <Link
+                          href={`/${locale}/ia/agent-bridge?command=${encodeURIComponent(historyCommand.commandId)}&historyInstallation=${encodeURIComponent(historyInstallationId)}`}
+                        >
+                          {text.viewCommand}
+                        </Link>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="empty-state">{text.historyEmpty}</p>
+                  )}
+                </div>
+                <div className="topbar-actions">
+                  {historyCursor ? (
+                    <Link
+                      href={`/${locale}/ia/agent-bridge?historyInstallation=${encodeURIComponent(historyInstallationId)}`}
+                    >
+                      {text.historyNewest}
+                    </Link>
+                  ) : null}
+                  {history?.nextCursor ? (
+                    <Link
+                      href={`/${locale}/ia/agent-bridge?historyInstallation=${encodeURIComponent(historyInstallationId)}&historyCursor=${encodeURIComponent(history.nextCursor)}`}
+                    >
+                      {text.historyOlder}
+                    </Link>
+                  ) : null}
+                </div>
+              </>
+            ) : (
+              <p className="empty-state">{text.noRuntimes}</p>
             )
           ) : (
             <p className="empty-state">{text.executionRequiresManage}</p>
