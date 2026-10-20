@@ -33,7 +33,7 @@ describe('Agent Bridge operator command projection', () => {
     });
   });
 
-  it('removes the runtime ACK session while keeping a bounded operator trace', () => {
+  it('removes runtime ACK sessions and correlations while keeping a bounded operator trace', () => {
     const projected = projectAgentBridgeOperatorCommand({
       commandId: 'command-1',
       correlationId: 'correlation-1',
@@ -57,7 +57,6 @@ describe('Agent Bridge operator command projection', () => {
 
     expect(projected).toEqual({
       commandId: 'command-1',
-      correlationId: 'correlation-1',
       installationId: 'installation-1',
       toolId: 'tool-1',
       state: 'completed',
@@ -68,7 +67,6 @@ describe('Agent Bridge operator command projection', () => {
         version: 'kab.command-ack.v1',
         commandId: 'command-1',
         deliveryAttempt: 1,
-        correlationId: 'correlation-1',
         status: 'executed',
         completedAt: '2026-10-20T06:00:01.000Z',
         output: { sessionId: '[redacted]', value: 42 },
@@ -76,5 +74,6 @@ describe('Agent Bridge operator command projection', () => {
     });
     expect(JSON.stringify(projected)).not.toContain('runtime-session-secret');
     expect(JSON.stringify(projected)).not.toContain('nested-runtime-secret');
+    expect(JSON.stringify(projected)).not.toContain('correlation-1');
   });
 });

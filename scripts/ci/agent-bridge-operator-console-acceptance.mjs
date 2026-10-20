@@ -225,6 +225,7 @@ try {
   assert.equal(completedRead.acknowledgement?.status, 'executed');
   assert.match(JSON.stringify(completedRead.acknowledgement?.output), /"id":42/);
   assert.equal(completedReadResult.text.includes('sessionId'), false);
+  assert.equal(completedReadResult.text.includes('correlationId'), false);
   assert.equal(completedReadResult.text.includes(secretMarker), false);
   console.log('CONSOLE_STAGE=read:ok');
 
@@ -238,9 +239,47 @@ try {
   assert.equal(completedWrite.acknowledgement?.status, 'executed');
   assert.match(JSON.stringify(completedWrite.acknowledgement?.output), /"status":"completed"/);
   assert.equal(completedWriteResult.text.includes('sessionId'), false);
+  assert.equal(completedWriteResult.text.includes('correlationId'), false);
   assert.equal(completedWriteResult.text.includes(secretMarker), false);
   assert.equal(completedWriteResult.text.includes('approvalToken'), false);
   console.log('CONSOLE_STAGE=write:ok');
+
+  console.log('CONSOLE_STAGE=history:start');
+  const firstHistory = await operatorRequest(
+    `/v1/products/agent-bridge/installations/${encodeURIComponent(binding.installationId)}/commands?limit=1`,
+  );
+  assert.equal(firstHistory.response.status, 200, JSON.stringify(firstHistory.body));
+  assert.equal(firstHistory.body?.version, 'kcc.agent-bridge-command-history.v1');
+  assert.equal(firstHistory.body?.installationId, binding.installationId);
+  assert.equal(firstHistory.body?.commands?.length, 1);
+  assert.equal(firstHistory.body?.commands?.[0]?.commandId, writeCommandId);
+  assert.equal(typeof firstHistory.body?.nextCursor, 'string');
+  for (const forbidden of [
+    'sessionId',
+    'correlationId',
+    'approvalToken',
+    'actionFingerprint',
+    secretMarker,
+  ]) {
+    assert.equal(firstHistory.text.includes(forbidden), false, `History exposed ${forbidden}.`);
+  }
+
+  const secondHistory = await operatorRequest(
+    `/v1/products/agent-bridge/installations/${encodeURIComponent(binding.installationId)}/commands?limit=1&cursor=${encodeURIComponent(firstHistory.body.nextCursor)}`,
+  );
+  assert.equal(secondHistory.response.status, 200, JSON.stringify(secondHistory.body));
+  assert.equal(secondHistory.body?.commands?.length, 1);
+  assert.equal(secondHistory.body?.commands?.[0]?.commandId, readCommandId);
+  for (const forbidden of [
+    'sessionId',
+    'correlationId',
+    'approvalToken',
+    'actionFingerprint',
+    secretMarker,
+  ]) {
+    assert.equal(secondHistory.text.includes(forbidden), false, `Second history page exposed ${forbidden}.`);
+  }
+  console.log('CONSOLE_STAGE=history:ok');
 
   const pageResponse = await globalThis.fetch(
     `${webBaseUrl}/es/ia/agent-bridge?command=${encodeURIComponent(writeCommandId)}`,
@@ -254,6 +293,7 @@ try {
   assert.match(page, /Completado|Ejecutado/);
   assert.equal(page.includes(secretMarker), false, 'Console rendered a secret-looking runtime value.');
   assert.equal(page.includes('sessionId'), false, 'Console rendered runtime session material.');
+  assert.equal(page.includes('correlationId'), false, 'Console rendered correlation material.');
   assert.equal(page.includes('approvalToken'), false, 'Console rendered approval-token material.');
   assert.equal(page.includes('actionFingerprint'), false, 'Console rendered action-fingerprint material.');
   console.log('CONSOLE_STAGE=projection:ok');
@@ -278,8 +318,11 @@ try {
         completedRead.acknowledgement?.status,
         completedWrite.acknowledgement?.status,
       ],
+      historyPageOneCommandId: firstHistory.body.commands[0].commandId,
+      historyPageTwoCommandId: secondHistory.body.commands[0].commandId,
       operatorReadExposedSession: completedReadResult.text.includes('sessionId'),
       operatorWriteExposedSession: completedWriteResult.text.includes('sessionId'),
+      historyExposedCorrelation: firstHistory.text.includes('correlationId'),
       renderedSecret: page.includes(secretMarker),
       renderedRuntimeSession: page.includes('sessionId'),
     }),

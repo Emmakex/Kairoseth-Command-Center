@@ -5,6 +5,7 @@ import type { AgentBridgeControlStore, AgentBridgeRuntimeSession } from './agent
 import type {
   AgentBridgeCommandAcknowledgement,
   AgentBridgeCommandAckStatus,
+  AgentBridgeCommandHistoryCursor,
   AgentBridgeCommandOutcomeStatus,
   AgentBridgeExecutionStore,
 } from './agent-bridge-execution-store';
@@ -12,6 +13,10 @@ import type {
 const MAX_ID = 512;
 const MAX_REASON = 4096;
 const MAX_LIMIT = 100;
+const DEFAULT_HISTORY_LIMIT = 20;
+const MAX_HISTORY_LIMIT = 50;
+const MAX_HISTORY_CURSOR = 1024;
+const HISTORY_CURSOR_VERSION = 'kcc.agent-bridge-history-cursor.v1';
 const ACK_STATUSES = new Set<AgentBridgeCommandAckStatus>([
   'executed',
   'approval_required',
@@ -51,6 +56,41 @@ function text(value: unknown, max = MAX_ID): string | null {
 function timestamp(value: unknown): string | null {
   const parsed = text(value, 64);
   return parsed && Number.isFinite(Date.parse(parsed)) ? parsed : null;
+}
+
+function parseHistoryCursor(value: unknown): AgentBridgeCommandHistoryCursor | null {
+  const encoded = text(value, MAX_HISTORY_CURSOR);
+  if (!encoded) return null;
+  try {
+    const decoded = Buffer.from(encoded, 'base64url').toString('utf8');
+    if (Buffer.byteLength(decoded, 'utf8') > MAX_HISTORY_CURSOR) return null;
+    const body = object(JSON.parse(decoded));
+    const createdAt = timestamp(body?.createdAt);
+    const commandId = text(body?.commandId);
+    if (
+      !body ||
+      body.version !== HISTORY_CURSOR_VERSION ||
+      !createdAt ||
+      !commandId ||
+      Object.keys(body).some((key) => !['version', 'createdAt', 'commandId'].includes(key))
+    ) {
+      return null;
+    }
+    return { createdAt, commandId };
+  } catch {
+    return null;
+  }
+}
+
+function encodeHistoryCursor(cursor: AgentBridgeCommandHistoryCursor): string {
+  return Buffer.from(
+    JSON.stringify({
+      version: HISTORY_CURSOR_VERSION,
+      createdAt: cursor.createdAt,
+      commandId: cursor.commandId,
+    }),
+    'utf8',
+  ).toString('base64url');
 }
 
 function bearer(request: FastifyRequest): string | null {
@@ -136,6 +176,48 @@ export function registerAgentBridgeExecutionRoutes(
     executionStore?: AgentBridgeExecutionStore;
   },
 ): void {
+  app.get('/v1/products/agent-bridge/installations/:installationId/commands', async (request, reply) => {
+    reply.header('cache-control', 'no-store');
+    const session = await operatorSession(request, options.authProvider);
+    if (!session) return reply.code(401).send({ code: 'unauthorized' });
+    if (!session.activeWorkspaceId) return reply.code(400).send({ code: 'workspace_required' });
+    if (!authorize(session, { product: 'agent-bridge', capability: 'workspace.manage' })) {
+      return reply.code(403).send({ code: 'agent_bridge_forbidden' });
+    }
+    if (!options.executionStore) {
+      return reply.code(503).send({ code: 'agent_bridge_execution_unavailable' });
+    }
+
+    const params = object(request.params);
+    const query = object(request.query);
+    const installationId = text(params?.installationId);
+    const limit = query?.limit === undefined ? DEFAULT_HISTORY_LIMIT : Number(query.limit);
+    const before = query?.cursor === undefined ? undefined : parseHistoryCursor(query.cursor);
+    if (
+      !installationId ||
+      !Number.isInteger(limit) ||
+      limit < 1 ||
+      limit > MAX_HISTORY_LIMIT ||
+      (query?.cursor !== undefined && !before) ||
+      (query && Object.keys(query).some((key) => !['limit', 'cursor'].includes(key)))
+    ) {
+      return reply.code(400).send({ code: 'invalid_agent_bridge_command_history_request' });
+    }
+
+    const page = await options.executionStore.listCommands({
+      tenantId: session.activeWorkspaceId,
+      installationId,
+      limit,
+      ...(before ? { before } : {}),
+    });
+    return {
+      version: 'kcc.agent-bridge-command-history.v1',
+      installationId,
+      commands: page.commands.map(projectAgentBridgeOperatorCommand),
+      ...(page.nextCursor ? { nextCursor: encodeHistoryCursor(page.nextCursor) } : {}),
+    };
+  });
+
   app.post('/v1/products/agent-bridge/installations/:installationId/commands', async (request, reply) => {
     reply.header('cache-control', 'no-store');
     const session = await operatorSession(request, options.authProvider);

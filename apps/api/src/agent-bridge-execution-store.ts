@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import type { Collection, Db } from 'mongodb';
+import type { Collection, Db, Filter } from 'mongodb';
 import type { AgentBridgeApprovalService } from './agent-bridge-approval-store';
 import type { AgentBridgeRuntimeSession } from './agent-bridge-control-store';
 
@@ -60,6 +60,16 @@ export type AgentBridgeQueuedCommand = {
   acknowledgement?: AgentBridgeCommandAcknowledgement;
 };
 
+export type AgentBridgeCommandHistoryCursor = {
+  createdAt: string;
+  commandId: string;
+};
+
+export type AgentBridgeCommandHistoryPage = {
+  commands: AgentBridgeQueuedCommand[];
+  nextCursor?: AgentBridgeCommandHistoryCursor;
+};
+
 export interface AgentBridgeExecutionStore {
   ensureIndexes(): Promise<void>;
   queueReadCommand(input: QueueCommandInput): Promise<AgentBridgeQueuedCommand | null>;
@@ -73,6 +83,12 @@ export interface AgentBridgeExecutionStore {
     acknowledgement: AgentBridgeCommandAcknowledgement,
   ): Promise<boolean>;
   getCommand(tenantId: string, commandId: string): Promise<AgentBridgeQueuedCommand | null>;
+  listCommands(input: {
+    tenantId: string;
+    installationId: string;
+    limit: number;
+    before?: AgentBridgeCommandHistoryCursor;
+  }): Promise<AgentBridgeCommandHistoryPage>;
 }
 
 type QueueCommandInput = {
@@ -133,6 +149,7 @@ const DEFAULT_COMMAND_TTL_SECONDS = 300;
 const DEFAULT_APPROVED_COMMAND_TTL_SECONDS = 120;
 const DELIVERY_LEASE_MS = 60_000;
 const MAX_INPUT_BYTES = 64 * 1024;
+const MAX_HISTORY_LIMIT = 50;
 
 export class MongoAgentBridgeExecutionStore implements AgentBridgeExecutionStore {
   private readonly installations: Collection<InstallationDocument>;
@@ -153,6 +170,7 @@ export class MongoAgentBridgeExecutionStore implements AgentBridgeExecutionStore
       this.commands.createIndex({ commandId: 1 }, { unique: true }),
       this.commands.createIndex({ tenantId: 1, correlationId: 1 }, { unique: true }),
       this.commands.createIndex({ tenantId: 1, installationId: 1, state: 1, createdAt: 1 }),
+      this.commands.createIndex({ tenantId: 1, installationId: 1, createdAt: -1, commandId: -1 }),
       this.commands.createIndex({ expiresAt: 1 }),
     ]);
   }
@@ -381,6 +399,59 @@ export class MongoAgentBridgeExecutionStore implements AgentBridgeExecutionStore
   ): Promise<AgentBridgeQueuedCommand | null> {
     const document = await this.commands.findOne({ tenantId, commandId });
     return document ? projectCommand(document) : null;
+  }
+
+  async listCommands(input: {
+    tenantId: string;
+    installationId: string;
+    limit: number;
+    before?: AgentBridgeCommandHistoryCursor;
+  }): Promise<AgentBridgeCommandHistoryPage> {
+    if (!Number.isInteger(input.limit) || input.limit < 1 || input.limit > MAX_HISTORY_LIMIT) {
+      throw new Error(`Agent Bridge command history limit must be between 1 and ${MAX_HISTORY_LIMIT}.`);
+    }
+    if (
+      input.before &&
+      (!Number.isFinite(Date.parse(input.before.createdAt)) || !input.before.commandId)
+    ) {
+      throw new Error('Invalid Agent Bridge command history cursor.');
+    }
+
+    const filter: Filter<CommandDocument> = {
+      tenantId: input.tenantId,
+      installationId: input.installationId,
+      ...(input.before
+        ? {
+            $or: [
+              { createdAt: { $lt: input.before.createdAt } },
+              {
+                createdAt: input.before.createdAt,
+                commandId: { $lt: input.before.commandId },
+              },
+            ],
+          }
+        : {}),
+    };
+    const documents = await this.commands
+      .find(filter)
+      .sort({ createdAt: -1, commandId: -1 })
+      .limit(input.limit + 1)
+      .toArray();
+    const hasMore = documents.length > input.limit;
+    const page = documents.slice(0, input.limit);
+    const last = page.at(-1);
+
+    return {
+      commands: page.map(projectCommand),
+      ...(hasMore && last
+        ? {
+            nextCursor: {
+              createdAt: last.createdAt,
+              commandId: last.commandId,
+            },
+          }
+        : {}),
+    };
   }
 }
 
