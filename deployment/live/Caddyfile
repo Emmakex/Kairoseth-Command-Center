@@ -1,6 +1,20 @@
 :80 {
   encode zstd gzip
 
+  # Public Agent Bridge runtime contract. Keep this narrow: remote runtimes
+  # need only the authenticated /api/products/agent-bridge/* surface.
+  @agent_bridge_runtime path /api/products/agent-bridge/*
+  handle @agent_bridge_runtime {
+    reverse_proxy api:4000
+  }
+
+  # Phase 7.3 / operator contract. Expose only the authenticated session
+  # projection and Agent Bridge operator surface, never the whole /v1 API.
+  @agent_bridge_operator path /v1/session /v1/products/agent-bridge/*
+  handle @agent_bridge_operator {
+    reverse_proxy api:4000
+  }
+
   handle {
     reverse_proxy web:3000
   }
