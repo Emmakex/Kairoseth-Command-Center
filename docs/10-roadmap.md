@@ -77,15 +77,67 @@ See [`47-phase-5-release-boundary.md`](47-phase-5-release-boundary.md) for objec
 
 **Status: complete. Technical release boundary CLOSED / CERRADA.**
 
-## After Phase 5 / Después de Fase 5
+## Phase 6 — Agent Bridge platform foundation and control plane
 
-The next product-level work is release/commercial packaging and catalog publication of:
+Delivered:
+
+- shared durable A2A task/state storage;
+- authenticated runtime enrollment and short-lived runtime sessions;
+- session-bound heartbeat and authenticated runtime snapshots;
+- workspace-scoped runtime observability;
+- reduced connector/tool health projections that do not expose runtime credentials or session material;
+- operator-facing control/observability surfaces with server-enforced workspace authorization.
+
+The phase established Platform as the authority for tenant scope, runtime identity and observable connector/tool state. Browser clients are not trusted as a source of runtime or tenant authority.
+
+**Status: complete. Foundation/control boundary CLOSED / CERRADA.**
+
+## Phase 7 — Governed Agent Bridge execution and security
+
+Delivered slices:
+
+- READ command delivery through the shared execution store and real `ProductionRuntime` acceptance;
+- server-side signed approval flow for WRITE/CRITICAL tools using Ed25519 approval material;
+- mutation security hardening, runtime audit coverage and negative acceptance paths;
+- chained approval-key rotation with safe overlap/retirement and ES/EN operator controls;
+- safe workspace/installation-scoped tool inventory exposing only executable identity, copy, risk, availability and reduced connector identity;
+- governed ES/EN execution console merged in PR #75 as `8101a76d126026bc2b4a1c0eb46810cf1e4f47b5`;
+- server-side derivation of READ versus signed mutation execution from authoritative inventory; the browser cannot choose risk, approval tokens or execution endpoints;
+- safe operator command projection that removes runtime session identity and redacts secret-bearing ACK reason/output before it leaves the API;
+- second defensive sanitization layer in the web surface;
+- real acceptance covering inventory → queue → `ProductionRuntime` → ACK for both READ and signed mutation execution.
+
+Infrastructure maintenance after the console merge:
+
+- PR #76 preserved `mongo:8.0` as the standalone/product default while allowing the GitHub-hosted standalone smoke to use the compatible `mongo:7.0.43` image;
+- merged `main` `f3a3726ed018b0425aefd06bfd72d4c9a1e75bfb` completed the full 18-workflow post-merge regression with no failed, queued or in-progress workflow remaining.
+
+### Next Phase 7 microphase
+
+**Safe paginated execution history per workspace/installation.**
+
+Scope:
+
+- add bounded `listCommands` persistence/query semantics scoped by authoritative tenant + installation;
+- expose an operator API that returns only the existing safe command projection;
+- add an execution-history panel to the Agent Bridge console;
+- use bounded cursor/limit pagination rather than unbounded command reads;
+- acceptance must prove that runtime session IDs, correlation IDs, approval material, action fingerprints, key material, credentials and secret-bearing connector output cannot leak through the history surface.
+
+Retry/cancel semantics are intentionally **not** part of this microphase unless a separate contract promotes them later.
+
+**Status: ACTIVE / ACTIVA.**
+
+## Commercial publication boundary
+
+The initial Kairoseth Software catalog publication remains complete:
 
 - **ES:** Gestor de Trabajo
 - **EN:** Work Manager
 - **Category:** Kairoseth Software
+- **Canonical route:** `/products/work-manager`
 
-Do not silently extend Phase 5 with deferred features. New capabilities require an explicitly documented future phase or maintenance slice with their own product, security and acceptance contracts.
+Public pricing remains deferred until the Cloud / Private Cloud / Self-Hosted resource and operating-cost profile is measured.
 
 ## Operating principles
 
@@ -95,4 +147,6 @@ Do not silently extend Phase 5 with deferred features. New capabilities require 
 - Portable/self-hosted operation must remain possible without hidden Kairoseth dependencies.
 - Authorization and tenant/private boundaries are server-enforced.
 - Every security-sensitive lifecycle must have negative tests and an auditable path.
+- Agent Bridge browser surfaces never become tenant, runtime-risk or approval authorities.
+- Runtime/session/key/approval secrets must be removed or redacted before operator API responses, with UI sanitization as defense in depth rather than the primary boundary.
 - Deferred backlog is not release-blocking unless a future roadmap explicitly promotes it into scope.
