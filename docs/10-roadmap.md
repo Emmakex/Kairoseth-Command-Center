@@ -138,11 +138,11 @@ Delivered:
 - signed keyset synchronization over the accepted runtime session;
 - encrypted old private-key retirement only after safe convergence;
 - workspace-authorized rotation GET/POST routes;
-- PR #70 — ES/EN operator controls showing only generation, phase and trusted-key count, merged as `3968f1d768f8e3d06f4a67dfdf1e923c5487e301`.
+- PR #70 — ES/EN operator controls showing only generation, phase and trusted-key count, merged as `3968f1d768f8e3d06f4a67dfdf1e923c5487e301`;
+- full 18-workflow post-merge regression completed successfully;
+- PR #72 isolated a later GitHub-hosted runner/MongoDB kernel incompatibility without changing the standalone MongoDB 8.x release profile.
 
-Post-merge regression for that boundary consists of 18 workflows and must be fully green before the next execution UX slice is merged.
-
-**Status: current Phase 7 delivered boundary merged; post-merge validation active.**
+**Status: current Phase 7 delivered boundary merged and green.**
 
 ## Next Phase 7 microphase — Operator execution console
 
