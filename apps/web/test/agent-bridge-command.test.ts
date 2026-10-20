@@ -24,9 +24,11 @@ describe('Agent Bridge command projection', () => {
           correlationId: 'correlation-private',
           status: 'executed',
           completedAt: '2026-10-20T06:00:02.000Z',
+          reason: 'Remote said Bearer abc.def.ghi and token=plain-secret',
           output: {
             count: 2,
             accessToken: 'must-not-render',
+            message: 'authorization=another-secret',
             nested: { password: 'must-not-render', ok: true },
           },
         },
@@ -46,9 +48,11 @@ describe('Agent Bridge command projection', () => {
         acknowledgement: {
           status: 'executed',
           completedAt: '2026-10-20T06:00:02.000Z',
+          reason: 'Remote said Bearer [redacted] and token=[redacted]',
           output: {
             count: 2,
             accessToken: '[redacted]',
+            message: 'authorization=[redacted]',
             nested: { password: '[redacted]', ok: true },
           },
         },
@@ -57,6 +61,8 @@ describe('Agent Bridge command projection', () => {
     expect(JSON.stringify(parsed)).not.toContain('runtime-session-private');
     expect(JSON.stringify(parsed)).not.toContain('correlation-private');
     expect(JSON.stringify(parsed)).not.toContain('must-not-render');
+    expect(JSON.stringify(parsed)).not.toContain('plain-secret');
+    expect(JSON.stringify(parsed)).not.toContain('another-secret');
   });
 
   it('rejects malformed command state and acknowledgement status', () => {
