@@ -207,6 +207,11 @@ try {
   assert.equal(queuedRead.response.status, 201, JSON.stringify(queuedRead.body));
   const readCommandId = queuedRead.body?.command?.commandId;
   assert.ok(readCommandId);
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(queuedRead.body?.command ?? {}, 'correlationId'),
+    false,
+    'Operator projection must never expose correlation identifiers.',
+  );
 
   const completedRead = await waitFor(async () => {
     const result = await operatorRequest(
@@ -218,7 +223,14 @@ try {
   }, 'Real Agent Bridge runtime did not execute the queued READ command.');
   assert.equal(completedRead.deliveryAttempt, 1);
   assert.equal(completedRead.acknowledgement?.status, 'executed');
-  assert.equal(completedRead.acknowledgement?.correlationId, readCorrelationId);
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(completedRead, 'correlationId'),
+    false,
+  );
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(completedRead.acknowledgement ?? {}, 'correlationId'),
+    false,
+  );
   assert.match(JSON.stringify(completedRead.acknowledgement?.output), /"id":42/);
   console.log('E2E_STAGE=read:ok');
 
@@ -243,6 +255,11 @@ try {
     false,
     'Operator projection must never expose the signed approval token.',
   );
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(queuedWrite.body?.command ?? {}, 'correlationId'),
+    false,
+    'Operator projection must never expose correlation identifiers.',
+  );
   const writeCommandId = queuedWrite.body?.command?.commandId;
   assert.ok(writeCommandId);
 
@@ -256,7 +273,14 @@ try {
   }, 'Real Agent Bridge runtime did not execute the signed WRITE command.');
   assert.equal(completedWrite.deliveryAttempt, 1);
   assert.equal(completedWrite.acknowledgement?.status, 'executed');
-  assert.equal(completedWrite.acknowledgement?.correlationId, writeCorrelationId);
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(completedWrite, 'correlationId'),
+    false,
+  );
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(completedWrite.acknowledgement ?? {}, 'correlationId'),
+    false,
+  );
   assert.match(JSON.stringify(completedWrite.acknowledgement?.output), /"status":"completed"/);
   console.log('E2E_STAGE=write:ok');
 
@@ -319,6 +343,10 @@ try {
     Object.prototype.hasOwnProperty.call(queuedRotatedWrite.body?.command ?? {}, 'approvalToken'),
     false,
   );
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(queuedRotatedWrite.body?.command ?? {}, 'correlationId'),
+    false,
+  );
   const rotatedWriteCommandId = queuedRotatedWrite.body?.command?.commandId;
   assert.ok(rotatedWriteCommandId);
 
@@ -332,7 +360,14 @@ try {
   }, 'Real Agent Bridge runtime did not execute WRITE signed by the rotated key.');
   assert.equal(completedRotatedWrite.deliveryAttempt, 1);
   assert.equal(completedRotatedWrite.acknowledgement?.status, 'executed');
-  assert.equal(completedRotatedWrite.acknowledgement?.correlationId, rotatedWriteCorrelationId);
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(completedRotatedWrite, 'correlationId'),
+    false,
+  );
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(completedRotatedWrite.acknowledgement ?? {}, 'correlationId'),
+    false,
+  );
   assert.match(
     JSON.stringify(completedRotatedWrite.acknowledgement?.output),
     /"status":"processing"/,
