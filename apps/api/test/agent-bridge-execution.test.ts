@@ -186,7 +186,7 @@ describe('Agent Bridge execution routes', () => {
     await app.close();
   });
 
-  it('delivers a session-bound command, accepts its ACK and exposes the result to the operator', async () => {
+  it('delivers a session-bound command, accepts its ACK and exposes only a safe result to the operator', async () => {
     const executionStore = new FakeExecutionStore();
     await executionStore.queueReadCommand({
       tenantId: 'workspace-a',
@@ -234,7 +234,15 @@ describe('Agent Bridge execution routes', () => {
       correlationId: 'correlation-1',
       status: 'executed',
       completedAt: '2026-10-19T13:00:02.000Z',
-      output: [{ id: 42, status: 'processing' }],
+      reason: 'Remote said Bearer raw-runtime-secret and token=another-secret',
+      output: [
+        {
+          id: 42,
+          status: 'processing',
+          accessToken: 'must-not-be-visible',
+          nested: { password: 'also-must-not-be-visible' },
+        },
+      ],
     };
     const ack = await app.inject({
       method: 'POST',
@@ -262,9 +270,30 @@ describe('Agent Bridge execution routes', () => {
         issuedAt: '2026-10-19T13:00:00.000Z',
         expiresAt: '2099-01-01T00:00:00.000Z',
         deliveryAttempt: 1,
-        acknowledgement,
+        acknowledgement: {
+          version: 'kab.command-ack.v1',
+          commandId: 'command-1',
+          deliveryAttempt: 1,
+          correlationId: 'correlation-1',
+          status: 'executed',
+          completedAt: '2026-10-19T13:00:02.000Z',
+          reason: 'Remote said Bearer [redacted] and token=[redacted]',
+          output: [
+            {
+              id: 42,
+              status: 'processing',
+              accessToken: '[redacted]',
+              nested: { password: '[redacted]' },
+            },
+          ],
+        },
       },
     });
+    expect(status.body).not.toContain('session-1');
+    expect(status.body).not.toContain('raw-runtime-secret');
+    expect(status.body).not.toContain('another-secret');
+    expect(status.body).not.toContain('must-not-be-visible');
+    expect(status.body).not.toContain('also-must-not-be-visible');
 
     const operatorTokenOnRuntimeRoute = await app.inject({
       method: 'POST',
