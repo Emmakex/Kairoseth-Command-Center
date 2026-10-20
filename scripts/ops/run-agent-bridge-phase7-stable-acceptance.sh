@@ -33,6 +33,18 @@ secrets_dir="$work_root/secrets"
 evidence_dir="${KAB_PHASE7_EVIDENCE_DIR:-$work_root/evidence}"
 state_dir="$work_root/state"
 certs_dir="$work_root/certs"
+CURRENT_STAGE="bootstrap"
+
+phase() {
+  CURRENT_STAGE="$1"
+  printf 'phase7-stage: %s\n' "$CURRENT_STAGE"
+}
+
+on_error() {
+  local code=$?
+  printf 'Phase 7.3 orchestration failed during stage: %s\n' "$CURRENT_STAGE" >&2
+  exit "$code"
+}
 
 cleanup() {
   set +e
@@ -43,6 +55,7 @@ cleanup() {
     rm -rf "$work_root"
   fi
 }
+trap on_error ERR
 trap cleanup EXIT
 
 require_command() {
@@ -52,6 +65,7 @@ require_command() {
   }
 }
 
+phase validate-host
 for command_name in docker curl openssl sha256sum python3; do
   require_command "$command_name"
 done
@@ -76,6 +90,7 @@ fi
 mkdir -p "$extract_root" "$secrets_dir" "$evidence_dir" "$state_dir" "$certs_dir"
 chmod 700 "$secrets_dir" "$state_dir" "$certs_dir"
 
+phase fetch-stable-artifact
 curl --fail --silent --show-error --location "$BRIDGE_URL" --output "$archive_path"
 printf '%s  %s\n' "$BRIDGE_SHA256" "$archive_path" | sha256sum --check --status || {
   echo "Stable Agent Bridge archive checksum mismatch." >&2
@@ -108,12 +123,14 @@ PY
   exit 1
 }
 
+phase install-stable-deps
 docker run --rm \
   -v "$bridge_dir:/app" \
   -w /app \
   "$NODE_IMAGE" \
   npm ci --omit=dev --no-audit --no-fund >/dev/null
 
+phase obtain-operator-token
 # shellcheck disable=SC1090
 . "$LIVE_ENV_FILE"
 : "${KCC_LOCAL_ADMIN_EMAIL:?KCC_LOCAL_ADMIN_EMAIL missing from live environment}"
@@ -138,6 +155,7 @@ printf '%s' "$operator_token" > "$secrets_dir/operator-token"
 chmod 600 "$secrets_dir/operator-token"
 unset operator_token
 
+phase start-disposable-woocommerce
 # A real but disposable WooCommerce instance keeps Phase 7.3 away from customer orders.
 docker network create "$network" >/dev/null
 docker volume create "$wp_volume" >/dev/null
@@ -193,6 +211,7 @@ wp() {
     "$WORDPRESS_CLI_IMAGE" "$@"
 }
 
+phase initialize-wordpress
 wp core install \
   --url=https://wc-phase7 \
   --title='Kairoseth Agent Bridge Phase 7 Acceptance' \
@@ -203,12 +222,14 @@ wp core install \
 wp plugin install woocommerce --activate >/dev/null
 wp rewrite structure '/%postname%/' --hard >/dev/null
 
+phase create-controlled-order
 order_id="$(wp eval '$order=wc_create_order();$order->set_status("processing");$order->set_currency("EUR");$order->set_billing_first_name("Phase");$order->set_billing_last_name("Seven");$order->set_billing_email("phase7@example.invalid");$order->set_total(10);$order->save();echo $order->get_id();')"
 [[ "$order_id" =~ ^[1-9][0-9]*$ ]] || {
   echo "Controlled WooCommerce order creation failed." >&2
   exit 1
 }
 
+phase create-temporary-rest-key
 keys_json="$(wp eval 'global $wpdb;$key="ck_".wc_rand_hash();$secret="cs_".wc_rand_hash();$ok=$wpdb->insert($wpdb->prefix."woocommerce_api_keys",array("user_id"=>1,"description"=>"Phase 7 stable acceptance","permissions"=>"read_write","consumer_key"=>wc_api_hash($key),"consumer_secret"=>$secret,"truncated_key"=>substr($key,-7)));if(!$ok){fwrite(STDERR,"api key insert failed\n");exit(1);}echo wp_json_encode(array("consumer_key"=>$key,"consumer_secret"=>$secret));')"
 consumer_key="$(printf '%s' "$keys_json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["consumer_key"])')"
 consumer_secret="$(printf '%s' "$keys_json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["consumer_secret"])')"
@@ -218,6 +239,7 @@ printf '%s' "$consumer_secret" > "$secrets_dir/wc-consumer-secret"
 chmod 600 "$secrets_dir/wc-consumer-key" "$secrets_dir/wc-consumer-secret"
 unset consumer_key consumer_secret
 
+phase start-disposable-https
 openssl req -x509 -newkey rsa:2048 -nodes -days 2 \
   -subj '/CN=Kairoseth Phase 7 Acceptance CA' \
   -keyout "$certs_dir/ca.key" -out "$certs_dir/ca.crt" >/dev/null 2>&1
@@ -261,10 +283,12 @@ for _ in $(seq 1 45); do
   sleep 2
 done
 
+phase verify-woocommerce-rest
 docker run --rm --network "$network" \
+  --entrypoint sh \
   -v "$certs_dir:/certs:ro" \
   -v "$secrets_dir:/secrets:ro" \
-  "$CURL_IMAGE" sh -ceu '
+  "$CURL_IMAGE" -ceu '
     key="$(cat /secrets/wc-consumer-key)"
     secret="$(cat /secrets/wc-consumer-secret)"
     curl --cacert /certs/ca.crt --fail --silent --show-error \
@@ -272,6 +296,7 @@ docker run --rm --network "$network" \
       "https://wc-phase7/wp-json/wc/v3/orders/'"$order_id"'" >/dev/null
   '
 
+phase run-stable-agent-bridge
 # The acceptance process is created on the disposable WooCommerce network and
 # then attached to the existing Kairoseth public-edge network. This exercises
 # the real live Agent Bridge edge contract without exposing local auth.
@@ -303,6 +328,7 @@ docker create --name "$acceptance_container" \
 docker network connect "$PUBLIC_EDGE_NETWORK" "$acceptance_container"
 docker start -a "$acceptance_container"
 
+phase verify-sanitized-evidence
 python3 - "$evidence_dir/phase7-real-platform.json" "$BRIDGE_SHA256" <<'PY'
 import json, sys
 path, digest = sys.argv[1], sys.argv[2]
@@ -332,3 +358,5 @@ if [[ "$evidence_dir" == "$work_root/evidence" ]]; then
   cp "$evidence_dir/phase7-real-platform.json" "$final_evidence_dir/phase7-real-platform.json"
   echo "KAB_PHASE7_EVIDENCE_PATH=$final_evidence_dir/phase7-real-platform.json" >> "${GITHUB_ENV:-/dev/null}"
 fi
+
+phase complete
