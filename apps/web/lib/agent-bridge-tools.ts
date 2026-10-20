@@ -108,7 +108,11 @@ function tool(value: unknown): AgentBridgeOperatorTool | null {
     description,
     risk: risk as AgentBridgeOperatorTool['risk'],
     availability: availability as AgentBridgeOperatorTool['availability'],
-    ...(blockedReason ? { blockedReason: blockedReason as AgentBridgeOperatorTool['blockedReason'] } : {}),
+    ...(blockedReason
+      ? {
+          blockedReason: blockedReason as NonNullable<AgentBridgeOperatorTool['blockedReason']>,
+        }
+      : {}),
     ...(Object.keys(localizations).length > 0 ? { localizations } : {}),
     connector: {
       connectorId,
