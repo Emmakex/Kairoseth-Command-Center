@@ -54,6 +54,7 @@ class FakeExecutionStore implements AgentBridgeExecutionStore {
   queued: AgentBridgeQueuedCommand | null = null;
   lastQueueInput: Parameters<AgentBridgeExecutionStore['queueReadCommand']>[0] | null = null;
   lastAck: AgentBridgeCommandAcknowledgement | null = null;
+  lastListInput: Parameters<AgentBridgeExecutionStore['listCommands']>[0] | null = null;
 
   async ensureIndexes(): Promise<void> {}
 
@@ -121,10 +122,48 @@ class FakeExecutionStore implements AgentBridgeExecutionStore {
     if (tenantId !== 'workspace-a' || commandId !== this.queued?.commandId) return null;
     return this.queued;
   }
+
+  async listCommands(input: Parameters<AgentBridgeExecutionStore['listCommands']>[0]) {
+    this.lastListInput = input;
+    if (input.tenantId !== 'workspace-a' || input.installationId !== 'installation-1') {
+      return { commands: [] };
+    }
+    const command: AgentBridgeQueuedCommand = {
+      commandId: 'history-command-2',
+      correlationId: 'history-correlation-secret',
+      installationId: 'installation-1',
+      toolId: 'woocommerce.store.orders.list',
+      state: 'completed',
+      issuedAt: '2026-10-20T07:00:00.000Z',
+      expiresAt: '2026-10-20T07:05:00.000Z',
+      deliveryAttempt: 1,
+      acknowledgement: {
+        version: 'kab.command-ack.v1',
+        commandId: 'history-command-2',
+        deliveryAttempt: 1,
+        sessionId: 'history-runtime-session-secret',
+        correlationId: 'history-correlation-secret',
+        status: 'executed',
+        completedAt: '2026-10-20T07:00:01.000Z',
+        reason: 'Bearer history-bearer-secret token=history-token-secret',
+        output: {
+          accessToken: 'history-output-secret',
+          value: 42,
+        },
+      },
+    };
+    return {
+      commands: [command],
+      nextCursor: {
+        createdAt: '2026-10-20T07:00:00.000Z',
+        commandId: 'history-command-2',
+      },
+    };
+  }
 }
 
 describe('Agent Bridge execution routes', () => {
-  it('queues only an observed READ command for the active workspace', async () => {
+  it('queues only an observed READ command for the active workspace without exposing correlation data', async () => {
     const executionStore = new FakeExecutionStore();
     const app = buildApp({
       authProvider,
@@ -156,8 +195,17 @@ describe('Agent Bridge execution routes', () => {
     });
     expect(response.json()).toEqual({
       version: 'kcc.agent-bridge-command.v1',
-      command: executionStore.queued,
+      command: {
+        commandId: 'command-1',
+        installationId: 'installation-1',
+        toolId: 'woocommerce.store.orders.list',
+        state: 'queued',
+        issuedAt: '2026-10-19T13:00:00.000Z',
+        expiresAt: '2099-01-01T00:00:00.000Z',
+        deliveryAttempt: 0,
+      },
     });
+    expect(response.body).not.toContain('correlation-1');
 
     const writeAttempt = await app.inject({
       method: 'POST',
@@ -263,7 +311,6 @@ describe('Agent Bridge execution routes', () => {
       version: 'kcc.agent-bridge-command.v1',
       command: {
         commandId: 'command-1',
-        correlationId: 'correlation-1',
         installationId: 'installation-1',
         toolId: 'woocommerce.store.orders.list',
         state: 'completed',
@@ -274,7 +321,6 @@ describe('Agent Bridge execution routes', () => {
           version: 'kab.command-ack.v1',
           commandId: 'command-1',
           deliveryAttempt: 1,
-          correlationId: 'correlation-1',
           status: 'executed',
           completedAt: '2026-10-19T13:00:02.000Z',
           reason: 'Remote said Bearer [redacted] and token=[redacted]',
@@ -290,6 +336,7 @@ describe('Agent Bridge execution routes', () => {
       },
     });
     expect(status.body).not.toContain('session-1');
+    expect(status.body).not.toContain('correlation-1');
     expect(status.body).not.toContain('raw-runtime-secret');
     expect(status.body).not.toContain('another-secret');
     expect(status.body).not.toContain('must-not-be-visible');
@@ -302,6 +349,92 @@ describe('Agent Bridge execution routes', () => {
       payload: { sessionId: 'session-1', limit: 10 },
     });
     expect(operatorTokenOnRuntimeRoute.statusCode).toBe(401);
+
+    await app.close();
+  });
+
+  it('lists bounded workspace-scoped history with an opaque reusable cursor and safe projection', async () => {
+    const executionStore = new FakeExecutionStore();
+    const app = buildApp({
+      authProvider,
+      agentBridgeControlStore: controlStore,
+      agentBridgeExecutionStore: executionStore,
+    });
+
+    const firstPage = await app.inject({
+      method: 'GET',
+      url: '/v1/products/agent-bridge/installations/installation-1/commands?limit=1',
+      headers: { authorization: 'Bearer operator-token' },
+    });
+    expect(firstPage.statusCode).toBe(200);
+    expect(firstPage.headers['cache-control']).toBe('no-store');
+    expect(executionStore.lastListInput).toEqual({
+      tenantId: 'workspace-a',
+      installationId: 'installation-1',
+      limit: 1,
+    });
+    const body = firstPage.json();
+    expect(body.version).toBe('kcc.agent-bridge-command-history.v1');
+    expect(body.installationId).toBe('installation-1');
+    expect(body.commands).toEqual([
+      {
+        commandId: 'history-command-2',
+        installationId: 'installation-1',
+        toolId: 'woocommerce.store.orders.list',
+        state: 'completed',
+        issuedAt: '2026-10-20T07:00:00.000Z',
+        expiresAt: '2026-10-20T07:05:00.000Z',
+        deliveryAttempt: 1,
+        acknowledgement: {
+          version: 'kab.command-ack.v1',
+          commandId: 'history-command-2',
+          deliveryAttempt: 1,
+          status: 'executed',
+          completedAt: '2026-10-20T07:00:01.000Z',
+          reason: 'Bearer [redacted] token=[redacted]',
+          output: {
+            accessToken: '[redacted]',
+            value: 42,
+          },
+        },
+      },
+    ]);
+    expect(typeof body.nextCursor).toBe('string');
+    expect(firstPage.body).not.toContain('history-correlation-secret');
+    expect(firstPage.body).not.toContain('history-runtime-session-secret');
+    expect(firstPage.body).not.toContain('history-bearer-secret');
+    expect(firstPage.body).not.toContain('history-token-secret');
+    expect(firstPage.body).not.toContain('history-output-secret');
+
+    const nextPage = await app.inject({
+      method: 'GET',
+      url: `/v1/products/agent-bridge/installations/installation-1/commands?limit=1&cursor=${encodeURIComponent(body.nextCursor)}`,
+      headers: { authorization: 'Bearer operator-token' },
+    });
+    expect(nextPage.statusCode).toBe(200);
+    expect(executionStore.lastListInput).toEqual({
+      tenantId: 'workspace-a',
+      installationId: 'installation-1',
+      limit: 1,
+      before: {
+        createdAt: '2026-10-20T07:00:00.000Z',
+        commandId: 'history-command-2',
+      },
+    });
+
+    const invalidCursor = await app.inject({
+      method: 'GET',
+      url: '/v1/products/agent-bridge/installations/installation-1/commands?cursor=not-a-valid-cursor',
+      headers: { authorization: 'Bearer operator-token' },
+    });
+    expect(invalidCursor.statusCode).toBe(400);
+
+    const excessiveLimit = await app.inject({
+      method: 'GET',
+      url: '/v1/products/agent-bridge/installations/installation-1/commands?limit=51',
+      headers: { authorization: 'Bearer operator-token' },
+    });
+    expect(excessiveLimit.statusCode).toBe(400);
 
     await app.close();
   });
