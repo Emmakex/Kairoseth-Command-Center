@@ -120,6 +120,32 @@ jobs:
             --retry 15 --retry-delay 2 --retry-connrefused --max-time 60 -fsS \
             http://work-manager-edge/es/login >/dev/null
 
+          runtime_code="$(docker run --rm --network kairoseth-public-edge curlimages/curl:8.16.0 \
+            -sS -o /dev/null -w '%{http_code}' -X POST \
+            -H 'content-type: application/json' --data '{}' \
+            http://work-manager-edge/api/products/agent-bridge/commands/pull)"
+          [[ "$runtime_code" == "401" ]]
+
+          session_code="$(docker run --rm --network kairoseth-public-edge curlimages/curl:8.16.0 \
+            -sS -o /dev/null -w '%{http_code}' \
+            http://work-manager-edge/v1/session)"
+          [[ "$session_code" == "401" ]]
+
+          operator_code="$(docker run --rm --network kairoseth-public-edge curlimages/curl:8.16.0 \
+            -sS -o /dev/null -w '%{http_code}' \
+            http://work-manager-edge/v1/products/agent-bridge/runtime-observability)"
+          [[ "$operator_code" == "401" ]]
+
+          local_login_code="$(docker run --rm --network kairoseth-public-edge curlimages/curl:8.16.0 \
+            -sS -o /dev/null -w '%{http_code}' -X POST \
+            -H 'content-type: application/json' \
+            --data '{"email":"live-acceptance@kcc.local","password":"live-acceptance-'"${GITHUB_RUN_ID}"'-valid"}' \
+            http://work-manager-edge/v1/auth/local/login)"
+          if [[ "$local_login_code" == "200" ]]; then
+            echo "local auth endpoint must not be exposed by the public live edge" >&2
+            exit 1
+          fi
+
           for service in mongo api worker web edge; do
             cid="$(compose ps -q "$service")"
             [[ -n "$cid" ]]
