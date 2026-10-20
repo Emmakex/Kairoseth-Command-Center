@@ -54,7 +54,7 @@ async function operatorRequest(path, init = {}) {
       body = text;
     }
   }
-  return { response, body };
+  return { response, body, text };
 }
 
 async function waitFor(check, message, timeoutMs = 45_000) {
@@ -166,7 +166,7 @@ async function waitForCompleted(commandId) {
       `/v1/products/agent-bridge/commands/${encodeURIComponent(commandId)}`,
     );
     return result.response.ok && result.body?.command?.state === 'completed'
-      ? result.body.command
+      ? result
       : false;
   }, `Agent Bridge runtime did not complete command ${commandId}.`);
 }
@@ -220,11 +220,12 @@ try {
   const readCommandId = await executeThroughWeb(binding.installationId, readToolId, {
     perPage: 1,
   });
-  const completedRead = await waitForCompleted(readCommandId);
+  const completedReadResult = await waitForCompleted(readCommandId);
+  const completedRead = completedReadResult.body.command;
   assert.equal(completedRead.acknowledgement?.status, 'executed');
   assert.match(JSON.stringify(completedRead.acknowledgement?.output), /"id":42/);
-  const runtimeSessionId = completedRead.acknowledgement?.sessionId;
-  assert.ok(runtimeSessionId);
+  assert.equal(completedReadResult.text.includes('sessionId'), false);
+  assert.equal(completedReadResult.text.includes(secretMarker), false);
   console.log('CONSOLE_STAGE=read:ok');
 
   console.log('CONSOLE_STAGE=write:start');
@@ -232,19 +233,13 @@ try {
     orderId: 42,
     status: 'completed',
   });
-  const completedWrite = await waitForCompleted(writeCommandId);
+  const completedWriteResult = await waitForCompleted(writeCommandId);
+  const completedWrite = completedWriteResult.body.command;
   assert.equal(completedWrite.acknowledgement?.status, 'executed');
   assert.match(JSON.stringify(completedWrite.acknowledgement?.output), /"status":"completed"/);
-
-  const writeDocumentEvidence = await operatorRequest(
-    `/v1/products/agent-bridge/commands/${encodeURIComponent(writeCommandId)}`,
-  );
-  assert.equal(writeDocumentEvidence.response.status, 200);
-  assert.equal(
-    Object.prototype.hasOwnProperty.call(writeDocumentEvidence.body?.command ?? {}, 'approvalToken'),
-    false,
-    'Operator command projection exposed an approval token.',
-  );
+  assert.equal(completedWriteResult.text.includes('sessionId'), false);
+  assert.equal(completedWriteResult.text.includes(secretMarker), false);
+  assert.equal(completedWriteResult.text.includes('approvalToken'), false);
   console.log('CONSOLE_STAGE=write:ok');
 
   const pageResponse = await globalThis.fetch(
@@ -258,7 +253,7 @@ try {
   assert.match(page, /Agent Bridge/);
   assert.match(page, /Completado|Ejecutado/);
   assert.equal(page.includes(secretMarker), false, 'Console rendered a secret-looking runtime value.');
-  assert.equal(page.includes(runtimeSessionId), false, 'Console rendered the runtime session ID.');
+  assert.equal(page.includes('sessionId'), false, 'Console rendered runtime session material.');
   assert.equal(page.includes('approvalToken'), false, 'Console rendered approval-token material.');
   assert.equal(page.includes('actionFingerprint'), false, 'Console rendered action-fingerprint material.');
   console.log('CONSOLE_STAGE=projection:ok');
@@ -283,8 +278,10 @@ try {
         completedRead.acknowledgement?.status,
         completedWrite.acknowledgement?.status,
       ],
+      operatorReadExposedSession: completedReadResult.text.includes('sessionId'),
+      operatorWriteExposedSession: completedWriteResult.text.includes('sessionId'),
       renderedSecret: page.includes(secretMarker),
-      renderedRuntimeSession: page.includes(runtimeSessionId),
+      renderedRuntimeSession: page.includes('sessionId'),
     }),
   );
 } finally {
