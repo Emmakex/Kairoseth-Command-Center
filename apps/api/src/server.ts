@@ -11,6 +11,7 @@ import { MongoAgentBridgeApprovalService } from './agent-bridge-approval-store';
 import { MongoAgentBridgeAuditStore } from './agent-bridge-audit-store';
 import { MongoAgentBridgeControlStore } from './agent-bridge-control-store';
 import { MongoAgentBridgeExecutionStore } from './agent-bridge-execution-store';
+import { MongoAgentBridgeToolInventoryStore } from './agent-bridge-tool-inventory-store';
 import { buildApp } from './application';
 import { MongoDecisionLifecycleStore } from './decision-lifecycle-store';
 import { MongoGitHubConnectionStore } from './github-connection-store';
@@ -35,6 +36,7 @@ const taskRecurrenceStore = new MongoTaskRecurrenceStore(mongo, db);
 const taskReminderStore = new MongoTaskReminderStore(mongo, db);
 const agentBridgeA2AStore = new MongoAgentBridgeA2AStore(db);
 const agentBridgeControlStore = new MongoAgentBridgeControlStore(db);
+const agentBridgeToolInventoryStore = new MongoAgentBridgeToolInventoryStore(db);
 const agentBridgeAuditStore = new MongoAgentBridgeAuditStore(db);
 const integrationSignalStore = new MongoIntegrationSignalStore(db);
 const integrationSyncJobStore = new MongoIntegrationSyncJobStore(db);
@@ -128,6 +130,7 @@ const app = buildApp({
   agentBridgeControlStore,
   agentBridgeExecutionStore,
   agentBridgeAuditStore,
+  agentBridgeToolInventoryStore,
   ...(agentBridgeApprovalService ? { agentBridgeApprovalService } : {}),
   integrationSignalStore,
   integrationSyncJobStore,

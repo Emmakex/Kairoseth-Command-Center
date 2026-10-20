@@ -16,6 +16,8 @@ import { registerAgentBridgeExecutionRoutes } from './agent-bridge-execution';
 import type { AgentBridgeExecutionStore } from './agent-bridge-execution-store';
 import { registerAgentBridgeRuntimeObservabilityRoutes } from './agent-bridge-runtime-observability';
 import { registerAgentBridgeSecurityRoutes } from './agent-bridge-security';
+import { registerAgentBridgeToolInventoryRoutes } from './agent-bridge-tool-inventory';
+import type { AgentBridgeToolInventoryStore } from './agent-bridge-tool-inventory-store';
 import { buildApp as buildBaseApp } from './app';
 import type { ReadinessCheck } from './app';
 import { registerAutomationRulePolicyRoutes } from './automation-rule-policies';
@@ -66,6 +68,7 @@ type ApplicationOptions = {
   agentBridgeExecutionStore?: AgentBridgeExecutionStore;
   agentBridgeApprovalService?: AgentBridgeApprovalService;
   agentBridgeAuditStore?: AgentBridgeAuditStore;
+  agentBridgeToolInventoryStore?: AgentBridgeToolInventoryStore;
   githubRepositoryStore?: GitHubRepositoryStore;
   githubConnectionStore?: GitHubConnectionStore;
   githubProviderClient?: GitHubProviderClient;
@@ -139,6 +142,12 @@ export function buildApp(options: ApplicationOptions = {}) {
     ...(options.authProvider ? { authProvider: options.authProvider } : {}),
     ...(options.agentBridgeControlStore
       ? { controlStore: options.agentBridgeControlStore }
+      : {}),
+  });
+  registerAgentBridgeToolInventoryRoutes(app, {
+    ...(options.authProvider ? { authProvider: options.authProvider } : {}),
+    ...(options.agentBridgeToolInventoryStore
+      ? { toolInventoryStore: options.agentBridgeToolInventoryStore }
       : {}),
   });
 
@@ -257,8 +266,7 @@ export function buildApp(options: ApplicationOptions = {}) {
   registerGitHubConnectionRoutes(app, {
     ...(options.authProvider ? { authProvider: options.authProvider } : {}),
     ...(options.githubConnectionStore
-      ? { githubConnectionStore: options.githubConnectionStore }
-      : {}),
+      ? { githubConnectionStore: options.githubConnectionStore } : {}),
     ...(options.githubProviderClient
       ? { githubProviderClient: options.githubProviderClient } : {}),
   });
@@ -266,8 +274,7 @@ export function buildApp(options: ApplicationOptions = {}) {
   registerGitHubWebhookRoutes(app, {
     ...(options.authProvider ? { authProvider: options.authProvider } : {}),
     ...(options.githubConnectionStore
-      ? { githubConnectionStore: options.githubConnectionStore }
-      : {}),
+      ? { githubConnectionStore: options.githubConnectionStore } : {}),
     ...(options.githubWebhookStore ? { githubWebhookStore: options.githubWebhookStore } : {}),
     ...(options.integrationSyncJobStore
       ? { integrationSyncJobStore: options.integrationSyncJobStore }
