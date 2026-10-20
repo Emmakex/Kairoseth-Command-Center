@@ -94,7 +94,7 @@ The phase established Platform as the authority for tenant scope, runtime identi
 
 ## Phase 7 — Governed Agent Bridge execution and security
 
-Delivered slices:
+Delivered:
 
 - READ command delivery through the shared execution store and real `ProductionRuntime` acceptance;
 - server-side signed approval flow for WRITE/CRITICAL tools using Ed25519 approval material;
@@ -103,30 +103,28 @@ Delivered slices:
 - safe workspace/installation-scoped tool inventory exposing only executable identity, copy, risk, availability and reduced connector identity;
 - governed ES/EN execution console merged in PR #75 as `8101a76d126026bc2b4a1c0eb46810cf1e4f47b5`;
 - server-side derivation of READ versus signed mutation execution from authoritative inventory; the browser cannot choose risk, approval tokens or execution endpoints;
-- safe operator command projection that removes runtime session identity and redacts secret-bearing ACK reason/output before it leaves the API;
+- safe operator command projection that removes runtime session and correlation identity and redacts secret-bearing ACK reason/output before it leaves the API;
 - second defensive sanitization layer in the web surface;
-- real acceptance covering inventory → queue → `ProductionRuntime` → ACK for both READ and signed mutation execution.
+- real acceptance covering inventory → queue → `ProductionRuntime` → ACK for both READ and signed mutation execution;
+- bounded tenant + installation scoped execution-history persistence/query semantics and safe operator API in PR #78, merged as `1db7699f77bbda85b56008d82c36373dd03a72cd`;
+- ES/EN paginated execution-history UI in PR #79, merged as `39871f5ef662b8b5b44d14ac3a3363a48eabd4f3`, with installation selection, 10 executions per page and sanitized detail links;
+- acceptance proving history responses and rendered HTML do not expose runtime session IDs, correlation IDs, approval material, action fingerprints, key material, credentials or secret-bearing connector output.
 
-Infrastructure maintenance after the console merge:
+Infrastructure maintenance during the phase:
 
-- PR #76 preserved `mongo:8.0` as the standalone/product default while allowing the GitHub-hosted standalone smoke to use the compatible `mongo:7.0.43` image;
-- merged `main` `f3a3726ed018b0425aefd06bfd72d4c9a1e75bfb` completed the full 18-workflow post-merge regression with no failed, queued or in-progress workflow remaining.
+- PR #76 preserved `mongo:8.0` as the standalone/product default while allowing the GitHub-hosted standalone smoke to use the compatible `mongo:7.0.43` image.
 
-### Next Phase 7 microphase
+Final runtime boundary: exact merged `main` `39871f5ef662b8b5b44d14ac3a3363a48eabd4f3` completed the full 18-workflow post-merge regression with no failed, queued or in-progress workflow remaining.
 
-**Safe paginated execution history per workspace/installation.**
+See [`48-phase-7-release-boundary.md`](48-phase-7-release-boundary.md) for objective-to-evidence mapping, security invariants, the final 18-workflow boundary and the explicitly deferred command-lifecycle backlog.
 
-Scope:
+Retry/cancel command semantics remain deliberately deferred. They require a separately promoted lifecycle contract covering authorization, idempotency, races and acceptance; they are not implied by the execution-history completion.
 
-- add bounded `listCommands` persistence/query semantics scoped by authoritative tenant + installation;
-- expose an operator API that returns only the existing safe command projection;
-- add an execution-history panel to the Agent Bridge console;
-- use bounded cursor/limit pagination rather than unbounded command reads;
-- acceptance must prove that runtime session IDs, correlation IDs, approval material, action fingerprints, key material, credentials and secret-bearing connector output cannot leak through the history surface.
+**Status: complete. Technical release boundary CLOSED / CERRADA.**
 
-Retry/cancel semantics are intentionally **not** part of this microphase unless a separate contract promotes them later.
+## Next phase / Siguiente fase
 
-**Status: ACTIVE / ACTIVA.**
+No Phase 8 scope is declared by the Phase 7 closure. The next product phase must be selected and documented explicitly, with its own goals, security boundary and acceptance criteria. Deferred backlog items do not automatically become the next phase.
 
 ## Commercial publication boundary
 
@@ -149,4 +147,6 @@ Public pricing remains deferred until the Cloud / Private Cloud / Self-Hosted re
 - Every security-sensitive lifecycle must have negative tests and an auditable path.
 - Agent Bridge browser surfaces never become tenant, runtime-risk or approval authorities.
 - Runtime/session/key/approval secrets must be removed or redacted before operator API responses, with UI sanitization as defense in depth rather than the primary boundary.
-- Deferred backlog is not release-blocking unless a future roadmap explicitly promotes it into scope.
+- Execution history remains tenant + installation scoped, bounded and cursor-based.
+- Closed phases reopen only for regressions in delivered contracts.
+- Deferred backlog is not release-blocking and does not become active scope unless a future roadmap explicitly promotes it.

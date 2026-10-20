@@ -57,6 +57,7 @@ Esta carpeta es la fuente de verdad para las decisiones de producto, arquitectur
 50. [`45-project-deadline-alerts.md`](45-project-deadline-alerts.md) — deterministic overdue-project alert creation, auto-resolution, reopening and dismissal-safe lifecycle.
 51. [`46-milestone-deadline-alerts.md`](46-milestone-deadline-alerts.md) — deterministic overdue-milestone alert creation, auto-resolution, reopening and dismissal-safe lifecycle.
 52. [`47-phase-5-release-boundary.md`](47-phase-5-release-boundary.md) — Phase 5 objective evidence, final 15-workflow technical boundary and explicitly deferred backlog.
+53. [`48-phase-7-release-boundary.md`](48-phase-7-release-boundary.md) — Phase 7 governed Agent Bridge execution/security evidence, final 18-workflow boundary and explicitly deferred retry/cancel lifecycle backlog.
 
 ## Living documents / Documentos vivos
 
