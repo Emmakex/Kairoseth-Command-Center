@@ -1,0 +1,3 @@
+work-manager.kairoseth.com {
+  reverse_proxy work-manager-edge:80
+}
