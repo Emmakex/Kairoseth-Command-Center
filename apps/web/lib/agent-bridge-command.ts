@@ -39,6 +39,9 @@ const ACK_STATUSES = new Set([
   'indeterminate',
 ]);
 const SECRET_KEY = /(?:token|secret|password|credential|authorization|cookie|private[_-]?key|api[_-]?key|access[_-]?key)/i;
+const SECRET_ASSIGNMENT = /\b(token|secret|password|credential|authorization|cookie|private[_-]?key|api[_-]?key|access[_-]?key)\b\s*[:=]\s*([^\s,;]+)/gi;
+const BEARER = /\bBearer\s+[A-Za-z0-9._~+/=-]+/gi;
+const PRIVATE_KEY = /-----BEGIN(?: [A-Z0-9]+)? PRIVATE KEY-----[\s\S]*?-----END(?: [A-Z0-9]+)? PRIVATE KEY-----/gi;
 const MAX_OUTPUT_DEPTH = 6;
 const MAX_OUTPUT_ITEMS = 50;
 const MAX_OUTPUT_TEXT = 2048;
@@ -66,12 +69,18 @@ function timestamp(value: unknown): string | null {
   return parsed && Number.isFinite(Date.parse(parsed)) ? parsed : null;
 }
 
+export function sanitizeAgentBridgeText(value: string, max = MAX_OUTPUT_TEXT): string {
+  const redacted = value
+    .replace(PRIVATE_KEY, '[redacted-private-key]')
+    .replace(BEARER, 'Bearer [redacted]')
+    .replace(SECRET_ASSIGNMENT, '$1=[redacted]');
+  return redacted.length > max ? `${redacted.slice(0, max)}…` : redacted;
+}
+
 export function sanitizeAgentBridgeOutput(value: unknown, depth = 0): unknown {
   if (depth > MAX_OUTPUT_DEPTH) return '[truncated]';
   if (value === null || typeof value === 'boolean' || typeof value === 'number') return value;
-  if (typeof value === 'string') {
-    return value.length > MAX_OUTPUT_TEXT ? `${value.slice(0, MAX_OUTPUT_TEXT)}…` : value;
-  }
+  if (typeof value === 'string') return sanitizeAgentBridgeText(value);
   if (Array.isArray(value)) {
     const projected = value
       .slice(0, MAX_OUTPUT_ITEMS)
@@ -123,19 +132,19 @@ export function parseAgentBridgeCommandResponse(value: unknown): AgentBridgeComm
     const ack = record(command.acknowledgement);
     const status = ack?.status;
     const completedAt = timestamp(ack?.completedAt);
-    const reason = ack?.reason === undefined ? undefined : safeText(ack.reason, 4096);
+    const rawReason = ack?.reason === undefined ? undefined : safeText(ack.reason, 4096);
     if (
       !ack ||
       !ACK_STATUSES.has(String(status)) ||
       !completedAt ||
-      (ack.reason !== undefined && !reason)
+      (ack.reason !== undefined && !rawReason)
     ) {
       return null;
     }
     acknowledgement = {
       status: status as NonNullable<AgentBridgeOperatorCommand['acknowledgement']>['status'],
       completedAt,
-      ...(reason ? { reason } : {}),
+      ...(rawReason ? { reason: sanitizeAgentBridgeText(rawReason, 4096) } : {}),
       ...(Object.prototype.hasOwnProperty.call(ack, 'output')
         ? { output: sanitizeAgentBridgeOutput(ack.output) }
         : {}),
