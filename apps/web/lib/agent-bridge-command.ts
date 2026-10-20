@@ -127,8 +127,11 @@ export function parseAgentBridgeCommandResponse(value: unknown): AgentBridgeComm
     return null;
   }
 
+  const hasAcknowledgement = command.acknowledgement !== undefined;
+  if ((state === 'completed') !== hasAcknowledgement) return null;
+
   let acknowledgement: AgentBridgeOperatorCommand['acknowledgement'];
-  if (command.acknowledgement !== undefined) {
+  if (hasAcknowledgement) {
     const ack = record(command.acknowledgement);
     const status = ack?.status;
     const completedAt = timestamp(ack?.completedAt);
