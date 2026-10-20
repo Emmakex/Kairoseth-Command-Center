@@ -1,0 +1,161 @@
+name: work-manager-live
+
+services:
+  mongo:
+    image: ${KCC_LIVE_MONGO_IMAGE:-mongo:8.0}
+    restart: unless-stopped
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    volumes:
+      - work-manager-live-mongo-data:/data/db
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mongosh --quiet --eval \"try { print(rs.status().ok) } catch (e) { print(rs.initiate({_id:'rs0',members:[{_id:0,host:'mongo:27017'}]}).ok) }\" | grep 1",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - data
+
+  api:
+    build:
+      context: ../..
+      dockerfile: deployment/docker/api.Dockerfile
+    image: work-manager/api:${KCC_DEPLOYMENT_REVISION:-local}
+    restart: unless-stopped
+    labels:
+      com.kairoseth.work-manager.live: "true"
+      com.kairoseth.work-manager.revision: "${KCC_DEPLOYMENT_REVISION:-local}"
+    environment:
+      NODE_ENV: production
+      KCC_API_HOST: 0.0.0.0
+      KCC_API_PORT: 4000
+      MONGODB_URI: mongodb://mongo:27017/kairoseth_command_center?replicaSet=rs0&directConnection=true
+      KCC_AUTH_MODE: local
+      KCC_LOCAL_ADMIN_EMAIL: ${KCC_LOCAL_ADMIN_EMAIL:?KCC_LOCAL_ADMIN_EMAIL is required}
+      KCC_LOCAL_ADMIN_PASSWORD: ${KCC_LOCAL_ADMIN_PASSWORD:?KCC_LOCAL_ADMIN_PASSWORD is required}
+      KCC_LOCAL_AUTH_SECRET: ${KCC_LOCAL_AUTH_SECRET:?KCC_LOCAL_AUTH_SECRET is required}
+      KCC_LOCAL_ADMIN_DISPLAY_NAME: ${KCC_LOCAL_ADMIN_DISPLAY_NAME:-Owner}
+      KCC_LOCAL_LOCALE: ${KCC_LOCAL_LOCALE:-es}
+      KCC_LOCAL_TIMEZONE: ${KCC_LOCAL_TIMEZONE:-Europe/Madrid}
+      KCC_LOCAL_USER_ID: ${KCC_LOCAL_USER_ID:-live-owner}
+      KCC_LOCAL_WORKSPACE_ID: ${KCC_LOCAL_WORKSPACE_ID:-work-manager-live}
+      KCC_LOCAL_WORKSPACE_NAME: ${KCC_LOCAL_WORKSPACE_NAME:-Work Manager}
+      KCC_LOCAL_SESSION_TTL_SECONDS: ${KCC_LOCAL_SESSION_TTL_SECONDS:-43200}
+      KCC_INTEGRATION_SECRET_KEY: ${KCC_INTEGRATION_SECRET_KEY:?KCC_INTEGRATION_SECRET_KEY is required for live dogfooding}
+      KCC_GITHUB_API_BASE_URL: ${KCC_GITHUB_API_BASE_URL:-https://api.github.com}
+    depends_on:
+      mongo:
+        condition: service_healthy
+    expose:
+      - "4000"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:4000/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - data
+      - app
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: deployment/docker/worker.Dockerfile
+    image: work-manager/worker:${KCC_DEPLOYMENT_REVISION:-local}
+    restart: unless-stopped
+    labels:
+      com.kairoseth.work-manager.live: "true"
+      com.kairoseth.work-manager.revision: "${KCC_DEPLOYMENT_REVISION:-local}"
+    environment:
+      NODE_ENV: production
+      KCC_WORKER_POLL_MS: ${KCC_WORKER_POLL_MS:-5000}
+      MONGODB_URI: mongodb://mongo:27017/kairoseth_command_center?replicaSet=rs0&directConnection=true
+      KCC_INTEGRATION_SECRET_KEY: ${KCC_INTEGRATION_SECRET_KEY:?KCC_INTEGRATION_SECRET_KEY is required for live dogfooding}
+      KCC_GITHUB_API_BASE_URL: ${KCC_GITHUB_API_BASE_URL:-https://api.github.com}
+    depends_on:
+      mongo:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - data
+      - app
+
+  web:
+    build:
+      context: ../..
+      dockerfile: deployment/docker/web.Dockerfile
+    image: work-manager/web:${KCC_DEPLOYMENT_REVISION:-local}
+    restart: unless-stopped
+    labels:
+      com.kairoseth.work-manager.live: "true"
+      com.kairoseth.work-manager.revision: "${KCC_DEPLOYMENT_REVISION:-local}"
+    environment:
+      NODE_ENV: production
+      KCC_API_INTERNAL_URL: http://api:4000
+    depends_on:
+      api:
+        condition: service_healthy
+    expose:
+      - "3000"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:3000/es/login').then(r=>{if(!(r.ok||r.status===307||r.status===308))process.exit(1)}).catch(()=>process.exit(1))\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - app
+
+  edge:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_healthy
+    expose:
+      - "80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - work-manager-live-caddy-data:/data
+      - work-manager-live-caddy-config:/config
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+    networks:
+      app: {}
+      public-edge:
+        aliases:
+          - work-manager-edge
+
+networks:
+  data:
+    internal: true
+  app:
+  public-edge:
+    name: kairoseth-public-edge
+    external: true
+
+volumes:
+  work-manager-live-mongo-data:
+    name: work-manager-live-mongo-data
+  work-manager-live-caddy-data:
+    name: work-manager-live-caddy-data
+  work-manager-live-caddy-config:
+    name: work-manager-live-caddy-config
