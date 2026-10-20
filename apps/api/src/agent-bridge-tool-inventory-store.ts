@@ -1,7 +1,12 @@
 import type { Collection, Db } from 'mongodb';
+import type {
+  AgentBridgeRuntimeSnapshot,
+  AgentBridgeToolAvailability,
+} from './agent-bridge-control-store';
 
-export type AgentBridgeToolRisk = 'READ' | 'WRITE' | 'CRITICAL';
-export type AgentBridgeToolAvailability = 'available' | 'degraded' | 'blocked';
+export type AgentBridgeToolRisk =
+  AgentBridgeRuntimeSnapshot['connectors'][number]['tools'][number]['risk'];
+export type { AgentBridgeToolAvailability };
 export type AgentBridgeToolBlockedReason = 'circuit_open' | 'credential_rotation';
 
 type LocalizedToolCopy = {
@@ -48,33 +53,11 @@ type InstallationDocument = {
 type RuntimeSnapshotDocument = {
   tenantId: string;
   installationId: string;
+  bridgeInstanceId: string;
   snapshotId: string;
   generatedAt: string;
   receivedAt: string;
-  snapshot: {
-    connectors: Array<{
-      connectorId: string;
-      connectorInstanceId: string;
-      name: string;
-      version: string;
-      tools: Array<{
-        runtimeToolId: string;
-        name: string;
-        description: string;
-        localizations?: Record<string, unknown>;
-        risk: AgentBridgeToolRisk;
-      }>;
-    }>;
-    health: Array<{
-      connectorId: string;
-      connectorInstanceId: string;
-      tools: Array<{
-        runtimeToolId: string;
-        availability: AgentBridgeToolAvailability;
-        blockedReason?: AgentBridgeToolBlockedReason;
-      }>;
-    }>;
-  };
+  snapshot: AgentBridgeRuntimeSnapshot;
 };
 
 function safeLocalizations(
