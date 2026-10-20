@@ -70,10 +70,14 @@ class FakeExecutionStore implements AgentBridgeExecutionStore {
   async getCommand(): Promise<AgentBridgeQueuedCommand | null> {
     return null;
   }
+
+  async listCommands() {
+    return { commands: [] };
+  }
 }
 
 describe('Agent Bridge approved mutation route', () => {
-  it('queues an explicit approved WRITE/CRITICAL command without exposing a token', async () => {
+  it('queues an explicit approved WRITE/CRITICAL command without exposing a token or correlation', async () => {
     const executionStore = new FakeExecutionStore();
     const app = buildApp({ authProvider, agentBridgeExecutionStore: executionStore });
 
@@ -106,6 +110,7 @@ describe('Agent Bridge approved mutation route', () => {
     expect(body.approval).toBe('signed');
     expect(body.command.toolId).toBe('woocommerce.store.orders.update-status');
     expect(Object.prototype.hasOwnProperty.call(body.command, 'approvalToken')).toBe(false);
+    expect(response.body).not.toContain('correlation-approved-1');
 
     await app.close();
   });
