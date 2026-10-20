@@ -6,6 +6,13 @@ function safeLocale(value: FormDataEntryValue | null): 'es' | 'en' {
   return value === 'en' ? 'en' : 'es';
 }
 
+function relativeRedirect(location: string): NextResponse {
+  return new NextResponse(null, {
+    status: 303,
+    headers: { location },
+  });
+}
+
 export async function POST(request: NextRequest) {
   const form = await request.formData();
   const locale = safeLocale(form.get('locale'));
@@ -13,7 +20,7 @@ export async function POST(request: NextRequest) {
   const password = typeof form.get('password') === 'string' ? String(form.get('password')) : '';
 
   if (!email || !password) {
-    return NextResponse.redirect(new URL(`/${locale}/login?error=invalid`, request.url), 303);
+    return relativeRedirect(`/${locale}/login?error=invalid`);
   }
 
   try {
@@ -26,15 +33,15 @@ export async function POST(request: NextRequest) {
 
     if (!response.ok) {
       const error = response.status === 401 ? 'credentials' : 'unavailable';
-      return NextResponse.redirect(new URL(`/${locale}/login?error=${error}`, request.url), 303);
+      return relativeRedirect(`/${locale}/login?error=${error}`);
     }
 
     const body = (await response.json()) as { accessToken?: string; expiresAt?: string };
     if (!body.accessToken || !body.expiresAt) {
-      return NextResponse.redirect(new URL(`/${locale}/login?error=unavailable`, request.url), 303);
+      return relativeRedirect(`/${locale}/login?error=unavailable`);
     }
 
-    const result = NextResponse.redirect(new URL(`/${locale}`, request.url), 303);
+    const result = relativeRedirect(`/${locale}`);
     result.cookies.set(SESSION_COOKIE, body.accessToken, {
       httpOnly: true,
       sameSite: 'lax',
@@ -44,6 +51,6 @@ export async function POST(request: NextRequest) {
     });
     return result;
   } catch {
-    return NextResponse.redirect(new URL(`/${locale}/login?error=unavailable`, request.url), 303);
+    return relativeRedirect(`/${locale}/login?error=unavailable`);
   }
 }
