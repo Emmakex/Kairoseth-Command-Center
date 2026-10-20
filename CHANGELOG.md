@@ -43,6 +43,13 @@ This project follows semantic versioning once versioned releases begin.
 - One-time task reminders, fixed-day task recurrence and exactly-once recurrence materialization.
 - Deterministic overdue task, project and milestone alert lifecycles with exact-scope deduplication, auto-resolution, reopening and human-authoritative dismissal.
 - Formal Phase 5 technical release boundary with a 15-workflow merged-main regression gate and explicit future backlog.
+- Phase 6 Agent Bridge foundation/control plane with durable A2A state, authenticated runtime enrollment/sessions, runtime snapshots, workspace-scoped observability and safe operator control projections.
+- Phase 7 governed Agent Bridge execution with real READ delivery, signed WRITE/CRITICAL approvals, mutation security, runtime audit coverage and chained approval-key rotation.
+- Safe workspace/installation-scoped Agent Bridge tool inventory and governed ES/EN operator execution console.
+- Safe operator command projection with runtime/correlation identity removal and secret-bearing acknowledgement sanitization.
+- Bounded tenant + installation scoped execution history API and ES/EN paginated history UI, delivered in PRs #78 and #79.
+- Formal Phase 7 technical release boundary anchored at merged `main` `39871f5ef662b8b5b44d14ac3a3363a48eabd4f3` with the complete 18-workflow post-merge regression green.
+- Kairoseth Software catalog publication for **Gestor de Trabajo** (ES) / **Work Manager** (EN) under canonical route `/products/work-manager`, with production deployment confirmed.
 
 ### Security
 - Upgraded Vitest to a patched release after CI detected critical `tinypool` advisories.
@@ -50,6 +57,10 @@ This project follows semantic versioning once versioned releases begin.
 - Role selection in the UI is explicitly non-authoritative; permissions are resolved server-side.
 - Provider credentials remain encrypted and outside durable automation/reminder/recurrence/deadline payloads.
 - Core automation and prioritization correctness remains deterministic and AI-independent.
+- Agent Bridge tenant, runtime identity, risk classification and approval policy remain server-authoritative.
+- WRITE/CRITICAL execution requires signed server-side approval; approval tokens, key material, runtime sessions and connector credentials are not operator-renderable.
+- Command and history projections exclude runtime session/correlation identity and sanitize secret-bearing acknowledgement output before leaving the API.
+- Execution-history reads are bounded and scoped by authoritative tenant + installation, with web-layer cross-installation rejection as defense in depth.
 
 ### Status
-Phases 0–5 are technically complete. Phase 5 runtime closure is anchored at merged `main` commit `d7eb0769bfed765727a851635eca41006ee412c2`, validated with the complete 15-workflow regression set after Slice 22. The next product-level work is release/commercial packaging and Kairoseth Software catalog publication as **Gestor de Trabajo** (ES) / **Work Manager** (EN).
+Phases 0–7 are technically complete. Phase 7 runtime closure is anchored at merged `main` commit `39871f5ef662b8b5b44d14ac3a3363a48eabd4f3`, validated with the complete 18-workflow post-merge regression set after PR #79. Commercial publication as **Gestor de Trabajo** (ES) / **Work Manager** (EN) is complete. No Phase 8 scope is declared; future work, including Agent Bridge retry/cancel, must be promoted explicitly with its own lifecycle, security and acceptance contract.
