@@ -2,6 +2,10 @@ import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { Card } from '@kcc/ui';
 import { apiBaseUrl, getSession, readSessionToken } from '../../../../lib/api';
+import {
+  parseAgentBridgeApprovalRotationResponse,
+  type AgentBridgeApprovalRotationStatus,
+} from '../../../../lib/agent-bridge-rotation';
 import { isLocale } from '../../../../lib/i18n';
 
 export const dynamic = 'force-dynamic';
@@ -79,6 +83,29 @@ const copy = {
     tools: 'Herramientas',
     healthy: 'sanos',
     toolAvailable: 'disponibles',
+    rotationTitle: 'Seguridad de aprobaciones',
+    rotationHelp:
+      'Control de la cadena de confianza Ed25519 por espacio de trabajo. La interfaz nunca muestra claves, IDs de clave ni tokens.',
+    rotationUnavailable: 'No se pudo cargar el estado de rotación de claves de aprobación.',
+    generation: 'Generación',
+    rotationPhase: 'Fase',
+    trustedKeys: 'Claves confiables activas',
+    rotateAction: 'Iniciar rotación segura',
+    rotationInProgress: 'La rotación ya está en curso y avanzará cuando los runtimes activos confirmen la nueva generación.',
+    rotationRequiresManage: 'Se requiere permiso de gestión del espacio de trabajo para controlar la rotación.',
+    phaseValues: {
+      stable: 'Estable',
+      overlap: 'Solape seguro',
+      retiring: 'Retirando clave anterior',
+    },
+    rotationResults: {
+      started: 'Rotación iniciada. Los runtimes activos convergerán mediante sincronización firmada.',
+      forbidden: 'No tienes permiso para iniciar la rotación.',
+      conflict: 'La rotación no pudo iniciarse por un conflicto de estado.',
+      unavailable: 'El servicio de aprobación no está disponible.',
+      invalid: 'La solicitud de rotación no era válida.',
+      error: 'No se pudo iniciar la rotación.',
+    },
     connectivity: {
       connected: 'Conectado',
       stale: 'Heartbeat vencido',
@@ -136,6 +163,29 @@ const copy = {
     tools: 'Tools',
     healthy: 'healthy',
     toolAvailable: 'available',
+    rotationTitle: 'Approval security',
+    rotationHelp:
+      'Workspace-scoped Ed25519 trust-chain control. The interface never displays keys, key IDs or tokens.',
+    rotationUnavailable: 'The approval-key rotation status could not be loaded.',
+    generation: 'Generation',
+    rotationPhase: 'Phase',
+    trustedKeys: 'Active trusted keys',
+    rotateAction: 'Start safe rotation',
+    rotationInProgress: 'Rotation is already in progress and advances as active runtimes acknowledge the new generation.',
+    rotationRequiresManage: 'Workspace management permission is required to control key rotation.',
+    phaseValues: {
+      stable: 'Stable',
+      overlap: 'Safe overlap',
+      retiring: 'Retiring previous key',
+    },
+    rotationResults: {
+      started: 'Rotation started. Active runtimes will converge through signed synchronization.',
+      forbidden: 'You do not have permission to start key rotation.',
+      conflict: 'Rotation could not start because the state changed.',
+      unavailable: 'The approval service is unavailable.',
+      invalid: 'The rotation request was invalid.',
+      error: 'Rotation could not be started.',
+    },
     connectivity: {
       connected: 'Connected',
       stale: 'Heartbeat stale',
@@ -191,6 +241,21 @@ async function getRuntimeObservability(token: string): Promise<RuntimeObservabil
   }
 }
 
+async function getApprovalRotation(token: string): Promise<AgentBridgeApprovalRotationStatus | null> {
+  try {
+    const response = await fetch(`${apiBaseUrl()}/v1/products/agent-bridge/approval-keys/rotation`, {
+      headers: { authorization: `Bearer ${token}` },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!response.ok) return null;
+    const parsed = parseAgentBridgeApprovalRotationResponse(await response.json());
+    return parsed?.status ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function formatTimestamp(value: string | null, locale: 'es' | 'en', timeZone: string): string | null {
   if (!value) return null;
   const date = new Date(value);
@@ -209,8 +274,10 @@ function formatTimestamp(value: string | null, locale: 'es' | 'en', timeZone: st
 
 export default async function AgentBridgeObservabilityPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string }>;
+  searchParams: Promise<{ rotation?: string | string[] }>;
 }) {
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
@@ -224,14 +291,22 @@ export default async function AgentBridgeObservabilityPage({
     redirect(`/${locale}`);
   }
 
-  const [summary, runtimeSummary] = await Promise.all([
+  const canManageAgentBridge = session.capabilities.includes('workspace.manage');
+  const [summary, runtimeSummary, rotationStatus] = await Promise.all([
     getObservability(token),
     getRuntimeObservability(token),
+    canManageAgentBridge ? getApprovalRotation(token) : Promise.resolve(null),
   ]);
+  const query = await searchParams;
   const text = copy[locale];
   const otherLocale = locale === 'es' ? 'en' : 'es';
   const latestActivity = formatTimestamp(summary?.latestUpdatedAt ?? null, locale, session.user.timezone);
   const authRequired = summary?.states.TASK_STATE_AUTH_REQUIRED ?? null;
+  const rotationResult = typeof query.rotation === 'string' ? query.rotation : null;
+  const rotationNotice =
+    rotationResult && rotationResult in text.rotationResults
+      ? text.rotationResults[rotationResult as keyof typeof text.rotationResults]
+      : null;
 
   return (
     <main className="shell dashboard-shell">
@@ -273,6 +348,8 @@ export default async function AgentBridgeObservabilityPage({
 
       {!summary ? <div className="notice">{text.backendUnavailable}</div> : null}
       {!runtimeSummary ? <div className="notice">{text.runtimeUnavailable}</div> : null}
+      {canManageAgentBridge && !rotationStatus ? <div className="notice">{text.rotationUnavailable}</div> : null}
+      {rotationNotice ? <div className="notice">{rotationNotice}</div> : null}
 
       <section className="metric-grid" aria-label={text.subtitle}>
         <Card title={text.totalTasks}>{summary?.totalTasks ?? '—'}</Card>
@@ -289,6 +366,49 @@ export default async function AgentBridgeObservabilityPage({
       </section>
 
       <section className="management-grid">
+        <article className="panel management-panel">
+          <div className="panel-heading management-heading">
+            <div>
+              <h2>{text.rotationTitle}</h2>
+              <p>{text.rotationHelp}</p>
+            </div>
+          </div>
+          {canManageAgentBridge ? (
+            rotationStatus ? (
+              <div className="item-list">
+                <div className="item-row">
+                  <div className="item-copy">
+                    <strong>{text.generation}</strong>
+                    <span>{text.rotationPhase}: {text.phaseValues[rotationStatus.phase]}</span>
+                  </div>
+                  <strong>{rotationStatus.generation}</strong>
+                </div>
+                <div className="item-row">
+                  <div className="item-copy">
+                    <strong>{text.trustedKeys}</strong>
+                    <span>{rotationStatus.phase === 'stable' ? text.phaseValues.stable : text.rotationInProgress}</span>
+                  </div>
+                  <strong>{rotationStatus.trustedKeyIds.length}</strong>
+                </div>
+                <form action="/api/agent-bridge/approval-keys/rotate" method="post">
+                  <input type="hidden" name="locale" value={locale} />
+                  <button
+                    className="primary-button"
+                    type="submit"
+                    disabled={rotationStatus.phase !== 'stable'}
+                  >
+                    {text.rotateAction}
+                  </button>
+                </form>
+              </div>
+            ) : (
+              <p className="empty-state">{text.rotationUnavailable}</p>
+            )
+          ) : (
+            <p className="empty-state">{text.rotationRequiresManage}</p>
+          )}
+        </article>
+
         <article className="panel management-panel">
           <div className="panel-heading management-heading">
             <div>
