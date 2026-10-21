@@ -100,6 +100,17 @@ jobs:
             caddy:2-alpine \
             caddy validate --config /etc/caddy/Caddyfile
 
+      - name: Validate live deployment reload contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          script="deployment/live/deploy-live.sh"
+          bash -n "$script"
+          grep -Fq 'caddy validate --config /etc/caddy/Caddyfile' "$script"
+          grep -Fq 'caddy reload --config /etc/caddy/Caddyfile' "$script"
+          grep -Fq 'Agent Bridge session edge route is stale or misrouted' "$script"
+          grep -Fq 'Agent Bridge runtime edge route is stale or misrouted' "$script"
+
       - name: Build and start isolated live topology
         shell: bash
         run: |

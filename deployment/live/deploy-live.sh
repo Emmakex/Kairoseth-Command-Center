@@ -148,6 +148,14 @@ wait_healthy api
 wait_healthy web
 wait_healthy edge
 
+# The live Caddyfile is bind-mounted. Docker Compose does not recreate a running
+# edge container merely because the mounted file contents changed, so validate
+# and reload explicitly before accepting the deployment.
+compose exec -T edge caddy validate --config /etc/caddy/Caddyfile >/dev/null
+compose exec -T edge caddy reload --config /etc/caddy/Caddyfile
+
+echo "[work-manager-live] internal edge configuration reloaded"
+
 for service in api worker web; do
   cid="$(compose ps -q "$service")"
   deployed_revision="$(docker inspect --format '{{ index .Config.Labels "com.kairoseth.work-manager.revision" }}' "$cid")"
@@ -170,7 +178,24 @@ docker run --rm --network "$PUBLIC_EDGE_NETWORK" curlimages/curl:8.16.0 \
   --retry 20 --retry-delay 2 --retry-connrefused --max-time 90 -fsS \
   "http://work-manager-edge/es/login" >/dev/null
 
-echo "[work-manager-live] internal shared-edge route verified"
+session_code="$(docker run --rm --network "$PUBLIC_EDGE_NETWORK" curlimages/curl:8.16.0 \
+  --silent --show-error --output /dev/null --write-out '%{http_code}' \
+  "http://work-manager-edge/v1/session")"
+if [[ "$session_code" != "401" ]]; then
+  echo "[work-manager-live] Agent Bridge session edge route is stale or misrouted: status=$session_code" >&2
+  exit 1
+fi
+
+runtime_code="$(docker run --rm --network "$PUBLIC_EDGE_NETWORK" curlimages/curl:8.16.0 \
+  --silent --show-error --output /dev/null --write-out '%{http_code}' \
+  -X POST -H 'content-type: application/json' --data '{}' \
+  "http://work-manager-edge/api/products/agent-bridge/commands/pull")"
+if [[ "$runtime_code" != "401" ]]; then
+  echo "[work-manager-live] Agent Bridge runtime edge route is stale or misrouted: status=$runtime_code" >&2
+  exit 1
+fi
+
+echo "[work-manager-live] internal shared-edge route and Agent Bridge boundary verified"
 
 if curl -fsS --max-time 20 "https://$DOMAIN/es/login" >/dev/null 2>&1; then
   echo "[work-manager-live] public HTTPS probe verified: https://$DOMAIN/es/login"
