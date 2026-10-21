@@ -124,6 +124,9 @@ services:
   edge:
     image: caddy:2-alpine
     restart: unless-stopped
+    labels:
+      com.kairoseth.work-manager.live: "true"
+      com.kairoseth.work-manager.revision: "${KCC_DEPLOYMENT_REVISION:-local}"
     depends_on:
       web:
         condition: service_healthy
