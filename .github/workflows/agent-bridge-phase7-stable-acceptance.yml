@@ -41,6 +41,9 @@ jobs:
           grep -Fq 'KAB_ACCEPTANCE_WC_CONSUMER_KEY_FILE=/secrets/wc-consumer-key' "$script"
           grep -Fq 'KAB_ACCEPTANCE_WC_CONSUMER_SECRET_FILE=/secrets/wc-consumer-secret' "$script"
           grep -Fq -- '--entrypoint sh' "$script"
+          grep -Fq -- '--entrypoint wp' "$script"
+          grep -Fq -- '--user "$(id -u):$(id -g)"' "$script"
+          grep -Fq -- '-e npm_config_cache=/tmp/.npm' "$script"
           grep -Fq 'Phase 7.3 orchestration failed during stage:' "$script"
           if grep -Eq 'KAB_ACCEPTANCE_(OPERATOR_TOKEN|WC_CONSUMER_KEY|WC_CONSUMER_SECRET)=' "$script"; then
             echo "Phase 7 acceptance secrets must only be passed by file." >&2
