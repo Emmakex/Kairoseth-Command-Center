@@ -276,19 +276,27 @@ docker run -d --name "$caddy_container" \
   -v "$certs_dir:/certs:ro" \
   "$CADDY_IMAGE" >/dev/null
 
+wc_ready=false
 for _ in $(seq 1 45); do
   if docker run --rm --network "$network" \
+    --user "$(id -u):$(id -g)" \
     -v "$certs_dir:/certs:ro" \
     "$CURL_IMAGE" \
     --cacert /certs/ca.crt --fail --silent --show-error \
     https://wc-phase7/wp-json/ >/dev/null 2>&1; then
+    wc_ready=true
     break
   fi
   sleep 2
 done
+[[ "$wc_ready" == true ]] || {
+  echo "Disposable WooCommerce HTTPS endpoint did not become ready." >&2
+  exit 1
+}
 
 phase verify-woocommerce-rest
 docker run --rm --network "$network" \
+  --user "$(id -u):$(id -g)" \
   --entrypoint sh \
   -v "$certs_dir:/certs:ro" \
   -v "$secrets_dir:/secrets:ro" \
