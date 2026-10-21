@@ -66,7 +66,7 @@ require_command() {
 }
 
 phase validate-host
-for command_name in docker curl openssl sha256sum python3; do
+for command_name in docker curl openssl sha256sum python3 id; do
   require_command "$command_name"
 done
 
@@ -125,6 +125,9 @@ PY
 
 phase install-stable-deps
 docker run --rm \
+  --user "$(id -u):$(id -g)" \
+  -e HOME=/tmp \
+  -e npm_config_cache=/tmp/.npm \
   -v "$bridge_dir:/app" \
   -w /app \
   "$NODE_IMAGE" \
@@ -208,6 +211,7 @@ wp() {
     -e WORDPRESS_DB_PASSWORD="$db_password" \
     -e WORDPRESS_DB_NAME=wordpress \
     --user 33:33 \
+    --entrypoint wp \
     "$WORDPRESS_CLI_IMAGE" "$@"
 }
 
