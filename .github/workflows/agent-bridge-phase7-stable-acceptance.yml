@@ -44,6 +44,9 @@ jobs:
           grep -Fq -- '--entrypoint wp' "$script"
           grep -Fq -- '--user "$(id -u):$(id -g)"' "$script"
           grep -Fq -- '-e npm_config_cache=/tmp/.npm' "$script"
+          grep -Fq 'wc_ready=false' "$script"
+          grep -Fq 'Disposable WooCommerce HTTPS endpoint did not become ready.' "$script"
+          [[ "$(grep -Fc -- '--user "$(id -u):$(id -g)"' "$script")" -ge 3 ]]
           grep -Fq 'Phase 7.3 orchestration failed during stage:' "$script"
           if grep -Eq 'KAB_ACCEPTANCE_(OPERATOR_TOKEN|WC_CONSUMER_KEY|WC_CONSUMER_SECRET)=' "$script"; then
             echo "Phase 7 acceptance secrets must only be passed by file." >&2
