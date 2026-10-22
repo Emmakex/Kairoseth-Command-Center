@@ -34,9 +34,9 @@ jobs:
           set -euo pipefail
           script="scripts/ops/run-agent-bridge-phase7-stable-acceptance.sh"
           bash -n "$script"
-          grep -Fq 'BRIDGE_VERSION="0.1.1"' "$script"
-          grep -Fq 'BRIDGE_COMMIT_SHORT="929acb5ee07f"' "$script"
-          grep -Fq 'BRIDGE_SHA256="04193f06dbedc7555198eb2b5f92b69cd807b223f066002bf81c772c354431af"' "$script"
+          grep -Fq 'BRIDGE_VERSION="0.1.2"' "$script"
+          grep -Fq 'BRIDGE_COMMIT_SHORT="977bf165b60f"' "$script"
+          grep -Fq 'BRIDGE_SHA256="b19f8d65e8d4dfe20299e339ca5b2b32b9b0b8d1ea589de8079fbe513fbfd22f"' "$script"
           grep -Fq 'KAB_ACCEPTANCE_OPERATOR_TOKEN_FILE=/secrets/operator-token' "$script"
           grep -Fq 'KAB_ACCEPTANCE_WC_CONSUMER_KEY_FILE=/secrets/wc-consumer-key' "$script"
           grep -Fq 'KAB_ACCEPTANCE_WC_CONSUMER_SECRET_FILE=/secrets/wc-consumer-secret' "$script"
@@ -48,6 +48,7 @@ jobs:
           grep -Fq 'Disposable WooCommerce HTTPS endpoint did not become ready.' "$script"
           [[ "$(grep -Fc -- '--user "$(id -u):$(id -g)"' "$script")" -ge 3 ]]
           grep -Fq 'Phase 7.3 orchestration failed during stage:' "$script"
+          grep -Fq "assert evidence['runtimeVersion'] == '0.1.2'" "$script"
           if grep -Eq 'KAB_ACCEPTANCE_(OPERATOR_TOKEN|WC_CONSUMER_KEY|WC_CONSUMER_SECRET)=' "$script"; then
             echo "Phase 7 acceptance secrets must only be passed by file." >&2
             exit 1
@@ -62,7 +63,7 @@ jobs:
       - name: Checkout accepted main
         uses: actions/checkout@v4
 
-      - name: Run exact v0.1.1 stable acceptance
+      - name: Run exact v0.1.2 stable acceptance
         shell: bash
         run: bash scripts/ops/run-agent-bridge-phase7-stable-acceptance.sh
 
