@@ -34,6 +34,7 @@ jobs:
               'BRIDGE_VERSION="0.1.2"': 'BRIDGE_VERSION="0.1.3"',
               'BRIDGE_COMMIT_SHORT="977bf165b60f"': 'BRIDGE_COMMIT_SHORT="72ffb6238bd8"',
               'BRIDGE_SHA256="b19f8d65e8d4dfe20299e339ca5b2b32b9b0b8d1ea589de8079fbe513fbfd22f"': 'BRIDGE_SHA256="c9d2bdaf053f63b4d48edb16ce48ac5f321ed5978fae9fc8e2818af23c078803"',
+              "assert evidence['runtimeVersion'] == '0.1.2'": "assert evidence['runtimeVersion'] == '0.1.3'",
           }
           for old, new in replacements.items():
               if old not in text:
@@ -67,6 +68,7 @@ jobs:
           grep -Fq 'BRIDGE_VERSION="0.1.3"' "$script"
           grep -Fq 'BRIDGE_COMMIT_SHORT="72ffb6238bd8"' "$script"
           grep -Fq 'BRIDGE_SHA256="c9d2bdaf053f63b4d48edb16ce48ac5f321ed5978fae9fc8e2818af23c078803"' "$script"
+          grep -Fq "assert evidence['runtimeVersion'] == '0.1.3'" "$script"
           grep -Fq 'BRIDGE_VERSION="0.1.3"' "$workflow"
           grep -Fq 'BRIDGE_COMMIT_SHORT="72ffb6238bd8"' "$workflow"
           grep -Fq 'BRIDGE_SHA256="c9d2bdaf053f63b4d48edb16ce48ac5f321ed5978fae9fc8e2818af23c078803"' "$workflow"
