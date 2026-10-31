@@ -7,53 +7,51 @@ import type { Locale } from '../lib/i18n';
 
 const copy = {
   es: {
-    title: 'Prioridades explicables',
-    help: 'Ordenadas con reglas deterministas. Cada elemento muestra por qué necesita atención.',
+    title: 'En foco',
+    help: 'Lo que merece tu atención primero, ordenado automáticamente.',
     unavailable: 'No se pudieron calcular las prioridades.',
-    empty: 'No hay trabajo activo que priorizar.',
+    empty: 'No hay nada urgente que priorizar ahora.',
     task: 'Tarea',
     alert: 'Alerta',
     project: 'Proyecto',
     milestone: 'Hito',
-    score: 'Puntuación',
-    manualPriority: 'Prioridad manual',
-    blocked: 'Tarea bloqueada',
-    dependencyImpact: 'Desbloquea tareas activas',
-    overdue: 'Tarea vencida',
+    manualPriority: 'Prioridad',
+    blocked: 'Está bloqueada',
+    dependencyImpact: 'Desbloquea otras tareas',
+    overdue: 'Está vencida',
     dueToday: 'Vence hoy',
     severity: 'Severidad',
     projectBlocked: 'Proyecto bloqueado',
     projectOverdue: 'Proyecto vencido',
     projectDueToday: 'Proyecto vence hoy',
-    projectRemainingProgress: 'Progreso restante',
+    projectRemainingProgress: 'Progreso pendiente',
     milestoneOverdue: 'Hito vencido',
     milestoneDueToday: 'Hito vence hoy',
     milestoneWeight: 'Peso del hito',
     severityInfo: 'informativa',
-    severityWarning: 'advertencia',
+    severityWarning: 'aviso',
     severityUrgent: 'urgente',
     severityCritical: 'crítica',
   },
   en: {
-    title: 'Explainable priorities',
-    help: 'Ranked by deterministic rules. Every item shows exactly why it needs attention.',
+    title: 'In focus',
+    help: 'What deserves your attention first, ranked automatically.',
     unavailable: 'Priorities could not be calculated.',
-    empty: 'There is no active work to prioritize.',
+    empty: 'There is nothing urgent to prioritize right now.',
     task: 'Task',
     alert: 'Alert',
     project: 'Project',
     milestone: 'Milestone',
-    score: 'Score',
-    manualPriority: 'Manual priority',
-    blocked: 'Task blocked',
-    dependencyImpact: 'Unblocks active tasks',
-    overdue: 'Task overdue',
+    manualPriority: 'Priority',
+    blocked: 'Blocked',
+    dependencyImpact: 'Unblocks other tasks',
+    overdue: 'Overdue',
     dueToday: 'Due today',
     severity: 'Severity',
     projectBlocked: 'Project blocked',
     projectOverdue: 'Project overdue',
     projectDueToday: 'Project due today',
-    projectRemainingProgress: 'Remaining progress',
+    projectRemainingProgress: 'Progress remaining',
     milestoneOverdue: 'Milestone overdue',
     milestoneDueToday: 'Milestone due today',
     milestoneWeight: 'Milestone weight',
@@ -82,34 +80,33 @@ function kindLabel(locale: Locale, kind: OperationalPrioritySummary['kind']): st
 
 function reasonLabel(locale: Locale, reason: OperationalPriorityReasonSummary): string {
   const t = copy[locale];
-  const suffix = reason.contribution > 0 ? `+${reason.contribution}` : `${reason.contribution}`;
   switch (reason.code) {
     case 'task.manual_priority':
-      return `${t.manualPriority} ${reason.value ?? '—'}/100 (${suffix})`;
+      return `${t.manualPriority} ${reason.value ?? '—'}/100`;
     case 'task.blocked':
-      return `${t.blocked} (${suffix})`;
+      return t.blocked;
     case 'task.dependency_impact':
-      return `${t.dependencyImpact}: ${reason.value ?? 0} (${suffix})`;
+      return `${t.dependencyImpact}: ${reason.value ?? 0}`;
     case 'task.overdue':
-      return `${t.overdue} (${suffix})`;
+      return t.overdue;
     case 'task.due_today':
-      return `${t.dueToday} (${suffix})`;
+      return t.dueToday;
     case 'alert.severity':
-      return `${t.severity}: ${severityLabel(locale, String(reason.value ?? 'info') as AutomationRuleSeverity)} (${suffix})`;
+      return `${t.severity}: ${severityLabel(locale, String(reason.value ?? 'info') as AutomationRuleSeverity)}`;
     case 'project.blocked':
-      return `${t.projectBlocked} (${suffix})`;
+      return t.projectBlocked;
     case 'project.overdue':
-      return `${t.projectOverdue} (${suffix})`;
+      return t.projectOverdue;
     case 'project.due_today':
-      return `${t.projectDueToday} (${suffix})`;
+      return t.projectDueToday;
     case 'project.remaining_progress':
-      return `${t.projectRemainingProgress}: ${100 - Number(reason.value ?? 100)}% (${suffix})`;
+      return `${t.projectRemainingProgress}: ${100 - Number(reason.value ?? 100)}%`;
     case 'milestone.overdue':
-      return `${t.milestoneOverdue} (${suffix})`;
+      return t.milestoneOverdue;
     case 'milestone.due_today':
-      return `${t.milestoneDueToday} (${suffix})`;
+      return t.milestoneDueToday;
     case 'milestone.weight':
-      return `${t.milestoneWeight}: ${reason.value ?? '—'}/100 (${suffix})`;
+      return `${t.milestoneWeight}: ${reason.value ?? '—'}/100`;
   }
 }
 
@@ -144,9 +141,7 @@ export function PriorityPanel({
                   <strong>
                     {index + 1}. {item.title}
                   </strong>
-                  <span className="github-connection-status">
-                    {kindLabel(locale, item.kind)} · {t.score} {item.score}
-                  </span>
+                  <span className="github-connection-status">{kindLabel(locale, item.kind)}</span>
                 </div>
                 <span>{item.reasons.map((reason) => reasonLabel(locale, reason)).join(' · ')}</span>
               </div>
