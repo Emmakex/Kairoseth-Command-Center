@@ -58,6 +58,10 @@
   padding-top: 10px;
 }
 
+.optionalGrid :global(.description-field) {
+  grid-column: auto;
+}
+
 @media (max-width: 760px) {
   .primaryRow,
   .optionalGrid {
