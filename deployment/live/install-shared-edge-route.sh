@@ -7,7 +7,6 @@ SHARED_EDGE_CONTAINER="${KCC_SHARED_EDGE_CONTAINER:-kairoseth-edge-caddy}"
 ROUTE_FRAGMENT="$ROOT_DIR/deployment/live/public-edge-route.caddy"
 CADDYFILE_SOURCE="${KCC_SHARED_EDGE_CADDYFILE:-}"
 SITES_SOURCE="${KCC_SHARED_EDGE_SITES_DIR:-}"
-SITES_DESTINATION="/etc/caddy/sites"
 SITE_FRAGMENT_NAME="work-manager.caddy"
 BEGIN_MARKER="# BEGIN work-manager.kairoseth.com managed route"
 END_MARKER="# END work-manager.kairoseth.com managed route"
@@ -38,28 +37,29 @@ validate_and_reload() {
   docker exec "$SHARED_EDGE_CONTAINER" caddy reload --config /etc/caddy/Caddyfile >/dev/null
 }
 
+has_sites_import() {
+  docker exec "$SHARED_EDGE_CONTAINER" sh -lc \
+    'grep -Fq "import /etc/caddy/sites/*.caddy" /etc/caddy/Caddyfile || grep -Fq "import /etc/caddy/sites/*" /etc/caddy/Caddyfile'
+}
+
 # Preferred mode: install a dedicated fragment in the shared edge sites directory.
 # This survives regeneration/replacement of the primary Caddyfile as long as it
 # keeps importing /etc/caddy/sites/*.caddy.
-if [[ -n "$SITES_SOURCE" && -d "$SITES_SOURCE" && -w "$SITES_SOURCE" ]] && \
-   docker exec "$SHARED_EDGE_CONTAINER" sh -lc 'grep -Eq "^[[:space:]]*import[[:space:]]+/etc/caddy/sites/(\\\*|\\\*\\.caddy)[[:space:]]*$" /etc/caddy/Caddyfile'; then
+if [[ -n "$SITES_SOURCE" && -d "$SITES_SOURCE" && -w "$SITES_SOURCE" ]] && has_sites_import; then
   TARGET="$SITES_SOURCE/$SITE_FRAGMENT_NAME"
   BACKUP=""
 
   if [[ -f "$TARGET" ]]; then
-    CURRENT="$(mktemp)"
     DESIRED="$(mktemp)"
-    trap 'rm -f "$CURRENT" "$DESIRED"' RETURN
-    cat "$TARGET" > "$CURRENT"
     render_route > "$DESIRED"
-    if cmp -s "$CURRENT" "$DESIRED"; then
+    if cmp -s "$TARGET" "$DESIRED"; then
+      rm -f "$DESIRED"
       echo "[work-manager-edge] persistent shared edge route already installed at $TARGET"
       exit 0
     fi
+    rm -f "$DESIRED"
     BACKUP="${TARGET}.backup.$(date -u +%Y%m%dT%H%M%SZ)"
     cp -a "$TARGET" "$BACKUP"
-    rm -f "$CURRENT" "$DESIRED"
-    trap - RETURN
   fi
 
   TMP="$(mktemp "${TARGET}.tmp.XXXXXX")"
