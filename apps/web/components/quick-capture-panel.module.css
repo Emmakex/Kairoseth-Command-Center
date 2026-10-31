@@ -1,0 +1,74 @@
+.form {
+  display: grid;
+  gap: 12px;
+}
+
+.primaryRow {
+  display: grid;
+  grid-template-columns: 150px minmax(240px, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.primaryRow button {
+  min-width: 104px;
+  min-height: 42px;
+}
+
+.optional {
+  border-top: 1px solid rgba(203, 213, 225, 0.72);
+  padding-top: 10px;
+}
+
+.optional summary {
+  width: fit-content;
+  padding: 7px 2px;
+  cursor: pointer;
+  color: #52627a;
+  font-size: 0.82rem;
+  font-weight: 750;
+  list-style: none;
+}
+
+.optional summary::-webkit-details-marker {
+  display: none;
+}
+
+.optional summary::before {
+  content: '+ ';
+  color: #2563eb;
+  font-weight: 900;
+}
+
+.optional[open] summary::before {
+  content: '− ';
+}
+
+.optional summary:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.24);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+.optionalGrid {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) 160px;
+  gap: 12px;
+  align-items: end;
+  padding-top: 10px;
+}
+
+.optionalGrid :global(.description-field) {
+  grid-column: auto;
+}
+
+@media (max-width: 760px) {
+  .primaryRow,
+  .optionalGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .primaryRow button {
+    width: 100%;
+  }
+}
