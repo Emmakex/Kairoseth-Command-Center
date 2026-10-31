@@ -1,0 +1,102 @@
+.skipLink {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 1000;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #0f172a;
+  color: #ffffff;
+  font-weight: 800;
+  text-decoration: none;
+  transform: translateY(-160%);
+  transition: transform 140ms ease;
+}
+
+.skipLink:focus {
+  transform: translateY(0);
+}
+
+.compactHero {
+  padding: 30px 34px;
+}
+
+.compactHero h1 {
+  font-size: clamp(2.7rem, 5vw, 4.4rem);
+}
+
+.compactHero p {
+  max-width: 620px;
+  margin-top: 12px;
+}
+
+.contentTarget:focus {
+  outline: none;
+}
+
+.secondaryTools {
+  margin-top: 22px;
+  padding: 26px;
+  border: 1px solid rgba(203, 213, 225, 0.78);
+  border-radius: 26px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.68), rgba(248, 250, 252, 0.78));
+}
+
+.secondaryHeading {
+  max-width: 720px;
+  margin-bottom: 18px;
+}
+
+.secondaryHeading h2 {
+  margin-bottom: 6px;
+  color: #0f172a;
+  font-size: clamp(1.35rem, 2vw, 1.75rem);
+  letter-spacing: -0.025em;
+}
+
+.secondaryHeading p {
+  margin: 0;
+  color: #64748b;
+  line-height: 1.6;
+}
+
+.disclosureStack {
+  display: grid;
+  gap: 10px;
+}
+
+.disclosureGrid {
+  margin-top: 16px;
+}
+
+:global(a:focus-visible),
+:global(button:focus-visible),
+:global(input:focus-visible),
+:global(select:focus-visible),
+:global(textarea:focus-visible) {
+  outline: 3px solid rgba(37, 99, 235, 0.26);
+  outline-offset: 2px;
+}
+
+:global(button),
+:global(.scope-switch a),
+:global(.topbar a) {
+  min-height: 40px;
+}
+
+@media (max-width: 760px) {
+  .compactHero {
+    padding: 24px;
+  }
+
+  .secondaryTools {
+    padding: 18px;
+    border-radius: 22px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skipLink {
+    transition: none;
+  }
+}
