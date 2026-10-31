@@ -11,11 +11,25 @@ function scopeValue(value: FormDataEntryValue | null): 'workspace' | 'private' {
   return value === 'private' ? 'private' : 'workspace';
 }
 
-function dashboardUrl(request: NextRequest, locale: 'es' | 'en', scope: 'workspace' | 'private', result: string) {
-  const url = new URL(`/${locale}`, request.url);
-  url.searchParams.set('scope', scope);
-  url.searchParams.set('result', result);
-  return url;
+function viewValue(operation: FormDataEntryValue | null): 'today' | 'work' {
+  return operation === 'quick-capture' ? 'today' : 'work';
+}
+
+function relativeRedirect(location: string) {
+  return new NextResponse(null, {
+    status: 303,
+    headers: { location },
+  });
+}
+
+function dashboardRedirect(
+  locale: 'es' | 'en',
+  scope: 'workspace' | 'private',
+  result: string,
+  view: 'today' | 'work',
+) {
+  const params = new URLSearchParams({ scope, view, result });
+  return relativeRedirect(`/${locale}?${params.toString()}`);
 }
 
 function clearSession(response: NextResponse) {
@@ -34,28 +48,30 @@ export async function POST(request: NextRequest) {
   try {
     form = await request.formData();
   } catch {
-    return NextResponse.redirect(new URL('/es?result=invalid', request.url), 303);
+    return relativeRedirect('/es?scope=workspace&view=today&result=invalid');
   }
 
   const locale = localeValue(form.get('locale'));
   const scope = scopeValue(form.get('scope'));
+  const operation = form.get('operation');
+  const view = viewValue(operation);
   const token = request.cookies.get(SESSION_COOKIE)?.value;
   if (!token) {
-    return NextResponse.redirect(new URL(`/${locale}/login`, request.url), 303);
+    return relativeRedirect(`/${locale}/login`);
   }
 
   let timeZone: string | undefined;
-  if (form.get('operation') === 'task-reminders') {
+  if (operation === 'task-reminders') {
     const session = await getSession(token);
     if (!session) {
-      return NextResponse.redirect(dashboardUrl(request, locale, scope, 'error'), 303);
+      return dashboardRedirect(locale, scope, 'error', view);
     }
     timeZone = session.user.timezone;
   }
 
   const mutation = parseOperationalMutation(form, { ...(timeZone ? { timeZone } : {}) });
   if (!mutation) {
-    return NextResponse.redirect(dashboardUrl(request, locale, scope, 'invalid'), 303);
+    return dashboardRedirect(locale, scope, 'invalid', view);
   }
 
   try {
@@ -71,16 +87,16 @@ export async function POST(request: NextRequest) {
     });
 
     if (response.status === 401) {
-      return clearSession(NextResponse.redirect(new URL(`/${locale}/login`, request.url), 303));
+      return clearSession(relativeRedirect(`/${locale}/login`));
     }
 
     if (!response.ok) {
       const result = response.status === 403 ? 'forbidden' : response.status === 404 ? 'not-found' : 'error';
-      return NextResponse.redirect(dashboardUrl(request, locale, scope, result), 303);
+      return dashboardRedirect(locale, scope, result, view);
     }
 
-    return NextResponse.redirect(dashboardUrl(request, locale, scope, 'saved'), 303);
+    return dashboardRedirect(locale, scope, 'saved', view);
   } catch {
-    return NextResponse.redirect(dashboardUrl(request, locale, scope, 'error'), 303);
+    return dashboardRedirect(locale, scope, 'error', view);
   }
 }
