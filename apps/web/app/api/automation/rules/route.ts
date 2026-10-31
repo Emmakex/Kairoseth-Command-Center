@@ -7,11 +7,16 @@ function safeLocale(value: FormDataEntryValue | null): 'es' | 'en' {
   return value === 'en' ? 'en' : 'es';
 }
 
-function dashboardUrl(request: NextRequest, locale: 'es' | 'en', result: string) {
-  const url = new URL(`/${locale}`, request.url);
-  url.searchParams.set('scope', 'workspace');
-  url.searchParams.set('result', result);
-  return url;
+function relativeRedirect(location: string) {
+  return new NextResponse(null, {
+    status: 303,
+    headers: { location },
+  });
+}
+
+function dashboardRedirect(locale: 'es' | 'en', result: string) {
+  const params = new URLSearchParams({ scope: 'workspace', view: 'settings', result });
+  return relativeRedirect(`/${locale}?${params.toString()}`);
 }
 
 function clearSession(response: NextResponse) {
@@ -30,15 +35,15 @@ export async function POST(request: NextRequest) {
   try {
     form = await request.formData();
   } catch {
-    return NextResponse.redirect(new URL('/es?scope=workspace&result=invalid', request.url), 303);
+    return relativeRedirect('/es?scope=workspace&view=settings&result=invalid');
   }
 
   const locale = safeLocale(form.get('locale'));
   const token = request.cookies.get(SESSION_COOKIE)?.value;
-  if (!token) return NextResponse.redirect(new URL(`/${locale}/login`, request.url), 303);
+  if (!token) return relativeRedirect(`/${locale}/login`);
 
   const mutation = parseAutomationRulePolicyMutation(form);
-  if (!mutation) return NextResponse.redirect(dashboardUrl(request, locale, 'invalid'), 303);
+  if (!mutation) return dashboardRedirect(locale, 'invalid');
 
   try {
     const response = await fetch(`${apiBaseUrl()}${mutation.path}`, {
@@ -53,7 +58,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (response.status === 401) {
-      return clearSession(NextResponse.redirect(new URL(`/${locale}/login`, request.url), 303));
+      return clearSession(relativeRedirect(`/${locale}/login`));
     }
     if (!response.ok) {
       const result =
@@ -66,11 +71,11 @@ export async function POST(request: NextRequest) {
               : response.status === 409
                 ? 'conflict'
                 : 'error';
-      return NextResponse.redirect(dashboardUrl(request, locale, result), 303);
+      return dashboardRedirect(locale, result);
     }
 
-    return NextResponse.redirect(dashboardUrl(request, locale, 'saved'), 303);
+    return dashboardRedirect(locale, 'saved');
   } catch {
-    return NextResponse.redirect(dashboardUrl(request, locale, 'error'), 303);
+    return dashboardRedirect(locale, 'error');
   }
 }
