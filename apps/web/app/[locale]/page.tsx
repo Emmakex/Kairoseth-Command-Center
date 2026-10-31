@@ -138,6 +138,8 @@ export default async function CommandCenterPage({
       ? {
           product: 'Gestor de Trabajo',
           skip: 'Saltar al contenido principal',
+          clearTitle: 'Todo despejado',
+          clearHelp: 'No hay trabajo activo ni alertas que requieran tu atención. Puedes crear algo cuando lo necesites.',
           secondaryEyebrow: 'Cuando lo necesites',
           secondaryTitle: 'Más herramientas, sin ruido',
           secondaryHelp:
@@ -154,6 +156,8 @@ export default async function CommandCenterPage({
       : {
           product: 'Work Manager',
           skip: 'Skip to main content',
+          clearTitle: 'All clear',
+          clearHelp: 'There is no active work or alert that needs your attention. Create something whenever you need it.',
           secondaryEyebrow: 'When you need it',
           secondaryTitle: 'More tools, without the noise',
           secondaryHelp:
@@ -167,6 +171,14 @@ export default async function CommandCenterPage({
           account: 'Account and team',
           accountHelp: 'Password, members and workspace administration.',
         };
+  const isCalmEmpty = Boolean(
+    today &&
+      priorities !== null &&
+      priorities.length === 0 &&
+      today.projects.length === 0 &&
+      today.tasks.length === 0 &&
+      today.alerts.length === 0,
+  );
 
   return (
     <main className="shell dashboard-shell">
@@ -242,16 +254,27 @@ export default async function CommandCenterPage({
 
       {!today ? <div className="notice">{copy.apiUnavailable}</div> : null}
 
-      {canReadPriorities ? <PriorityPanel locale={locale} priorities={priorities} /> : null}
-
-      <OperationalPanels
-        locale={locale}
-        scope={scope}
-        copy={copy}
-        today={today}
-        taskCatalog={taskCatalog}
-        timeZone={session.user.timezone}
-      />
+      {isCalmEmpty ? (
+        <section className={styles.clearState} aria-labelledby="today-clear-heading">
+          <span className={styles.clearMark} aria-hidden="true">✓</span>
+          <div>
+            <h2 id="today-clear-heading">{uxCopy.clearTitle}</h2>
+            <p>{uxCopy.clearHelp}</p>
+          </div>
+        </section>
+      ) : (
+        <>
+          {canReadPriorities ? <PriorityPanel locale={locale} priorities={priorities} /> : null}
+          <OperationalPanels
+            locale={locale}
+            scope={scope}
+            copy={copy}
+            today={today}
+            taskCatalog={taskCatalog}
+            timeZone={session.user.timezone}
+          />
+        </>
+      )}
 
       <section className={styles.secondaryTools} aria-labelledby="secondary-tools-heading">
         <div className={styles.secondaryHeading}>
