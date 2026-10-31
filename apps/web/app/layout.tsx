@@ -3,10 +3,11 @@ import './globals.css';
 import './management.css';
 import './integration-activity.css';
 import './github-setup.css';
+import './ux-premium.css';
 
 export const metadata: Metadata = {
-  title: 'Kairoseth Command Center',
-  description: 'Intelligent command center for projects, tasks, alerts and personal work.',
+  title: 'Work Manager · Gestor de Trabajo',
+  description: 'A calm workspace for projects, tasks, priorities and alerts.',
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
