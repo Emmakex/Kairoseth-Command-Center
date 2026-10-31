@@ -98,7 +98,7 @@ Kairoseth SSO/OIDC can be promoted later as a separate hardening/integration sli
 - `deployment/live/Caddyfile` — internal Work Manager edge and narrow Agent Bridge API allowlist.
 - `deployment/live/public-edge-route.caddy` — controlled shared-edge route fragment.
 - `deployment/live/deploy-live.sh` — fail-closed deployment/bootstrap/acceptance script.
-- `deployment/live/install-shared-edge-route.sh` — guarded shared-edge route installer with backup and Caddy validation.
+- `deployment/live/install-shared-edge-route.sh` — guarded shared-edge route installer. When the shared edge exposes and imports `/etc/caddy/sites/*.caddy`, it installs an independent `work-manager.caddy` fragment there so regeneration of the primary Caddyfile cannot silently remove the Work Manager route; legacy managed-block installation remains only as compatibility fallback.
 - `.github/workflows/work-manager-live.yml` — isolated topology acceptance and accepted-main deployment path.
 
 ## CI acceptance
@@ -170,7 +170,7 @@ Those remain separately scoped future capabilities.
 6. Only the explicit Agent Bridge runtime/operator allowlist may reach `api:4000` through the public edge; local auth and generic `/v1/*` remain private.
 7. The live reference uses the same server-derived tenancy/authorization boundaries as the validated standalone product.
 8. Deployment revisions are labelled and checked against the accepted Git revision.
-9. Shared-edge mutation is backed up and validated before reload; an invalid route must fail closed.
+9. Shared-edge mutation is backed up and validated before reload; when the shared edge provides a persistent imported sites directory, Work Manager owns only its dedicated fragment and does not mutate the primary Caddyfile.
 
 ## Status
 
