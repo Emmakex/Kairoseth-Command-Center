@@ -33,6 +33,7 @@ import {
 } from '../../lib/api';
 import { dictionary, isLocale, locales } from '../../lib/i18n';
 import { getLocalMembers } from '../../lib/local-identities';
+import styles from './today.module.css';
 
 export const dynamic = 'force-dynamic';
 
@@ -169,7 +170,7 @@ export default async function CommandCenterPage({
 
   return (
     <main className="shell dashboard-shell">
-      <a className="skip-link" href="#today-content">
+      <a className={styles.skipLink} href="#today-content">
         {uxCopy.skip}
       </a>
 
@@ -196,7 +197,11 @@ export default async function CommandCenterPage({
         </div>
       </nav>
 
-      <header id="today-content" className="hero dashboard-hero" tabIndex={-1}>
+      <header
+        id="today-content"
+        className={`hero dashboard-hero ${styles.compactHero} ${styles.contentTarget}`}
+        tabIndex={-1}
+      >
         <div>
           <span className="eyebrow">{copy.eyebrow}</span>
           <h1>{copy.today}</h1>
@@ -248,16 +253,16 @@ export default async function CommandCenterPage({
         timeZone={session.user.timezone}
       />
 
-      <section className="secondary-tools" aria-labelledby="secondary-tools-heading">
-        <div className="secondary-tools-heading">
+      <section className={styles.secondaryTools} aria-labelledby="secondary-tools-heading">
+        <div className={styles.secondaryHeading}>
           <span className="eyebrow">{uxCopy.secondaryEyebrow}</span>
           <h2 id="secondary-tools-heading">{uxCopy.secondaryTitle}</h2>
           <p>{uxCopy.secondaryHelp}</p>
         </div>
 
-        <div className="disclosure-stack">
+        <div className={styles.disclosureStack}>
           <DashboardDisclosure title={uxCopy.planning} description={uxCopy.planningHelp}>
-            <div className="management-grid disclosure-grid">
+            <div className={`management-grid ${styles.disclosureGrid}`}>
               <MilestonePanel
                 locale={locale}
                 scope={scope}
@@ -289,7 +294,7 @@ export default async function CommandCenterPage({
 
           {scope === 'workspace' && canManageAutomation ? (
             <DashboardDisclosure title={uxCopy.automation} description={uxCopy.automationHelp}>
-              <div className="management-grid disclosure-grid">
+              <div className={`management-grid ${styles.disclosureGrid}`}>
                 <AutomationRulePolicyPanel locale={locale} rules={automationRules} />
                 <PrioritizationWeightPolicyPanel locale={locale} policy={prioritizationWeightPolicy} />
               </div>
@@ -298,7 +303,7 @@ export default async function CommandCenterPage({
 
           {scope === 'workspace' ? (
             <DashboardDisclosure title={uxCopy.integrations} description={uxCopy.integrationsHelp}>
-              <div className="management-grid disclosure-grid">
+              <div className={`management-grid ${styles.disclosureGrid}`}>
                 {canManageIntegrations ? (
                   <GitHubSetupPanel
                     locale={locale}
@@ -319,7 +324,7 @@ export default async function CommandCenterPage({
           ) : null}
 
           <DashboardDisclosure title={uxCopy.account} description={uxCopy.accountHelp}>
-            <div className="management-grid disclosure-grid">
+            <div className={`management-grid ${styles.disclosureGrid}`}>
               <AccountPanel locale={locale} />
               {scope === 'workspace' && canManageMembers ? (
                 <MemberPanel locale={locale} members={members} />
