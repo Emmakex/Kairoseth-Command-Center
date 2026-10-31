@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { Card } from '@kcc/ui';
 import { AccountPanel } from '../../components/account-panel';
 import { AutomationRulePolicyPanel } from '../../components/automation-rule-policy-panel';
+import { DashboardDisclosure } from '../../components/dashboard-disclosure';
 import { DecisionPanel } from '../../components/decision-panel';
 import { GitHubSetupPanel } from '../../components/github-setup-panel';
 import { IntegrationActivityPanel } from '../../components/integration-activity-panel';
@@ -32,6 +33,7 @@ import {
 } from '../../lib/api';
 import { dictionary, isLocale, locales } from '../../lib/i18n';
 import { getLocalMembers } from '../../lib/local-identities';
+import styles from './today.module.css';
 
 export const dynamic = 'force-dynamic';
 
@@ -131,13 +133,51 @@ export default async function CommandCenterPage({
     error: copy.actionError,
   };
   const resultMessage = result ? resultMessages[result] : undefined;
+  const uxCopy =
+    locale === 'es'
+      ? {
+          product: 'Gestor de Trabajo',
+          skip: 'Saltar al contenido principal',
+          secondaryEyebrow: 'Cuando lo necesites',
+          secondaryTitle: 'Más herramientas, sin ruido',
+          secondaryHelp:
+            'La vista Hoy se mantiene simple. Abre solo la sección que necesites para organizar, configurar o administrar.',
+          planning: 'Planificación y seguimiento',
+          planningHelp: 'Hitos, decisiones y actividad reciente.',
+          automation: 'Automatización y prioridades',
+          automationHelp: 'Reglas y pesos avanzados para adaptar cómo se ordena el trabajo.',
+          integrations: 'Integraciones',
+          integrationsHelp: 'GitHub y señales de herramientas conectadas.',
+          account: 'Cuenta y equipo',
+          accountHelp: 'Contraseña, miembros y administración del espacio de trabajo.',
+        }
+      : {
+          product: 'Work Manager',
+          skip: 'Skip to main content',
+          secondaryEyebrow: 'When you need it',
+          secondaryTitle: 'More tools, without the noise',
+          secondaryHelp:
+            'Today stays simple. Open only the section you need to organize, configure or administer.',
+          planning: 'Planning and follow-up',
+          planningHelp: 'Milestones, decisions and recent activity.',
+          automation: 'Automation and priorities',
+          automationHelp: 'Advanced rules and weights for adapting how work is ranked.',
+          integrations: 'Integrations',
+          integrationsHelp: 'GitHub and signals from connected tools.',
+          account: 'Account and team',
+          accountHelp: 'Password, members and workspace administration.',
+        };
 
   return (
     <main className="shell dashboard-shell">
-      <nav className="topbar" aria-label="Command Center">
+      <a className={styles.skipLink} href="#today-content">
+        {uxCopy.skip}
+      </a>
+
+      <nav className="topbar" aria-label={uxCopy.product}>
         <div>
-          <span className="product-mark">KCC</span>
-          <strong>{copy.title}</strong>
+          <span className="product-mark">WM</span>
+          <strong>{uxCopy.product}</strong>
         </div>
         <div className="topbar-actions">
           {canViewAgentBridge ? (
@@ -157,7 +197,11 @@ export default async function CommandCenterPage({
         </div>
       </nav>
 
-      <header className="hero dashboard-hero">
+      <header
+        id="today-content"
+        className={`hero dashboard-hero ${styles.compactHero} ${styles.contentTarget}`}
+        tabIndex={-1}
+      >
         <div>
           <span className="eyebrow">{copy.eyebrow}</span>
           <h1>{copy.today}</h1>
@@ -167,7 +211,6 @@ export default async function CommandCenterPage({
           <div className="status-row">
             <span className="status-dot status-dot-live" aria-hidden="true" />
             <span>{copy.status}</span>
-            <strong>{copy.phase}</strong>
           </div>
           <div className="scope-switch" aria-label={copy.scope}>
             <Link className={scope === 'workspace' ? 'active' : ''} href={`/${locale}?scope=workspace`}>
@@ -210,60 +253,85 @@ export default async function CommandCenterPage({
         timeZone={session.user.timezone}
       />
 
-      <section className="management-grid">
-        <MilestonePanel
-          locale={locale}
-          scope={scope}
-          copy={copy}
-          projects={projectCatalog}
-          milestones={milestones}
-        />
-        {scope === 'workspace' ? (
-          <DecisionPanel locale={locale} copy={copy} projects={projectCatalog} decisions={decisions} />
-        ) : (
-          <article className="panel management-panel decisions-panel workspace-only-panel">
-            <div className="panel-heading management-heading">
-              <div>
-                <h2>{copy.decisions}</h2>
-                <p>{copy.decisionHelp}</p>
-              </div>
+      <section className={styles.secondaryTools} aria-labelledby="secondary-tools-heading">
+        <div className={styles.secondaryHeading}>
+          <span className="eyebrow">{uxCopy.secondaryEyebrow}</span>
+          <h2 id="secondary-tools-heading">{uxCopy.secondaryTitle}</h2>
+          <p>{uxCopy.secondaryHelp}</p>
+        </div>
+
+        <div className={styles.disclosureStack}>
+          <DashboardDisclosure title={uxCopy.planning} description={uxCopy.planningHelp}>
+            <div className={`management-grid ${styles.disclosureGrid}`}>
+              <MilestonePanel
+                locale={locale}
+                scope={scope}
+                copy={copy}
+                projects={projectCatalog}
+                milestones={milestones}
+              />
+              {scope === 'workspace' ? (
+                <DecisionPanel locale={locale} copy={copy} projects={projectCatalog} decisions={decisions} />
+              ) : (
+                <article className="panel management-panel decisions-panel workspace-only-panel">
+                  <div className="panel-heading management-heading">
+                    <div>
+                      <h2>{copy.decisions}</h2>
+                      <p>{copy.decisionHelp}</p>
+                    </div>
+                  </div>
+                  <p className="empty-state">{copy.decisionWorkspaceOnly}</p>
+                </article>
+              )}
+              <TimelinePanel
+                locale={locale}
+                copy={copy}
+                timeZone={session.user.timezone}
+                events={timeline}
+              />
             </div>
-            <p className="empty-state">{copy.decisionWorkspaceOnly}</p>
-          </article>
-        )}
-        {scope === 'workspace' && canManageAutomation ? (
-          <AutomationRulePolicyPanel locale={locale} rules={automationRules} />
-        ) : null}
-        {scope === 'workspace' && canManageAutomation ? (
-          <PrioritizationWeightPolicyPanel locale={locale} policy={prioritizationWeightPolicy} />
-        ) : null}
-        {scope === 'workspace' && canManageIntegrations ? (
-          <GitHubSetupPanel
-            locale={locale}
-            projects={projectCatalog}
-            connections={githubConnections}
-            repositories={githubRepositories}
-            webhooks={githubWebhooks}
-          />
-        ) : null}
-        {scope === 'workspace' ? (
-          <IntegrationActivityPanel
-            locale={locale}
-            copy={copy}
-            timeZone={session.user.timezone}
-            signals={integrationSignals}
-          />
-        ) : null}
-        <TimelinePanel
-          locale={locale}
-          copy={copy}
-          timeZone={session.user.timezone}
-          events={timeline}
-        />
-        <AccountPanel locale={locale} />
-        {scope === 'workspace' && canManageMembers ? (
-          <MemberPanel locale={locale} members={members} />
-        ) : null}
+          </DashboardDisclosure>
+
+          {scope === 'workspace' && canManageAutomation ? (
+            <DashboardDisclosure title={uxCopy.automation} description={uxCopy.automationHelp}>
+              <div className={`management-grid ${styles.disclosureGrid}`}>
+                <AutomationRulePolicyPanel locale={locale} rules={automationRules} />
+                <PrioritizationWeightPolicyPanel locale={locale} policy={prioritizationWeightPolicy} />
+              </div>
+            </DashboardDisclosure>
+          ) : null}
+
+          {scope === 'workspace' ? (
+            <DashboardDisclosure title={uxCopy.integrations} description={uxCopy.integrationsHelp}>
+              <div className={`management-grid ${styles.disclosureGrid}`}>
+                {canManageIntegrations ? (
+                  <GitHubSetupPanel
+                    locale={locale}
+                    projects={projectCatalog}
+                    connections={githubConnections}
+                    repositories={githubRepositories}
+                    webhooks={githubWebhooks}
+                  />
+                ) : null}
+                <IntegrationActivityPanel
+                  locale={locale}
+                  copy={copy}
+                  timeZone={session.user.timezone}
+                  signals={integrationSignals}
+                />
+              </div>
+            </DashboardDisclosure>
+          ) : null}
+
+          <DashboardDisclosure title={uxCopy.account} description={uxCopy.accountHelp}>
+            <div className={`management-grid ${styles.disclosureGrid}`}>
+              <AccountPanel locale={locale} />
+              {scope === 'workspace' && canManageMembers ? (
+                <MemberPanel locale={locale} members={members} />
+              ) : null}
+            </div>
+          </DashboardDisclosure>
+        </div>
       </section>
     </main>
   );
