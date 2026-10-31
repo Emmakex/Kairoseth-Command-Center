@@ -25,6 +25,7 @@ const apiSchema = z.object({
   KCC_LOCAL_WORKSPACE_NAME: z.string().min(1).max(160).default('Local Workspace'),
   KCC_LOCAL_SESSION_TTL_SECONDS: z.coerce.number().int().min(900).max(604800).default(43200),
   KCC_INTEGRATION_SECRET_KEY: integrationSecretKey,
+  KCC_AGENT_BRIDGE_CONSUMER_BINDINGS_JSON: optionalSecret(z.string().min(2).max(32768)),
   KCC_GITHUB_API_BASE_URL: z.string().url().default('https://api.github.com'),
 });
 

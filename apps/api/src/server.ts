@@ -9,6 +9,7 @@ import { MongoSignalAlertRulePolicyStore } from '@kcc/persistence/signal-alert-r
 import { MongoAgentBridgeA2AStore } from './agent-bridge-a2a-store';
 import { MongoAgentBridgeApprovalService } from './agent-bridge-approval-store';
 import { MongoAgentBridgeAuditStore } from './agent-bridge-audit-store';
+import { StaticAgentBridgeConsumerAuthProvider } from './agent-bridge-consumer-auth';
 import { MongoAgentBridgeControlStore } from './agent-bridge-control-store';
 import { MongoAgentBridgeExecutionStore } from './agent-bridge-execution-store';
 import { MongoAgentBridgeToolInventoryStore } from './agent-bridge-tool-inventory-store';
@@ -38,6 +39,11 @@ const agentBridgeA2AStore = new MongoAgentBridgeA2AStore(db);
 const agentBridgeControlStore = new MongoAgentBridgeControlStore(db);
 const agentBridgeToolInventoryStore = new MongoAgentBridgeToolInventoryStore(db);
 const agentBridgeAuditStore = new MongoAgentBridgeAuditStore(db);
+const agentBridgeConsumerAuthProvider = config.KCC_AGENT_BRIDGE_CONSUMER_BINDINGS_JSON
+  ? StaticAgentBridgeConsumerAuthProvider.fromJson(
+      config.KCC_AGENT_BRIDGE_CONSUMER_BINDINGS_JSON,
+    )
+  : undefined;
 const integrationSignalStore = new MongoIntegrationSignalStore(db);
 const integrationSyncJobStore = new MongoIntegrationSyncJobStore(db);
 const signalAlertRulePolicyStore = new MongoSignalAlertRulePolicyStore(mongo, db);
@@ -131,6 +137,7 @@ const app = buildApp({
   agentBridgeExecutionStore,
   agentBridgeAuditStore,
   agentBridgeToolInventoryStore,
+  ...(agentBridgeConsumerAuthProvider ? { agentBridgeConsumerAuthProvider } : {}),
   ...(agentBridgeApprovalService ? { agentBridgeApprovalService } : {}),
   integrationSignalStore,
   integrationSyncJobStore,
