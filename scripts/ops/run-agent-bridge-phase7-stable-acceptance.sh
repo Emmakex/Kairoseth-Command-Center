@@ -313,6 +313,7 @@ phase run-stable-agent-bridge
 # then attached to the existing Kairoseth public-edge network. This exercises
 # the real live Agent Bridge edge contract without exposing local auth.
 docker create --name "$acceptance_container" \
+  --user "$(id -u):$(id -g)" \
   --network "$network" \
   -v "$bridge_dir:/app" \
   -v "$secrets_dir:/secrets:ro" \
