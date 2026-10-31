@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BRIDGE_VERSION="0.1.3"
-BRIDGE_COMMIT_SHORT="72ffb6238bd8"
+BRIDGE_VERSION="0.1.4"
+BRIDGE_COMMIT_SHORT="595fbddb3856"
 BRIDGE_ARCHIVE="agent-bridge-${BRIDGE_VERSION}-${BRIDGE_COMMIT_SHORT}.tar.gz"
-BRIDGE_SHA256="c9d2bdaf053f63b4d48edb16ce48ac5f321ed5978fae9fc8e2818af23c078803"
+BRIDGE_SHA256="de222c168699a8c00eae6a656273e559837348565a665e8bd5c886ca65c01e9d"
 BRIDGE_URL="https://github.com/Emmakex/kairoseth-agent-bridge/releases/download/v${BRIDGE_VERSION}/${BRIDGE_ARCHIVE}"
 PLATFORM_BASE_URL="${KAB_PHASE7_PLATFORM_BASE_URL:-http://work-manager-edge/}"
 LIVE_ENV_FILE="${KAB_PHASE7_LIVE_ENV_FILE:-/srv/kairoseth/apps/work-manager/shared/runtime.env}"
@@ -347,7 +347,7 @@ path, digest = sys.argv[1], sys.argv[2]
 with open(path, encoding='utf-8') as f:
     evidence = json.load(f)
 assert evidence['result'] == 'passed'
-assert evidence['runtimeVersion'] == '0.1.3'
+assert evidence['runtimeVersion'] == '0.1.4'
 assert evidence['artifactSha256'] == f'sha256:{digest}'
 assert evidence['read']['status'] == 'executed'
 assert evidence['write']['status'] == 'executed'
