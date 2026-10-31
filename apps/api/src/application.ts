@@ -10,6 +10,8 @@ import type { AgentBridgeA2AStore } from './agent-bridge-a2a-store';
 import { registerAgentBridgeApprovedExecutionRoutes } from './agent-bridge-approved-execution';
 import type { AgentBridgeApprovalService } from './agent-bridge-approval-store';
 import type { AgentBridgeAuditStore } from './agent-bridge-audit-store';
+import { registerAgentBridgeConsumerRoutes } from './agent-bridge-consumer';
+import type { AgentBridgeConsumerAuthProvider } from './agent-bridge-consumer-auth';
 import { registerAgentBridgeControlRoutes } from './agent-bridge-control';
 import type { AgentBridgeControlStore } from './agent-bridge-control-store';
 import { registerAgentBridgeExecutionRoutes } from './agent-bridge-execution';
@@ -69,6 +71,7 @@ type ApplicationOptions = {
   agentBridgeApprovalService?: AgentBridgeApprovalService;
   agentBridgeAuditStore?: AgentBridgeAuditStore;
   agentBridgeToolInventoryStore?: AgentBridgeToolInventoryStore;
+  agentBridgeConsumerAuthProvider?: AgentBridgeConsumerAuthProvider;
   githubRepositoryStore?: GitHubRepositoryStore;
   githubConnectionStore?: GitHubConnectionStore;
   githubProviderClient?: GitHubProviderClient;
@@ -146,6 +149,17 @@ export function buildApp(options: ApplicationOptions = {}) {
   });
   registerAgentBridgeToolInventoryRoutes(app, {
     ...(options.authProvider ? { authProvider: options.authProvider } : {}),
+    ...(options.agentBridgeToolInventoryStore
+      ? { toolInventoryStore: options.agentBridgeToolInventoryStore }
+      : {}),
+  });
+  registerAgentBridgeConsumerRoutes(app, {
+    ...(options.agentBridgeConsumerAuthProvider
+      ? { consumerAuthProvider: options.agentBridgeConsumerAuthProvider }
+      : {}),
+    ...(options.agentBridgeExecutionStore
+      ? { executionStore: options.agentBridgeExecutionStore }
+      : {}),
     ...(options.agentBridgeToolInventoryStore
       ? { toolInventoryStore: options.agentBridgeToolInventoryStore }
       : {}),
