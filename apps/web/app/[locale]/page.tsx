@@ -35,6 +35,13 @@ import { getLocalMembers } from '../../lib/local-identities';
 
 export const dynamic = 'force-dynamic';
 
+const views = ['today', 'work', 'activity', 'settings'] as const;
+type DashboardView = (typeof views)[number];
+
+function isDashboardView(value: string | undefined): value is DashboardView {
+  return views.includes(value as DashboardView);
+}
+
 export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
 }
@@ -44,7 +51,7 @@ export default async function CommandCenterPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ scope?: string; result?: string }>;
+  searchParams: Promise<{ scope?: string; result?: string; view?: string }>;
 }) {
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
@@ -55,8 +62,9 @@ export default async function CommandCenterPage({
   const session = await getSession(token);
   if (!session) redirect(`/${locale}/login`);
 
-  const { scope: requestedScope, result } = await searchParams;
+  const { scope: requestedScope, result, view: requestedView } = await searchParams;
   const scope = requestedScope === 'private' ? 'private' : 'workspace';
+  const view: DashboardView = isDashboardView(requestedView) ? requestedView : 'today';
   const canManageMembers = session.capabilities.includes('members.manage');
   const canManageIntegrations = session.capabilities.includes('integrations.manage');
   const canManageAutomation = session.capabilities.includes('automation.manage');
@@ -83,7 +91,7 @@ export default async function CommandCenterPage({
     members,
   ] = await Promise.all([
     getToday(token, scope),
-    canReadPriorities ? getPriorities(token, scope, 8) : Promise.resolve(null),
+    canReadPriorities ? getPriorities(token, scope, 5) : Promise.resolve(null),
     getProjects(token, scope),
     getTasks(token, scope),
     getMilestones(token, scope),
@@ -131,21 +139,35 @@ export default async function CommandCenterPage({
     error: copy.actionError,
   };
   const resultMessage = result ? resultMessages[result] : undefined;
+  const viewLabels: Record<DashboardView, string> = {
+    today: copy.today,
+    work: copy.work,
+    activity: copy.activity,
+    settings: copy.settings,
+  };
+  const viewSubtitles: Record<DashboardView, string> = {
+    today: copy.todaySubtitle,
+    work: copy.workSubtitle,
+    activity: copy.activitySubtitle,
+    settings: copy.settingsSubtitle,
+  };
+  const currentQuery = `scope=${scope}&view=${view}`;
 
   return (
     <main className="shell dashboard-shell">
-      <nav className="topbar" aria-label="Command Center">
-        <div>
-          <span className="product-mark">KCC</span>
+      <a className="skip-link" href="#main-content">
+        {copy.skipToContent}
+      </a>
+
+      <nav className="topbar" aria-label={copy.productNavigation}>
+        <div className="brand-lockup">
+          <span className="product-mark" aria-hidden="true">
+            {locale === 'es' ? 'GT' : 'WM'}
+          </span>
           <strong>{copy.title}</strong>
         </div>
         <div className="topbar-actions">
-          {canViewAgentBridge ? (
-            <Link href={`/${locale}/ia/agent-bridge`}>
-              {locale === 'es' ? 'IA · Agent Bridge' : 'AI · Agent Bridge'}
-            </Link>
-          ) : null}
-          <Link href={`/${otherLocale}?scope=${scope}`}>{otherLocale.toUpperCase()}</Link>
+          <Link href={`/${otherLocale}?${currentQuery}`}>{otherLocale.toUpperCase()}</Link>
           <span className="user-label">
             {copy.signedInAs} <strong>{session.user.displayName}</strong>
           </span>
@@ -157,114 +179,160 @@ export default async function CommandCenterPage({
         </div>
       </nav>
 
-      <header className="hero dashboard-hero">
+      <nav className="view-nav" aria-label={copy.primaryNavigation}>
+        {views.map((item) => (
+          <Link
+            key={item}
+            href={`/${locale}?scope=${scope}&view=${item}`}
+            aria-current={view === item ? 'page' : undefined}
+            className={view === item ? 'active' : undefined}
+          >
+            {viewLabels[item]}
+          </Link>
+        ))}
+      </nav>
+
+      <header className="hero dashboard-hero premium-hero">
         <div>
           <span className="eyebrow">{copy.eyebrow}</span>
-          <h1>{copy.today}</h1>
-          <p>{copy.subtitle}</p>
+          <h1>{viewLabels[view]}</h1>
+          <p>{viewSubtitles[view]}</p>
         </div>
         <div className="hero-meta">
-          <div className="status-row">
-            <span className="status-dot status-dot-live" aria-hidden="true" />
-            <span>{copy.status}</span>
-            <strong>{copy.phase}</strong>
-          </div>
           <div className="scope-switch" aria-label={copy.scope}>
-            <Link className={scope === 'workspace' ? 'active' : ''} href={`/${locale}?scope=workspace`}>
+            <Link
+              className={scope === 'workspace' ? 'active' : ''}
+              aria-current={scope === 'workspace' ? 'true' : undefined}
+              href={`/${locale}?scope=workspace&view=${view}`}
+            >
               {copy.workspace}
             </Link>
-            <Link className={scope === 'private' ? 'active' : ''} href={`/${locale}?scope=private`}>
+            <Link
+              className={scope === 'private' ? 'active' : ''}
+              aria-current={scope === 'private' ? 'true' : undefined}
+              href={`/${locale}?scope=private&view=${view}`}
+            >
               {copy.private}
             </Link>
           </div>
         </div>
       </header>
 
-      {resultMessage ? (
-        <div className={`notice ${result === 'saved' ? 'notice-success' : ''}`} role="status">
-          {resultMessage}
-        </div>
-      ) : null}
-
-      <QuickCapturePanel locale={locale} scope={scope} copy={copy} />
-
-      <section className="metric-grid" aria-label={copy.today}>
-        <Card title={copy.projects}>{summary?.activeProjects ?? '—'}</Card>
-        <Card title={copy.tasks}>{summary?.openTasks ?? '—'}</Card>
-        <Card title={copy.dueToday}>{summary?.dueToday ?? '—'}</Card>
-        <Card title={copy.blocked}>{summary?.blockedTasks ?? '—'}</Card>
-        <Card title={copy.alerts}>{summary?.openAlerts ?? '—'}</Card>
-        <Card title={copy.urgent}>{summary?.urgentAlerts ?? '—'}</Card>
-      </section>
-
-      {!today ? <div className="notice">{copy.apiUnavailable}</div> : null}
-
-      {canReadPriorities ? <PriorityPanel locale={locale} priorities={priorities} /> : null}
-
-      <OperationalPanels
-        locale={locale}
-        scope={scope}
-        copy={copy}
-        today={today}
-        taskCatalog={taskCatalog}
-        timeZone={session.user.timezone}
-      />
-
-      <section className="management-grid">
-        <MilestonePanel
-          locale={locale}
-          scope={scope}
-          copy={copy}
-          projects={projectCatalog}
-          milestones={milestones}
-        />
-        {scope === 'workspace' ? (
-          <DecisionPanel locale={locale} copy={copy} projects={projectCatalog} decisions={decisions} />
-        ) : (
-          <article className="panel management-panel decisions-panel workspace-only-panel">
-            <div className="panel-heading management-heading">
-              <div>
-                <h2>{copy.decisions}</h2>
-                <p>{copy.decisionHelp}</p>
-              </div>
-            </div>
-            <p className="empty-state">{copy.decisionWorkspaceOnly}</p>
-          </article>
-        )}
-        {scope === 'workspace' && canManageAutomation ? (
-          <AutomationRulePolicyPanel locale={locale} rules={automationRules} />
+      <div id="main-content" className="view-content" tabIndex={-1}>
+        {resultMessage ? (
+          <div className={`notice ${result === 'saved' ? 'notice-success' : ''}`} role="status">
+            {resultMessage}
+          </div>
         ) : null}
-        {scope === 'workspace' && canManageAutomation ? (
-          <PrioritizationWeightPolicyPanel locale={locale} policy={prioritizationWeightPolicy} />
+
+        {view === 'today' ? (
+          <>
+            <QuickCapturePanel locale={locale} scope={scope} copy={copy} />
+
+            <section className="metric-grid metric-grid-focus" aria-label={copy.today}>
+              <Card title={copy.tasks}>{summary?.openTasks ?? '—'}</Card>
+              <Card title={copy.dueToday}>{summary?.dueToday ?? '—'}</Card>
+              <Card title={copy.blocked}>{summary?.blockedTasks ?? '—'}</Card>
+              <Card title={copy.urgent}>{summary?.urgentAlerts ?? '—'}</Card>
+            </section>
+
+            {!today ? <div className="notice">{copy.apiUnavailable}</div> : null}
+
+            {canReadPriorities ? <PriorityPanel locale={locale} priorities={priorities} /> : null}
+          </>
         ) : null}
-        {scope === 'workspace' && canManageIntegrations ? (
-          <GitHubSetupPanel
-            locale={locale}
-            projects={projectCatalog}
-            connections={githubConnections}
-            repositories={githubRepositories}
-            webhooks={githubWebhooks}
-          />
+
+        {view === 'work' ? (
+          <>
+            <OperationalPanels
+              locale={locale}
+              scope={scope}
+              copy={copy}
+              today={today}
+              taskCatalog={taskCatalog}
+              timeZone={session.user.timezone}
+            />
+
+            <section className="management-grid">
+              <MilestonePanel
+                locale={locale}
+                scope={scope}
+                copy={copy}
+                projects={projectCatalog}
+                milestones={milestones}
+              />
+              {scope === 'workspace' ? (
+                <DecisionPanel locale={locale} copy={copy} projects={projectCatalog} decisions={decisions} />
+              ) : (
+                <article className="panel management-panel decisions-panel workspace-only-panel">
+                  <div className="panel-heading management-heading">
+                    <div>
+                      <h2>{copy.decisions}</h2>
+                      <p>{copy.decisionHelp}</p>
+                    </div>
+                  </div>
+                  <p className="empty-state">{copy.decisionWorkspaceOnly}</p>
+                </article>
+              )}
+            </section>
+          </>
         ) : null}
-        {scope === 'workspace' ? (
-          <IntegrationActivityPanel
-            locale={locale}
-            copy={copy}
-            timeZone={session.user.timezone}
-            signals={integrationSignals}
-          />
+
+        {view === 'activity' ? (
+          <section className="management-grid activity-view-grid">
+            {scope === 'workspace' ? (
+              <IntegrationActivityPanel
+                locale={locale}
+                copy={copy}
+                timeZone={session.user.timezone}
+                signals={integrationSignals}
+              />
+            ) : null}
+            <TimelinePanel
+              locale={locale}
+              copy={copy}
+              timeZone={session.user.timezone}
+              events={timeline}
+            />
+          </section>
         ) : null}
-        <TimelinePanel
-          locale={locale}
-          copy={copy}
-          timeZone={session.user.timezone}
-          events={timeline}
-        />
-        <AccountPanel locale={locale} />
-        {scope === 'workspace' && canManageMembers ? (
-          <MemberPanel locale={locale} members={members} />
+
+        {view === 'settings' ? (
+          <section className="management-grid settings-view-grid">
+            {scope === 'workspace' && canManageAutomation ? (
+              <AutomationRulePolicyPanel locale={locale} rules={automationRules} />
+            ) : null}
+            {scope === 'workspace' && canManageAutomation ? (
+              <PrioritizationWeightPolicyPanel locale={locale} policy={prioritizationWeightPolicy} />
+            ) : null}
+            {scope === 'workspace' && canManageIntegrations ? (
+              <GitHubSetupPanel
+                locale={locale}
+                projects={projectCatalog}
+                connections={githubConnections}
+                repositories={githubRepositories}
+                webhooks={githubWebhooks}
+              />
+            ) : null}
+            {canViewAgentBridge ? (
+              <article className="panel settings-shortcut-panel">
+                <div>
+                  <span className="eyebrow">IA</span>
+                  <h2>Agent Bridge</h2>
+                  <p>{copy.agentBridgeHelp}</p>
+                </div>
+                <Link className="settings-shortcut" href={`/${locale}/ia/agent-bridge`}>
+                  {copy.openAgentBridge}
+                </Link>
+              </article>
+            ) : null}
+            <AccountPanel locale={locale} />
+            {scope === 'workspace' && canManageMembers ? (
+              <MemberPanel locale={locale} members={members} />
+            ) : null}
+          </section>
         ) : null}
-      </section>
+      </div>
     </main>
   );
 }
