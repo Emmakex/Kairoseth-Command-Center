@@ -1,0 +1,54 @@
+name: Apply Phase 7 Evidence Ownership Fix
+
+on:
+  push:
+    branches:
+      - phase7/evidence-file-ownership
+    paths:
+      - .github/workflows/apply-phase7-evidence-ownership-fix.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout fix branch
+        uses: actions/checkout@v4
+        with:
+          ref: phase7/evidence-file-ownership
+          fetch-depth: 0
+
+      - name: Run acceptance container as runner uid/gid
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/ops/run-agent-bridge-phase7-stable-acceptance.sh')
+          text = path.read_text()
+          old = '''docker create --name "$acceptance_container" \\
+  --network "$network" \\
+'''
+          new = '''docker create --name "$acceptance_container" \\
+  --user "$(id -u):$(id -g)" \\
+  --network "$network" \\
+'''
+          if old not in text:
+              raise SystemExit('acceptance docker create marker not found')
+          path.write_text(text.replace(old, new, 1))
+          PY
+          bash -n scripts/ops/run-agent-bridge-phase7-stable-acceptance.sh
+          [[ "$(grep -Fc -- '--user "$(id -u):$(id -g)"' scripts/ops/run-agent-bridge-phase7-stable-acceptance.sh)" -ge 4 ]]
+
+      - name: Commit fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/ops/run-agent-bridge-phase7-stable-acceptance.sh
+          git commit -m "fix(phase7): preserve runner ownership for evidence"
+          git push origin HEAD:phase7/evidence-file-ownership
