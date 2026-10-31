@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import styles from './dashboard-disclosure.module.css';
 
 export function DashboardDisclosure({
   title,
@@ -10,15 +11,15 @@ export function DashboardDisclosure({
   children: ReactNode;
 }) {
   return (
-    <details className="dashboard-disclosure">
-      <summary>
-        <span className="disclosure-copy">
+    <details className={styles.disclosure}>
+      <summary className={styles.summary}>
+        <span className={styles.copy}>
           <strong>{title}</strong>
           <span>{description}</span>
         </span>
-        <span className="disclosure-chevron" aria-hidden="true">⌄</span>
+        <span className={styles.chevron} aria-hidden="true">⌄</span>
       </summary>
-      <div className="disclosure-content">{children}</div>
+      <div className={styles.content}>{children}</div>
     </details>
   );
 }
