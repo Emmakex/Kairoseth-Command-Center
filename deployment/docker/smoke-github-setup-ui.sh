@@ -51,7 +51,7 @@ fi
 
 workspace_es="$(curl --fail --silent \
   -H "Cookie: kcc_session=$access_token" \
-  "$WEB_BASE_URL/es?scope=workspace")"
+  "$WEB_BASE_URL/es?scope=workspace&view=settings")"
 printf '%s' "$workspace_es" | grep -Fq 'Configuración de GitHub'
 printf '%s' "$workspace_es" | grep -Fq "$DISPLAY_NAME"
 if printf '%s' "$workspace_es" | grep -Fq "$KCC_GITHUB_MOCK_TOKEN"; then
@@ -98,14 +98,14 @@ printf '%s' "$repositories_response" | python3 -c 'import json,sys; data=json.lo
 
 workspace_en="$(curl --fail --silent \
   -H "Cookie: kcc_session=$access_token" \
-  "$WEB_BASE_URL/en?scope=workspace")"
+  "$WEB_BASE_URL/en?scope=workspace&view=settings")"
 printf '%s' "$workspace_en" | grep -Fq 'GitHub setup'
 printf '%s' "$workspace_en" | grep -Fq "$DISPLAY_NAME"
 printf '%s' "$workspace_en" | grep -Fq 'Emmakex/Kairoseth-Command-Center'
 
 private_en="$(curl --fail --silent \
   -H "Cookie: kcc_session=$access_token" \
-  "$WEB_BASE_URL/en?scope=private")"
+  "$WEB_BASE_URL/en?scope=private&view=settings")"
 if printf '%s' "$private_en" | grep -Fq 'GitHub setup'; then
   echo 'Private dashboard leaked GitHub setup surface' >&2
   exit 1
