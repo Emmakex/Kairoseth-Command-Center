@@ -1,21 +1,18 @@
-import { NextResponse } from 'next/server';
+import type { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { apiBaseUrl, SESSION_COOKIE } from '../../../../lib/api';
+import { sameOriginRedirect, sameOriginUrl } from '../../../../lib/public-url';
 
 function localeValue(value: FormDataEntryValue | null): 'es' | 'en' {
   return value === 'en' ? 'en' : 'es';
 }
 
-function relativeRedirect(location: string) {
-  return new NextResponse(null, {
-    status: 303,
-    headers: { location },
-  });
-}
-
-function dashboardRedirect(locale: 'es' | 'en', result: string) {
-  const params = new URLSearchParams({ scope: 'workspace', view: 'settings', result });
-  return relativeRedirect(`/${locale}?${params.toString()}`);
+function dashboardUrl(locale: 'es' | 'en', result: string) {
+  const url = sameOriginUrl(`/${locale}`);
+  url.searchParams.set('scope', 'workspace');
+  url.searchParams.set('view', 'settings');
+  url.searchParams.set('result', result);
+  return url;
 }
 
 function clearSession(response: NextResponse) {
@@ -41,13 +38,13 @@ export async function POST(request: NextRequest) {
   try {
     form = await request.formData();
   } catch {
-    return relativeRedirect('/es?scope=workspace&view=settings&result=invalid');
+    return sameOriginRedirect('/es?scope=workspace&view=settings&result=invalid');
   }
 
   const locale = localeValue(form.get('locale'));
   const operation = form.get('operation');
   const token = request.cookies.get(SESSION_COOKIE)?.value;
-  if (!token) return relativeRedirect(`/${locale}/login`);
+  if (!token) return sameOriginRedirect(`/${locale}/login`);
 
   let path: string;
   let method: 'POST' | 'PATCH' = 'POST';
@@ -58,7 +55,7 @@ export async function POST(request: NextRequest) {
     const currentPassword = stringValue(form, 'currentPassword', 1024);
     const newPassword = stringValue(form, 'newPassword', 1024);
     if (!currentPassword || !newPassword || newPassword.length < 12) {
-      return dashboardRedirect(locale, 'invalid');
+      return sameOriginRedirect(dashboardUrl(locale, 'invalid'));
     }
     path = '/v1/auth/local/change-password';
     body = { currentPassword, newPassword };
@@ -79,7 +76,7 @@ export async function POST(request: NextRequest) {
       (role !== 'admin' && role !== 'member') ||
       (memberLocale !== 'es' && memberLocale !== 'en')
     ) {
-      return dashboardRedirect(locale, 'invalid');
+      return sameOriginRedirect(dashboardUrl(locale, 'invalid'));
     }
     path = '/v1/auth/local/members';
     body = { email, displayName, timezone, password, role, locale: memberLocale };
@@ -92,7 +89,7 @@ export async function POST(request: NextRequest) {
       (role !== 'admin' && role !== 'member') ||
       (status !== 'active' && status !== 'suspended' && status !== 'disabled')
     ) {
-      return dashboardRedirect(locale, 'invalid');
+      return sameOriginRedirect(dashboardUrl(locale, 'invalid'));
     }
     path = `/v1/auth/local/members/${encodeURIComponent(userId)}`;
     method = 'PATCH';
@@ -101,12 +98,12 @@ export async function POST(request: NextRequest) {
     const userId = stringValue(form, 'userId', 160);
     const newPassword = stringValue(form, 'newPassword', 1024);
     if (!userId || !newPassword || newPassword.length < 12) {
-      return dashboardRedirect(locale, 'invalid');
+      return sameOriginRedirect(dashboardUrl(locale, 'invalid'));
     }
     path = `/v1/auth/local/members/${encodeURIComponent(userId)}/reset-password`;
     body = { newPassword };
   } else {
-    return dashboardRedirect(locale, 'invalid');
+    return sameOriginRedirect(dashboardUrl(locale, 'invalid'));
   }
 
   try {
@@ -122,7 +119,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (response.status === 401 && !invalidateCurrentSession) {
-      return clearSession(relativeRedirect(`/${locale}/login`));
+      return clearSession(sameOriginRedirect(`/${locale}/login`));
     }
     if (!response.ok) {
       const result =
@@ -133,14 +130,14 @@ export async function POST(request: NextRequest) {
             : response.status === 409
               ? 'conflict'
               : 'error';
-      return dashboardRedirect(locale, result);
+      return sameOriginRedirect(dashboardUrl(locale, result));
     }
 
     if (invalidateCurrentSession) {
-      return clearSession(relativeRedirect(`/${locale}/login?password=changed`));
+      return clearSession(sameOriginRedirect(`/${locale}/login?password=changed`));
     }
-    return dashboardRedirect(locale, 'saved');
+    return sameOriginRedirect(dashboardUrl(locale, 'saved'));
   } catch {
-    return dashboardRedirect(locale, 'error');
+    return sameOriginRedirect(dashboardUrl(locale, 'error'));
   }
 }
