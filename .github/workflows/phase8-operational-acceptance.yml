@@ -1,0 +1,93 @@
+name: Phase 8 Operational Acceptance
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "deployment/live/phase8-operational-acceptance.sh"
+      - ".github/workflows/phase8-operational-acceptance.yml"
+      - "docs/56-phase-8-operational-acceptance.md"
+  workflow_dispatch:
+    inputs:
+      confirm_live_restart:
+        description: "Type RESTART-LIVE to acknowledge the controlled production restart"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase8-operational-acceptance
+  cancel-in-progress: false
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate operational acceptance contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          script="deployment/live/phase8-operational-acceptance.sh"
+          bash -n "$script"
+          grep -Fq 'mongodump --quiet --db' "$script"
+          grep -Fq 'mongorestore' "$script"
+          grep -Fq -- '--nsFrom=' "$script"
+          grep -Fq -- '--nsTo=' "$script"
+          grep -Fq 'compose restart mongo' "$script"
+          grep -Fq 'docker stats --no-stream' "$script"
+          grep -Fq 'chmod 600 "$BACKUP_FILE"' "$script"
+          grep -Fq 'trap cleanup EXIT' "$script"
+          if grep -Eq '(^|[[:space:]])set[[:space:]]+-x' "$script"; then
+            echo 'operational acceptance must never enable shell xtrace' >&2
+            exit 1
+          fi
+
+  live-operational-acceptance:
+    needs: contract
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, Linux, X64, kairoseth-ci]
+    timeout-minutes: 30
+    steps:
+      - name: Checkout accepted main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Guard exact main and explicit restart acknowledgement
+        shell: bash
+        env:
+          CONFIRM_LIVE_RESTART: ${{ inputs.confirm_live_restart }}
+        run: |
+          set -euo pipefail
+          [[ "$CONFIRM_LIVE_RESTART" == "RESTART-LIVE" ]]
+          [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
+          git fetch origin main
+          [[ "$(git rev-parse origin/main)" == "$GITHUB_SHA" ]]
+          command -v flock >/dev/null
+
+      - name: Exercise backup, restore and restart persistence
+        shell: bash
+        run: |
+          set -euo pipefail
+          flock -w 1200 /tmp/work-manager-live-ops.lock \
+            bash deployment/live/phase8-operational-acceptance.sh
+
+      - name: Publish sanitized operational evidence summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          summary="/srv/kairoseth/apps/work-manager/evidence/phase8/latest/summary.txt"
+          [[ -r "$summary" ]]
+          {
+            echo "## Phase 8 operational acceptance"
+            echo
+            sed 's/^/- /' "$summary"
+            echo "- container footprint: retained on the deployment runner"
+            echo "- volume footprint: retained on the deployment runner"
+            echo "- backup archive: retained on the deployment runner with mode 0600"
+          } >> "$GITHUB_STEP_SUMMARY"
