@@ -1,45 +1,43 @@
-type RequestUrlSource = {
-  url: string;
-  headers: Pick<Headers, 'get'>;
-};
+import { NextResponse } from 'next/server';
 
-function firstHeaderValue(value: string | null): string | null {
-  if (!value) return null;
-  const first = value.split(',', 1)[0]?.trim();
-  return first || null;
-}
+const SAME_ORIGIN_BASE = 'http://same-origin.invalid';
 
-function forwardedProtocol(headers: RequestUrlSource['headers']): 'http:' | 'https:' | null {
-  const value = firstHeaderValue(headers.get('x-forwarded-proto'))?.toLowerCase();
-  return value === 'http' || value === 'https' ? `${value}:` : null;
-}
-
-function forwardedHost(headers: RequestUrlSource['headers']): string | null {
-  const value = firstHeaderValue(headers.get('x-forwarded-host'));
-  if (!value) return null;
-
-  try {
-    const parsed = new URL(`http://${value}`);
-    if (parsed.host !== value || parsed.pathname !== '/' || parsed.search || parsed.hash) return null;
-    return value;
-  } catch {
-    return null;
+function assertSameOriginPath(value: string): void {
+  if (!value.startsWith('/') || value.startsWith('//')) {
+    throw new Error('same-origin redirect target must be an absolute path');
   }
 }
 
 /**
- * Build an absolute same-origin URL using the public reverse-proxy origin when present.
+ * Build a mutable URL for a path-only redirect target.
  *
- * Next.js can expose the internal container origin in `request.url` behind a reverse proxy
- * (for example `http://localhost:3000`). Caddy supplies the public origin through the
- * standard X-Forwarded-* headers, so redirects must prefer those values while preserving
- * a request-url fallback for local development and direct/self-hosted deployments.
+ * The synthetic origin is never emitted. `sameOriginRedirect` serializes only
+ * pathname/search/hash into the Location header, keeping redirects bound to the
+ * browser's current origin regardless of reverse-proxy topology.
  */
-export function publicRequestUrl(request: RequestUrlSource, pathname: string): URL {
-  const internalUrl = new URL(request.url);
-  const host = forwardedHost(request.headers);
-  if (!host) return new URL(pathname, internalUrl);
+export function sameOriginUrl(pathname: string): URL {
+  assertSameOriginPath(pathname);
+  return new URL(pathname, SAME_ORIGIN_BASE);
+}
 
-  const protocol = forwardedProtocol(request.headers) ?? internalUrl.protocol;
-  return new URL(pathname, `${protocol}//${host}`);
+/**
+ * Return an HTTP redirect with a relative same-origin Location header.
+ *
+ * This deliberately avoids request.url and X-Forwarded-* origin reconstruction:
+ * internal container hosts such as localhost:3000 can never leak into the browser,
+ * and client/self-hosted deployments remain portable without public-domain config.
+ */
+export function sameOriginRedirect(target: URL | string, status = 303): NextResponse {
+  const location =
+    typeof target === 'string'
+      ? target
+      : `${target.pathname}${target.search}${target.hash}`;
+  assertSameOriginPath(location);
+
+  return new NextResponse(null, {
+    status,
+    headers: {
+      location,
+    },
+  });
 }
