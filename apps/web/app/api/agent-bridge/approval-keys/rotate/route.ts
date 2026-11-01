@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { apiBaseUrl, SESSION_COOKIE } from '../../../../../lib/api';
+import { publicRequestUrl } from '../../../../../lib/public-url';
 
 function safeLocale(value: FormDataEntryValue | null): 'es' | 'en' {
   return value === 'en' ? 'en' : 'es';
 }
 
 function agentBridgeUrl(request: NextRequest, locale: 'es' | 'en', result: string) {
-  const url = new URL(`/${locale}/ia/agent-bridge`, request.url);
+  const url = publicRequestUrl(request, `/${locale}/ia/agent-bridge`);
   url.searchParams.set('rotation', result);
   return url;
 }
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest) {
 
   const locale = safeLocale(form.get('locale'));
   const token = request.cookies.get(SESSION_COOKIE)?.value;
-  if (!token) return NextResponse.redirect(new URL(`/${locale}/login`, request.url), 303);
+  if (!token) return NextResponse.redirect(publicRequestUrl(request, `/${locale}/login`), 303);
 
   try {
     const response = await fetch(`${apiBaseUrl()}/v1/products/agent-bridge/approval-keys/rotate`, {
@@ -44,7 +45,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (response.status === 401) {
-      return clearSession(NextResponse.redirect(new URL(`/${locale}/login`, request.url), 303));
+      return clearSession(NextResponse.redirect(publicRequestUrl(request, `/${locale}/login`), 303));
     }
 
     if (!response.ok) {
