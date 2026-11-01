@@ -1,13 +1,14 @@
-import { NextResponse } from 'next/server';
+import type { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { apiBaseUrl, SESSION_COOKIE } from '../../../../../lib/api';
+import { sameOriginRedirect, sameOriginUrl } from '../../../../../lib/public-url';
 
 function safeLocale(value: FormDataEntryValue | null): 'es' | 'en' {
   return value === 'en' ? 'en' : 'es';
 }
 
-function agentBridgeUrl(request: NextRequest, locale: 'es' | 'en', result: string) {
-  const url = new URL(`/${locale}/ia/agent-bridge`, request.url);
+function agentBridgeUrl(locale: 'es' | 'en', result: string) {
+  const url = sameOriginUrl(`/${locale}/ia/agent-bridge`);
   url.searchParams.set('rotation', result);
   return url;
 }
@@ -28,12 +29,12 @@ export async function POST(request: NextRequest) {
   try {
     form = await request.formData();
   } catch {
-    return NextResponse.redirect(agentBridgeUrl(request, 'es', 'invalid'), 303);
+    return sameOriginRedirect(agentBridgeUrl('es', 'invalid'));
   }
 
   const locale = safeLocale(form.get('locale'));
   const token = request.cookies.get(SESSION_COOKIE)?.value;
-  if (!token) return NextResponse.redirect(new URL(`/${locale}/login`, request.url), 303);
+  if (!token) return sameOriginRedirect(`/${locale}/login`);
 
   try {
     const response = await fetch(`${apiBaseUrl()}/v1/products/agent-bridge/approval-keys/rotate`, {
@@ -44,7 +45,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (response.status === 401) {
-      return clearSession(NextResponse.redirect(new URL(`/${locale}/login`, request.url), 303));
+      return clearSession(sameOriginRedirect(`/${locale}/login`));
     }
 
     if (!response.ok) {
@@ -56,11 +57,11 @@ export async function POST(request: NextRequest) {
             : response.status === 503
               ? 'unavailable'
               : 'error';
-      return NextResponse.redirect(agentBridgeUrl(request, locale, result), 303);
+      return sameOriginRedirect(agentBridgeUrl(locale, result));
     }
 
-    return NextResponse.redirect(agentBridgeUrl(request, locale, 'started'), 303);
+    return sameOriginRedirect(agentBridgeUrl(locale, 'started'));
   } catch {
-    return NextResponse.redirect(agentBridgeUrl(request, locale, 'error'), 303);
+    return sameOriginRedirect(agentBridgeUrl(locale, 'error'));
   }
 }

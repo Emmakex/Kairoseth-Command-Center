@@ -5,6 +5,7 @@ import {
   renderGitHubWebhookSecretHtml,
   unsealGitHubWebhookSecret,
 } from '../../../../../lib/github-webhook-secret';
+import { sameOriginRedirect, sameOriginUrl } from '../../../../../lib/public-url';
 
 const WEBHOOK_REVEAL_COOKIE = 'kcc_github_webhook_reveal';
 
@@ -27,18 +28,16 @@ export async function GET(request: NextRequest) {
   const locale = localeFrom(request);
   const sessionToken = request.cookies.get(SESSION_COOKIE)?.value;
   if (!sessionToken) {
-    return clearRevealCookie(
-      NextResponse.redirect(new URL(`/${locale}/login`, request.url), 303),
-    );
+    return clearRevealCookie(sameOriginRedirect(`/${locale}/login`));
   }
 
   const sealed = request.cookies.get(WEBHOOK_REVEAL_COOKIE)?.value;
   const reveal = sealed ? unsealGitHubWebhookSecret(sessionToken, sealed) : null;
   if (!reveal) {
-    const url = new URL(`/${locale}`, request.url);
+    const url = sameOriginUrl(`/${locale}`);
     url.searchParams.set('scope', 'workspace');
     url.searchParams.set('result', 'error');
-    return clearRevealCookie(NextResponse.redirect(url, 303));
+    return clearRevealCookie(sameOriginRedirect(url));
   }
 
   const response = new NextResponse(renderGitHubWebhookSecretHtml(locale, reveal), {

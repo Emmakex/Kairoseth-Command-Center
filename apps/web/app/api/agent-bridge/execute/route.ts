@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import type { NextRequest } from 'next/server';
-import { NextResponse } from 'next/server';
+import type { NextResponse } from 'next/server';
 import { apiBaseUrl, SESSION_COOKIE } from '../../../../lib/api';
 import { parseAgentBridgeCommandResponse } from '../../../../lib/agent-bridge-command';
 import { planAgentBridgeExecution } from '../../../../lib/agent-bridge-execution';
 import { parseAgentBridgeToolInventoryResponse } from '../../../../lib/agent-bridge-tools';
+import { sameOriginRedirect, sameOriginUrl } from '../../../../lib/public-url';
 
 function safeLocale(value: FormDataEntryValue | null): 'es' | 'en' {
   return value === 'en' ? 'en' : 'es';
@@ -22,12 +23,11 @@ function safeText(value: FormDataEntryValue | null, max: number): string | null 
 }
 
 function agentBridgeUrl(
-  request: NextRequest,
   locale: 'es' | 'en',
   result: string,
   commandId?: string,
 ) {
-  const url = new URL(`/${locale}/ia/agent-bridge`, request.url);
+  const url = sameOriginUrl(`/${locale}/ia/agent-bridge`);
   url.searchParams.set('execution', result);
   if (commandId) url.searchParams.set('command', commandId);
   return url;
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
   try {
     form = await request.formData();
   } catch {
-    return NextResponse.redirect(agentBridgeUrl(request, 'es', 'invalid'), 303);
+    return sameOriginRedirect(agentBridgeUrl('es', 'invalid'));
   }
 
   const locale = safeLocale(form.get('locale'));
@@ -57,11 +57,11 @@ export async function POST(request: NextRequest) {
   const executionToolId = safeText(form.get('executionToolId'), 512);
   const rawInput = typeof form.get('input') === 'string' ? String(form.get('input')) : '';
   if (!installationId || !executionToolId) {
-    return NextResponse.redirect(agentBridgeUrl(request, locale, 'invalid'), 303);
+    return sameOriginRedirect(agentBridgeUrl(locale, 'invalid'));
   }
 
   const token = request.cookies.get(SESSION_COOKIE)?.value;
-  if (!token) return NextResponse.redirect(new URL(`/${locale}/login`, request.url), 303);
+  if (!token) return sameOriginRedirect(`/${locale}/login`);
 
   try {
     const inventoryResponse = await fetch(
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
     );
 
     if (inventoryResponse.status === 401) {
-      return clearSession(NextResponse.redirect(new URL(`/${locale}/login`, request.url), 303));
+      return clearSession(sameOriginRedirect(`/${locale}/login`));
     }
     if (!inventoryResponse.ok) {
       const result =
@@ -85,12 +85,12 @@ export async function POST(request: NextRequest) {
             : inventoryResponse.status === 503
               ? 'unavailable'
               : 'error';
-      return NextResponse.redirect(agentBridgeUrl(request, locale, result), 303);
+      return sameOriginRedirect(agentBridgeUrl(locale, result));
     }
 
     const inventoryBody = parseAgentBridgeToolInventoryResponse(await inventoryResponse.json());
     if (!inventoryBody || inventoryBody.inventory.installationId !== installationId) {
-      return NextResponse.redirect(agentBridgeUrl(request, locale, 'invalid_inventory'), 303);
+      return sameOriginRedirect(agentBridgeUrl(locale, 'invalid_inventory'));
     }
 
     const planned = planAgentBridgeExecution(
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
             : planned.error === 'input_too_large'
               ? 'input_too_large'
               : 'invalid_input';
-      return NextResponse.redirect(agentBridgeUrl(request, locale, result), 303);
+      return sameOriginRedirect(agentBridgeUrl(locale, result));
     }
 
     const path = planned.plan.endpointKind === 'read' ? 'commands' : 'approved-commands';
@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
     );
 
     if (executionResponse.status === 401) {
-      return clearSession(NextResponse.redirect(new URL(`/${locale}/login`, request.url), 303));
+      return clearSession(sameOriginRedirect(`/${locale}/login`));
     }
     if (!executionResponse.ok) {
       const result =
@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
               : executionResponse.status === 400
                 ? 'invalid'
                 : 'error';
-      return NextResponse.redirect(agentBridgeUrl(request, locale, result), 303);
+      return sameOriginRedirect(agentBridgeUrl(locale, result));
     }
 
     const queued = parseAgentBridgeCommandResponse(await executionResponse.json());
@@ -152,14 +152,11 @@ export async function POST(request: NextRequest) {
       queued.command.installationId !== installationId ||
       queued.command.toolId !== executionToolId
     ) {
-      return NextResponse.redirect(agentBridgeUrl(request, locale, 'invalid_response'), 303);
+      return sameOriginRedirect(agentBridgeUrl(locale, 'invalid_response'));
     }
 
-    return NextResponse.redirect(
-      agentBridgeUrl(request, locale, 'queued', queued.command.commandId),
-      303,
-    );
+    return sameOriginRedirect(agentBridgeUrl(locale, 'queued', queued.command.commandId));
   } catch {
-    return NextResponse.redirect(agentBridgeUrl(request, locale, 'error'), 303);
+    return sameOriginRedirect(agentBridgeUrl(locale, 'error'));
   }
 }

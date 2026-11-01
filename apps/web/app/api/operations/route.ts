@@ -1,7 +1,8 @@
-import { NextResponse } from 'next/server';
+import type { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { apiBaseUrl, getSession, SESSION_COOKIE } from '../../../lib/api';
 import { parseOperationalMutation } from '../../../lib/operations';
+import { sameOriginRedirect, sameOriginUrl } from '../../../lib/public-url';
 
 function localeValue(value: FormDataEntryValue | null): 'es' | 'en' {
   return value === 'en' ? 'en' : 'es';
@@ -11,8 +12,8 @@ function scopeValue(value: FormDataEntryValue | null): 'workspace' | 'private' {
   return value === 'private' ? 'private' : 'workspace';
 }
 
-function dashboardUrl(request: NextRequest, locale: 'es' | 'en', scope: 'workspace' | 'private', result: string) {
-  const url = new URL(`/${locale}`, request.url);
+function dashboardUrl(locale: 'es' | 'en', scope: 'workspace' | 'private', result: string) {
+  const url = sameOriginUrl(`/${locale}`);
   url.searchParams.set('scope', scope);
   url.searchParams.set('result', result);
   return url;
@@ -34,28 +35,28 @@ export async function POST(request: NextRequest) {
   try {
     form = await request.formData();
   } catch {
-    return NextResponse.redirect(new URL('/es?result=invalid', request.url), 303);
+    return sameOriginRedirect('/es?result=invalid');
   }
 
   const locale = localeValue(form.get('locale'));
   const scope = scopeValue(form.get('scope'));
   const token = request.cookies.get(SESSION_COOKIE)?.value;
   if (!token) {
-    return NextResponse.redirect(new URL(`/${locale}/login`, request.url), 303);
+    return sameOriginRedirect(`/${locale}/login`);
   }
 
   let timeZone: string | undefined;
   if (form.get('operation') === 'task-reminders') {
     const session = await getSession(token);
     if (!session) {
-      return NextResponse.redirect(dashboardUrl(request, locale, scope, 'error'), 303);
+      return sameOriginRedirect(dashboardUrl(locale, scope, 'error'));
     }
     timeZone = session.user.timezone;
   }
 
   const mutation = parseOperationalMutation(form, { ...(timeZone ? { timeZone } : {}) });
   if (!mutation) {
-    return NextResponse.redirect(dashboardUrl(request, locale, scope, 'invalid'), 303);
+    return sameOriginRedirect(dashboardUrl(locale, scope, 'invalid'));
   }
 
   try {
@@ -71,16 +72,16 @@ export async function POST(request: NextRequest) {
     });
 
     if (response.status === 401) {
-      return clearSession(NextResponse.redirect(new URL(`/${locale}/login`, request.url), 303));
+      return clearSession(sameOriginRedirect(`/${locale}/login`));
     }
 
     if (!response.ok) {
       const result = response.status === 403 ? 'forbidden' : response.status === 404 ? 'not-found' : 'error';
-      return NextResponse.redirect(dashboardUrl(request, locale, scope, result), 303);
+      return sameOriginRedirect(dashboardUrl(locale, scope, result));
     }
 
-    return NextResponse.redirect(dashboardUrl(request, locale, scope, 'saved'), 303);
+    return sameOriginRedirect(dashboardUrl(locale, scope, 'saved'));
   } catch {
-    return NextResponse.redirect(dashboardUrl(request, locale, scope, 'error'), 303);
+    return sameOriginRedirect(dashboardUrl(locale, scope, 'error'));
   }
 }
