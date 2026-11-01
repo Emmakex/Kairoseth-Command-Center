@@ -17,6 +17,119 @@
   transform: translateY(0);
 }
 
+.topbarControls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.languageLink {
+  display: inline-flex;
+  min-width: 42px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  border-radius: 10px;
+  color: #52627a;
+  font-size: 0.88rem;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.languageLink:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.accountMenu {
+  position: relative;
+}
+
+.accountMenu summary {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px 4px 5px;
+  border-radius: 12px;
+  color: #0f172a;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 750;
+  list-style: none;
+  user-select: none;
+}
+
+.accountMenu summary::-webkit-details-marker {
+  display: none;
+}
+
+.accountMenu summary:hover,
+.accountMenu[open] summary {
+  background: #f1f5f9;
+}
+
+.accountAvatar {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 999px;
+  background: #e8eef8;
+  color: #1e3a8a;
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.accountChevron {
+  color: #64748b;
+  font-size: 0.75rem;
+  transition: transform 140ms ease;
+}
+
+.accountMenu[open] .accountChevron {
+  transform: rotate(180deg);
+}
+
+.accountPopover {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 50;
+  width: min(280px, calc(100vw - 48px));
+  padding: 14px;
+  border: 1px solid #dbe3ef;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.14);
+}
+
+.accountPopover p {
+  margin: 0 0 12px;
+  color: #64748b;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.accountPopover strong {
+  color: #0f172a;
+}
+
+.logoutButton {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid #dbe3ef;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #0f172a;
+  cursor: pointer;
+  font-weight: 750;
+}
+
+.logoutButton:hover {
+  background: #eef2f7;
+}
+
 .compactHero {
   padding: 30px 34px;
 }
@@ -107,11 +220,60 @@
   margin-top: 16px;
 }
 
+.agentBridgeShortcut {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 14px 16px;
+  border: 1px solid #dbe3ef;
+  border-radius: 14px;
+  background: #ffffff;
+  color: #0f172a;
+  text-decoration: none;
+}
+
+.agentBridgeShortcut:hover {
+  border-color: #c7d2fe;
+  background: #f8faff;
+}
+
+.agentBridgeShortcut strong,
+.agentBridgeShortcut small {
+  display: block;
+}
+
+.agentBridgeShortcut small {
+  margin-top: 3px;
+  color: #64748b;
+  line-height: 1.45;
+}
+
+.agentBridgeMark {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 10px;
+  background: #eef2ff;
+  color: #3730a3;
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.05em;
+}
+
+.agentBridgeArrow {
+  color: #64748b;
+  font-size: 1.1rem;
+}
+
 :global(a:focus-visible),
 :global(button:focus-visible),
 :global(input:focus-visible),
 :global(select:focus-visible),
-:global(textarea:focus-visible) {
+:global(textarea:focus-visible),
+.accountMenu summary:focus-visible {
   outline: 3px solid rgba(37, 99, 235, 0.26);
   outline-offset: 2px;
 }
@@ -136,10 +298,19 @@
     padding: 18px;
     border-radius: 22px;
   }
+
+  .accountMenu summary > span:nth-child(2) {
+    display: none;
+  }
+
+  .agentBridgeShortcut {
+    align-items: start;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .skipLink {
+  .skipLink,
+  .accountChevron {
     transition: none;
   }
 }
