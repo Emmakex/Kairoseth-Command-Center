@@ -2,13 +2,14 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { apiBaseUrl, SESSION_COOKIE } from '../../../../lib/api';
 import { parsePrioritizationWeightPolicyMutation } from '../../../../lib/prioritization-weight-policies';
+import { publicRequestUrl } from '../../../../lib/public-url';
 
 function safeLocale(value: FormDataEntryValue | null): 'es' | 'en' {
   return value === 'en' ? 'en' : 'es';
 }
 
 function dashboardUrl(request: NextRequest, locale: 'es' | 'en', result: string) {
-  const url = new URL(`/${locale}`, request.url);
+  const url = publicRequestUrl(request, `/${locale}`);
   url.searchParams.set('scope', 'workspace');
   url.searchParams.set('result', result);
   return url;
@@ -30,12 +31,12 @@ export async function POST(request: NextRequest) {
   try {
     form = await request.formData();
   } catch {
-    return NextResponse.redirect(new URL('/es?scope=workspace&result=invalid', request.url), 303);
+    return NextResponse.redirect(publicRequestUrl(request, '/es?scope=workspace&result=invalid'), 303);
   }
 
   const locale = safeLocale(form.get('locale'));
   const token = request.cookies.get(SESSION_COOKIE)?.value;
-  if (!token) return NextResponse.redirect(new URL(`/${locale}/login`, request.url), 303);
+  if (!token) return NextResponse.redirect(publicRequestUrl(request, `/${locale}/login`), 303);
 
   const mutation = parsePrioritizationWeightPolicyMutation(form);
   if (!mutation) return NextResponse.redirect(dashboardUrl(request, locale, 'invalid'), 303);
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (response.status === 401) {
-      return clearSession(NextResponse.redirect(new URL(`/${locale}/login`, request.url), 303));
+      return clearSession(NextResponse.redirect(publicRequestUrl(request, `/${locale}/login`), 303));
     }
     if (!response.ok) {
       const result =
