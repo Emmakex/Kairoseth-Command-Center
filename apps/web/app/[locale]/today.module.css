@@ -147,12 +147,16 @@
   outline: none;
 }
 
+:global(.dashboard-shell):has(.clearState) :global(.metric-grid) {
+  display: none;
+}
+
 .clearState {
   display: flex;
   align-items: center;
   gap: 18px;
-  margin-top: 18px;
-  padding: 24px 26px;
+  margin-top: 14px;
+  padding: 22px 24px;
   border: 1px solid rgba(187, 247, 208, 0.9);
   border-radius: 22px;
   background: linear-gradient(135deg, rgba(240, 253, 244, 0.9), rgba(255, 255, 255, 0.96));
@@ -186,8 +190,8 @@
 }
 
 .secondaryTools {
-  margin-top: 22px;
-  padding: 26px;
+  margin-top: 18px;
+  padding: 24px;
   border: 1px solid rgba(203, 213, 225, 0.78);
   border-radius: 26px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.68), rgba(248, 250, 252, 0.78));
@@ -195,7 +199,7 @@
 
 .secondaryHeading {
   max-width: 720px;
-  margin-bottom: 18px;
+  margin-bottom: 16px;
 }
 
 .secondaryHeading h2 {

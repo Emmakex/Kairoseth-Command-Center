@@ -1,12 +1,30 @@
+:global(.capture-panel) {
+  padding: 20px 22px;
+}
+
+:global(.capture-heading) {
+  margin-bottom: 14px;
+}
+
+:global(.capture-heading h2) {
+  margin-bottom: 4px;
+  font-size: 1.15rem;
+}
+
+:global(.capture-heading p) {
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
 .form {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .primaryRow {
   display: grid;
   grid-template-columns: 150px minmax(240px, 1fr) auto;
-  gap: 12px;
+  gap: 10px;
   align-items: end;
 }
 
@@ -17,12 +35,12 @@
 
 .optional {
   border-top: 1px solid rgba(203, 213, 225, 0.72);
-  padding-top: 10px;
+  padding-top: 8px;
 }
 
 .optional summary {
   width: fit-content;
-  padding: 7px 2px;
+  padding: 6px 2px;
   cursor: pointer;
   color: #52627a;
   font-size: 0.82rem;
@@ -53,9 +71,9 @@
 .optionalGrid {
   display: grid;
   grid-template-columns: minmax(260px, 1fr) 160px;
-  gap: 12px;
+  gap: 10px;
   align-items: end;
-  padding-top: 10px;
+  padding-top: 8px;
 }
 
 .optionalGrid :global(.description-field) {
@@ -63,6 +81,10 @@
 }
 
 @media (max-width: 760px) {
+  :global(.capture-panel) {
+    padding: 18px;
+  }
+
   .primaryRow,
   .optionalGrid {
     grid-template-columns: 1fr;
