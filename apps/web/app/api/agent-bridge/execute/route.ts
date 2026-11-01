@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { NextRequest } from 'next/server';
-import { NextResponse } from 'next/server';
+import type { NextResponse } from 'next/server';
 import { apiBaseUrl, SESSION_COOKIE } from '../../../../lib/api';
 import { parseAgentBridgeCommandResponse } from '../../../../lib/agent-bridge-command';
 import { planAgentBridgeExecution } from '../../../../lib/agent-bridge-execution';

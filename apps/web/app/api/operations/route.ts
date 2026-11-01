@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import type { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { apiBaseUrl, getSession, SESSION_COOKIE } from '../../../lib/api';
 import { parseOperationalMutation } from '../../../lib/operations';
