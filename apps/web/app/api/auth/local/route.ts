@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { apiBaseUrl, SESSION_COOKIE } from '../../../../lib/api';
+import { publicRequestUrl } from '../../../../lib/public-url';
 
 function localeValue(value: FormDataEntryValue | null): 'es' | 'en' {
   return value === 'en' ? 'en' : 'es';
 }
 
 function dashboardUrl(request: NextRequest, locale: 'es' | 'en', result: string) {
-  const url = new URL(`/${locale}`, request.url);
+  const url = publicRequestUrl(request, `/${locale}`);
   url.searchParams.set('scope', 'workspace');
   url.searchParams.set('result', result);
   return url;
@@ -36,13 +37,13 @@ export async function POST(request: NextRequest) {
   try {
     form = await request.formData();
   } catch {
-    return NextResponse.redirect(new URL('/es?scope=workspace&result=invalid', request.url), 303);
+    return NextResponse.redirect(publicRequestUrl(request, '/es?scope=workspace&result=invalid'), 303);
   }
 
   const locale = localeValue(form.get('locale'));
   const operation = form.get('operation');
   const token = request.cookies.get(SESSION_COOKIE)?.value;
-  if (!token) return NextResponse.redirect(new URL(`/${locale}/login`, request.url), 303);
+  if (!token) return NextResponse.redirect(publicRequestUrl(request, `/${locale}/login`), 303);
 
   let path: string;
   let method: 'POST' | 'PATCH' = 'POST';
@@ -117,7 +118,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (response.status === 401 && !invalidateCurrentSession) {
-      return clearSession(NextResponse.redirect(new URL(`/${locale}/login`, request.url), 303));
+      return clearSession(NextResponse.redirect(publicRequestUrl(request, `/${locale}/login`), 303));
     }
     if (!response.ok) {
       const result =
@@ -133,7 +134,7 @@ export async function POST(request: NextRequest) {
 
     if (invalidateCurrentSession) {
       return clearSession(
-        NextResponse.redirect(new URL(`/${locale}/login?password=changed`, request.url), 303),
+        NextResponse.redirect(publicRequestUrl(request, `/${locale}/login?password=changed`), 303),
       );
     }
     return NextResponse.redirect(dashboardUrl(request, locale, 'saved'), 303);
