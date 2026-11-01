@@ -16,11 +16,9 @@ export function QuickCapturePanel({
     <section className="capture-panel" aria-labelledby="quick-capture-heading">
       <div className="capture-heading">
         <div>
-          <span className="eyebrow">{copy.quickCapture}</span>
           <h2 id="quick-capture-heading">{copy.quickCapture}</h2>
           <p>{copy.quickCaptureHelp}</p>
         </div>
-        <span className="scope-badge">{scope === 'private' ? copy.private : copy.workspace}</span>
       </div>
       <form className={styles.form} action="/api/operations" method="post">
         <input type="hidden" name="locale" value={locale} />
