@@ -151,13 +151,13 @@ jobs:
             http://work-manager-edge/es/login >/dev/null
 
           redirect_location="$(docker run --rm --network kairoseth-public-edge curlimages/curl:8.16.0 \
-            -sS -o /dev/null -w '%{redirect_url}' -X POST \
+            -sS -D - -o /dev/null -X POST \
             -H 'Host: work-manager.kairoseth.com' \
-            -H 'X-Forwarded-Proto: https' \
             -H 'content-type: application/x-www-form-urlencoded' \
             --data 'locale=es&scope=private&operation=quick-capture&kind=task&title=Redirect%20acceptance' \
-            http://work-manager-edge/api/operations)"
-          [[ "$redirect_location" == "https://work-manager.kairoseth.com/es/login" ]]
+            http://work-manager-edge/api/operations \
+            | tr -d '\r' | awk 'tolower($1) == "location:" { print $2; exit }')"
+          [[ "$redirect_location" == "/es/login" ]]
 
           runtime_code="$(docker run --rm --network kairoseth-public-edge curlimages/curl:8.16.0 \
             -sS -o /dev/null -w '%{http_code}' -X POST \
