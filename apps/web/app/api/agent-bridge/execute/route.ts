@@ -5,6 +5,7 @@ import { apiBaseUrl, SESSION_COOKIE } from '../../../../lib/api';
 import { parseAgentBridgeCommandResponse } from '../../../../lib/agent-bridge-command';
 import { planAgentBridgeExecution } from '../../../../lib/agent-bridge-execution';
 import { parseAgentBridgeToolInventoryResponse } from '../../../../lib/agent-bridge-tools';
+import { publicRequestUrl } from '../../../../lib/public-url';
 
 function safeLocale(value: FormDataEntryValue | null): 'es' | 'en' {
   return value === 'en' ? 'en' : 'es';
@@ -27,7 +28,7 @@ function agentBridgeUrl(
   result: string,
   commandId?: string,
 ) {
-  const url = new URL(`/${locale}/ia/agent-bridge`, request.url);
+  const url = publicRequestUrl(request, `/${locale}/ia/agent-bridge`);
   url.searchParams.set('execution', result);
   if (commandId) url.searchParams.set('command', commandId);
   return url;
@@ -61,7 +62,7 @@ export async function POST(request: NextRequest) {
   }
 
   const token = request.cookies.get(SESSION_COOKIE)?.value;
-  if (!token) return NextResponse.redirect(new URL(`/${locale}/login`, request.url), 303);
+  if (!token) return NextResponse.redirect(publicRequestUrl(request, `/${locale}/login`), 303);
 
   try {
     const inventoryResponse = await fetch(
@@ -74,7 +75,7 @@ export async function POST(request: NextRequest) {
     );
 
     if (inventoryResponse.status === 401) {
-      return clearSession(NextResponse.redirect(new URL(`/${locale}/login`, request.url), 303));
+      return clearSession(NextResponse.redirect(publicRequestUrl(request, `/${locale}/login`), 303));
     }
     if (!inventoryResponse.ok) {
       const result =
@@ -130,7 +131,7 @@ export async function POST(request: NextRequest) {
     );
 
     if (executionResponse.status === 401) {
-      return clearSession(NextResponse.redirect(new URL(`/${locale}/login`, request.url), 303));
+      return clearSession(NextResponse.redirect(publicRequestUrl(request, `/${locale}/login`), 303));
     }
     if (!executionResponse.ok) {
       const result =
