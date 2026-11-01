@@ -138,8 +138,10 @@ export default async function CommandCenterPage({
       ? {
           product: 'Gestor de Trabajo',
           skip: 'Saltar al contenido principal',
+          accountMenu: 'Cuenta',
           clearTitle: 'Todo despejado',
-          clearHelp: 'No hay trabajo activo ni alertas que requieran tu atención. Puedes crear algo cuando lo necesites.',
+          clearHelp:
+            'No hay trabajo activo ni alertas que requieran tu atención. Puedes crear algo cuando lo necesites.',
           secondaryEyebrow: 'Cuando lo necesites',
           secondaryTitle: 'Más herramientas, sin ruido',
           secondaryHelp:
@@ -149,15 +151,19 @@ export default async function CommandCenterPage({
           automation: 'Automatización y prioridades',
           automationHelp: 'Reglas y pesos avanzados para adaptar cómo se ordena el trabajo.',
           integrations: 'Integraciones',
-          integrationsHelp: 'GitHub y señales de herramientas conectadas.',
+          integrationsHelp: 'GitHub, Agent Bridge y señales de herramientas conectadas.',
+          agentBridge: 'IA · Agent Bridge',
+          agentBridgeHelp: 'Abre la consola gobernada de ejecución y observabilidad de agentes.',
           account: 'Cuenta y equipo',
           accountHelp: 'Contraseña, miembros y administración del espacio de trabajo.',
         }
       : {
           product: 'Work Manager',
           skip: 'Skip to main content',
+          accountMenu: 'Account',
           clearTitle: 'All clear',
-          clearHelp: 'There is no active work or alert that needs your attention. Create something whenever you need it.',
+          clearHelp:
+            'There is no active work or alert that needs your attention. Create something whenever you need it.',
           secondaryEyebrow: 'When you need it',
           secondaryTitle: 'More tools, without the noise',
           secondaryHelp:
@@ -167,7 +173,9 @@ export default async function CommandCenterPage({
           automation: 'Automation and priorities',
           automationHelp: 'Advanced rules and weights for adapting how work is ranked.',
           integrations: 'Integrations',
-          integrationsHelp: 'GitHub and signals from connected tools.',
+          integrationsHelp: 'GitHub, Agent Bridge and signals from connected tools.',
+          agentBridge: 'AI · Agent Bridge',
+          agentBridgeHelp: 'Open the governed agent execution and observability console.',
           account: 'Account and team',
           accountHelp: 'Password, members and workspace administration.',
         };
@@ -179,6 +187,7 @@ export default async function CommandCenterPage({
       today.tasks.length === 0 &&
       today.alerts.length === 0,
   );
+  const userInitial = session.user.displayName.trim().charAt(0).toUpperCase() || 'U';
 
   return (
     <main className="shell dashboard-shell">
@@ -191,21 +200,35 @@ export default async function CommandCenterPage({
           <span className="product-mark">WM</span>
           <strong>{uxCopy.product}</strong>
         </div>
-        <div className="topbar-actions">
-          {canViewAgentBridge ? (
-            <Link href={`/${locale}/ia/agent-bridge`}>
-              {locale === 'es' ? 'IA · Agent Bridge' : 'AI · Agent Bridge'}
-            </Link>
-          ) : null}
-          <Link href={`/${otherLocale}?scope=${scope}`}>{otherLocale.toUpperCase()}</Link>
-          <span className="user-label">
-            {copy.signedInAs} <strong>{session.user.displayName}</strong>
-          </span>
-          <form action={`/api/auth/logout?locale=${locale}`} method="post">
-            <button className="text-button" type="submit">
-              {copy.logout}
-            </button>
-          </form>
+        <div className={styles.topbarControls}>
+          <Link
+            className={styles.languageLink}
+            href={`/${otherLocale}?scope=${scope}`}
+            aria-label={locale === 'es' ? 'Cambiar a inglés' : 'Switch to Spanish'}
+          >
+            {otherLocale.toUpperCase()}
+          </Link>
+          <details className={styles.accountMenu}>
+            <summary aria-label={uxCopy.accountMenu}>
+              <span className={styles.accountAvatar} aria-hidden="true">
+                {userInitial}
+              </span>
+              <span>{session.user.displayName}</span>
+              <span className={styles.accountChevron} aria-hidden="true">
+                ▾
+              </span>
+            </summary>
+            <div className={styles.accountPopover}>
+              <p>
+                {copy.signedInAs} <strong>{session.user.displayName}</strong>
+              </p>
+              <form action={`/api/auth/logout?locale=${locale}`} method="post">
+                <button className={styles.logoutButton} type="submit">
+                  {copy.logout}
+                </button>
+              </form>
+            </div>
+          </details>
         </div>
       </nav>
 
@@ -256,7 +279,9 @@ export default async function CommandCenterPage({
 
       {isCalmEmpty ? (
         <section className={styles.clearState} aria-labelledby="today-clear-heading">
-          <span className={styles.clearMark} aria-hidden="true">✓</span>
+          <span className={styles.clearMark} aria-hidden="true">
+            ✓
+          </span>
           <div>
             <h2 id="today-clear-heading">{uxCopy.clearTitle}</h2>
             <p>{uxCopy.clearHelp}</p>
@@ -326,6 +351,20 @@ export default async function CommandCenterPage({
 
           {scope === 'workspace' ? (
             <DashboardDisclosure title={uxCopy.integrations} description={uxCopy.integrationsHelp}>
+              {canViewAgentBridge ? (
+                <Link className={styles.agentBridgeShortcut} href={`/${locale}/ia/agent-bridge`}>
+                  <span className={styles.agentBridgeMark} aria-hidden="true">
+                    IA
+                  </span>
+                  <span>
+                    <strong>{uxCopy.agentBridge}</strong>
+                    <small>{uxCopy.agentBridgeHelp}</small>
+                  </span>
+                  <span className={styles.agentBridgeArrow} aria-hidden="true">
+                    →
+                  </span>
+                </Link>
+              ) : null}
               <div className={`management-grid ${styles.disclosureGrid}`}>
                 {canManageIntegrations ? (
                   <GitHubSetupPanel
