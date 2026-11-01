@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { apiBaseUrl, SESSION_COOKIE } from '../../../../lib/api';
-import { publicRequestUrl } from '../../../../lib/public-url';
+import { sameOriginRedirect, sameOriginUrl } from '../../../../lib/public-url';
 
 function localeValue(value: FormDataEntryValue | null): 'es' | 'en' {
   return value === 'en' ? 'en' : 'es';
 }
 
-function dashboardUrl(request: NextRequest, locale: 'es' | 'en', result: string) {
-  const url = publicRequestUrl(request, `/${locale}`);
+function dashboardUrl(locale: 'es' | 'en', result: string) {
+  const url = sameOriginUrl(`/${locale}`);
   url.searchParams.set('scope', 'workspace');
   url.searchParams.set('result', result);
   return url;
@@ -37,13 +37,13 @@ export async function POST(request: NextRequest) {
   try {
     form = await request.formData();
   } catch {
-    return NextResponse.redirect(publicRequestUrl(request, '/es?scope=workspace&result=invalid'), 303);
+    return sameOriginRedirect('/es?scope=workspace&result=invalid');
   }
 
   const locale = localeValue(form.get('locale'));
   const operation = form.get('operation');
   const token = request.cookies.get(SESSION_COOKIE)?.value;
-  if (!token) return NextResponse.redirect(publicRequestUrl(request, `/${locale}/login`), 303);
+  if (!token) return sameOriginRedirect(`/${locale}/login`);
 
   let path: string;
   let method: 'POST' | 'PATCH' = 'POST';
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
     const currentPassword = stringValue(form, 'currentPassword', 1024);
     const newPassword = stringValue(form, 'newPassword', 1024);
     if (!currentPassword || !newPassword || newPassword.length < 12) {
-      return NextResponse.redirect(dashboardUrl(request, locale, 'invalid'), 303);
+      return sameOriginRedirect(dashboardUrl(locale, 'invalid'));
     }
     path = '/v1/auth/local/change-password';
     body = { currentPassword, newPassword };
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
       (role !== 'admin' && role !== 'member') ||
       (memberLocale !== 'es' && memberLocale !== 'en')
     ) {
-      return NextResponse.redirect(dashboardUrl(request, locale, 'invalid'), 303);
+      return sameOriginRedirect(dashboardUrl(locale, 'invalid'));
     }
     path = '/v1/auth/local/members';
     body = { email, displayName, timezone, password, role, locale: memberLocale };
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
       (role !== 'admin' && role !== 'member') ||
       (status !== 'active' && status !== 'suspended' && status !== 'disabled')
     ) {
-      return NextResponse.redirect(dashboardUrl(request, locale, 'invalid'), 303);
+      return sameOriginRedirect(dashboardUrl(locale, 'invalid'));
     }
     path = `/v1/auth/local/members/${encodeURIComponent(userId)}`;
     method = 'PATCH';
@@ -97,12 +97,12 @@ export async function POST(request: NextRequest) {
     const userId = stringValue(form, 'userId', 160);
     const newPassword = stringValue(form, 'newPassword', 1024);
     if (!userId || !newPassword || newPassword.length < 12) {
-      return NextResponse.redirect(dashboardUrl(request, locale, 'invalid'), 303);
+      return sameOriginRedirect(dashboardUrl(locale, 'invalid'));
     }
     path = `/v1/auth/local/members/${encodeURIComponent(userId)}/reset-password`;
     body = { newPassword };
   } else {
-    return NextResponse.redirect(dashboardUrl(request, locale, 'invalid'), 303);
+    return sameOriginRedirect(dashboardUrl(locale, 'invalid'));
   }
 
   try {
@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (response.status === 401 && !invalidateCurrentSession) {
-      return clearSession(NextResponse.redirect(publicRequestUrl(request, `/${locale}/login`), 303));
+      return clearSession(sameOriginRedirect(`/${locale}/login`));
     }
     if (!response.ok) {
       const result =
@@ -129,16 +129,14 @@ export async function POST(request: NextRequest) {
             : response.status === 409
               ? 'conflict'
               : 'error';
-      return NextResponse.redirect(dashboardUrl(request, locale, result), 303);
+      return sameOriginRedirect(dashboardUrl(locale, result));
     }
 
     if (invalidateCurrentSession) {
-      return clearSession(
-        NextResponse.redirect(publicRequestUrl(request, `/${locale}/login?password=changed`), 303),
-      );
+      return clearSession(sameOriginRedirect(`/${locale}/login?password=changed`));
     }
-    return NextResponse.redirect(dashboardUrl(request, locale, 'saved'), 303);
+    return sameOriginRedirect(dashboardUrl(locale, 'saved'));
   } catch {
-    return NextResponse.redirect(dashboardUrl(request, locale, 'error'), 303);
+    return sameOriginRedirect(dashboardUrl(locale, 'error'));
   }
 }
