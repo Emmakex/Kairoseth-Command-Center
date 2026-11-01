@@ -1,7 +1,8 @@
-import { NextResponse } from 'next/server';
+import type { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { apiBaseUrl, getSession, SESSION_COOKIE } from '../../../lib/api';
 import { parseOperationalMutation } from '../../../lib/operations';
+import { sameOriginRedirect, sameOriginUrl } from '../../../lib/public-url';
 
 function localeValue(value: FormDataEntryValue | null): 'es' | 'en' {
   return value === 'en' ? 'en' : 'es';
@@ -15,21 +16,17 @@ function viewValue(operation: FormDataEntryValue | null): 'today' | 'work' {
   return operation === 'quick-capture' ? 'today' : 'work';
 }
 
-function relativeRedirect(location: string) {
-  return new NextResponse(null, {
-    status: 303,
-    headers: { location },
-  });
-}
-
-function dashboardRedirect(
+function dashboardUrl(
   locale: 'es' | 'en',
   scope: 'workspace' | 'private',
   result: string,
   view: 'today' | 'work',
 ) {
-  const params = new URLSearchParams({ scope, view, result });
-  return relativeRedirect(`/${locale}?${params.toString()}`);
+  const url = sameOriginUrl(`/${locale}`);
+  url.searchParams.set('scope', scope);
+  url.searchParams.set('view', view);
+  url.searchParams.set('result', result);
+  return url;
 }
 
 function clearSession(response: NextResponse) {
@@ -48,7 +45,7 @@ export async function POST(request: NextRequest) {
   try {
     form = await request.formData();
   } catch {
-    return relativeRedirect('/es?scope=workspace&view=today&result=invalid');
+    return sameOriginRedirect('/es?scope=workspace&view=today&result=invalid');
   }
 
   const locale = localeValue(form.get('locale'));
@@ -57,21 +54,21 @@ export async function POST(request: NextRequest) {
   const view = viewValue(operation);
   const token = request.cookies.get(SESSION_COOKIE)?.value;
   if (!token) {
-    return relativeRedirect(`/${locale}/login`);
+    return sameOriginRedirect(`/${locale}/login`);
   }
 
   let timeZone: string | undefined;
   if (operation === 'task-reminders') {
     const session = await getSession(token);
     if (!session) {
-      return dashboardRedirect(locale, scope, 'error', view);
+      return sameOriginRedirect(dashboardUrl(locale, scope, 'error', view));
     }
     timeZone = session.user.timezone;
   }
 
   const mutation = parseOperationalMutation(form, { ...(timeZone ? { timeZone } : {}) });
   if (!mutation) {
-    return dashboardRedirect(locale, scope, 'invalid', view);
+    return sameOriginRedirect(dashboardUrl(locale, scope, 'invalid', view));
   }
 
   try {
@@ -87,16 +84,16 @@ export async function POST(request: NextRequest) {
     });
 
     if (response.status === 401) {
-      return clearSession(relativeRedirect(`/${locale}/login`));
+      return clearSession(sameOriginRedirect(`/${locale}/login`));
     }
 
     if (!response.ok) {
       const result = response.status === 403 ? 'forbidden' : response.status === 404 ? 'not-found' : 'error';
-      return dashboardRedirect(locale, scope, result, view);
+      return sameOriginRedirect(dashboardUrl(locale, scope, result, view));
     }
 
-    return dashboardRedirect(locale, scope, 'saved', view);
+    return sameOriginRedirect(dashboardUrl(locale, scope, 'saved', view));
   } catch {
-    return dashboardRedirect(locale, scope, 'error', view);
+    return sameOriginRedirect(dashboardUrl(locale, scope, 'error', view));
   }
 }
