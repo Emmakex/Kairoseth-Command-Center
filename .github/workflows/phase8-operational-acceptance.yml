@@ -34,6 +34,9 @@ jobs:
           set -euo pipefail
           script="deployment/live/phase8-operational-acceptance.sh"
           bash -n "$script"
+          grep -Fq 'prepare_private_dir "$EVIDENCE_ROOT"' "$script"
+          grep -Fq 'prepare_private_dir "$BACKUP_ROOT"' "$script"
+          grep -Fq 'docker run --rm --user 0:0 --entrypoint sh' "$script"
           grep -Fq 'mongodump --quiet --db' "$script"
           grep -Fq 'mongorestore' "$script"
           grep -Fq -- '--nsFrom=' "$script"
