@@ -16,7 +16,7 @@ BACKUP_FILE="$BACKUP_ROOT/work-manager-$STAMP.archive.gz"
 
 cd "$ROOT_DIR"
 
-for command_name in docker sha256sum stat install date awk sed; do
+for command_name in docker sha256sum stat install date awk sed id; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
     echo "[phase8-ops] required command is missing: $command_name" >&2
     exit 1
@@ -36,7 +36,42 @@ if (( (8#$perm & 077) != 0 )); then
   exit 1
 fi
 
-install -d -m 700 "$EVIDENCE_ROOT" "$BACKUP_ROOT" "$EVIDENCE_DIR"
+prepare_private_dir() {
+  local dir="$1"
+  local uid gid helper_image
+
+  if install -d -m 700 "$dir" 2>/dev/null; then
+    return 0
+  fi
+
+  case "$dir" in
+    /srv/kairoseth/apps/work-manager/*) ;;
+    *)
+      echo "[phase8-ops] protected directory is not writable and is outside the managed live root: $dir" >&2
+      exit 1
+      ;;
+  esac
+
+  uid="$(id -u)"
+  gid="$(id -g)"
+  helper_image="${KCC_PHASE8_PERMISSION_HELPER_IMAGE:-caddy:2-alpine}"
+
+  echo "[phase8-ops] bootstrapping protected host directory via Docker: $dir"
+  docker run --rm --user 0:0 --entrypoint sh \
+    -v "$dir:/target" \
+    "$helper_image" \
+    -c "chown $uid:$gid /target && chmod 700 /target"
+
+  if [[ ! -d "$dir" || ! -w "$dir" ]]; then
+    echo "[phase8-ops] protected directory remains unavailable after bootstrap: $dir" >&2
+    exit 1
+  fi
+  chmod 700 "$dir"
+}
+
+prepare_private_dir "$EVIDENCE_ROOT"
+prepare_private_dir "$BACKUP_ROOT"
+install -d -m 700 "$EVIDENCE_DIR"
 
 compose() {
   docker compose \

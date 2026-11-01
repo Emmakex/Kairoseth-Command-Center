@@ -49,11 +49,13 @@ By default:
 
 Backup and evidence directories are mode `0700`; backup and evidence files are mode `0600`. Backups and raw evidence are never uploaded as public GitHub artifacts.
 
+On the self-hosted runner, the parent live application directory can be root-owned. If the runner cannot create the protected backup/evidence directories directly, the acceptance script uses the already-authorized local Docker daemon only to bootstrap those managed `/srv/kairoseth/apps/work-manager/...` directories, assigns them to the runner UID/GID, and immediately enforces mode `0700`. Custom paths outside the managed live root never receive this privilege bootstrap and fail closed if they are not writable.
+
 The summary records only operational metadata: accepted revision, database name, backup path/hash/size, and pass/fail booleans. It does not read or print runtime secrets.
 
 ## Failure behavior
 
-The script is fail-closed. Any failed backup, restore verification, service restart, persistence check, missing container, unexpected published port or inaccessible protected environment aborts acceptance.
+The script is fail-closed. Any failed directory bootstrap, backup, restore verification, service restart, persistence check, missing container, unexpected published port or inaccessible protected environment aborts acceptance.
 
 A cleanup trap removes the temporary canary and temporary restore database when possible. The backup archive is intentionally retained because exercising and retaining a recoverable backup is part of Phase 8 acceptance.
 
