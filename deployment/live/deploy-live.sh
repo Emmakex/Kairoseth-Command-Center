@@ -179,14 +179,14 @@ docker run --rm --network "$PUBLIC_EDGE_NETWORK" curlimages/curl:8.16.0 \
   "http://work-manager-edge/es/login" >/dev/null
 
 redirect_location="$(docker run --rm --network "$PUBLIC_EDGE_NETWORK" curlimages/curl:8.16.0 \
-  --silent --show-error --output /dev/null --write-out '%{redirect_url}' \
+  --silent --show-error -D - --output /dev/null \
   -X POST \
   -H "Host: $DOMAIN" \
-  -H 'X-Forwarded-Proto: https' \
   -H 'content-type: application/x-www-form-urlencoded' \
   --data 'locale=es&scope=private&operation=quick-capture&kind=task&title=Redirect%20acceptance' \
-  "http://work-manager-edge/api/operations")"
-if [[ "$redirect_location" != "https://$DOMAIN/es/login" ]]; then
+  "http://work-manager-edge/api/operations" \
+  | tr -d '\r' | awk 'tolower($1) == "location:" { print $2; exit }')"
+if [[ "$redirect_location" != "/es/login" ]]; then
   echo "[work-manager-live] public redirect origin is stale or misrouted: location=$redirect_location" >&2
   exit 1
 fi
@@ -212,16 +212,17 @@ echo "[work-manager-live] internal shared-edge route, redirect origin and Agent 
 
 if curl -fsS --max-time 20 "https://$DOMAIN/es/login" >/dev/null 2>&1; then
   public_redirect_location="$(curl \
-    --silent --show-error --output /dev/null --write-out '%{redirect_url}' \
+    --silent --show-error -D - --output /dev/null \
     -X POST \
     -H 'content-type: application/x-www-form-urlencoded' \
     --data 'locale=es&scope=private&operation=quick-capture&kind=task&title=Redirect%20acceptance' \
-    "https://$DOMAIN/api/operations")"
-  if [[ "$public_redirect_location" != "https://$DOMAIN/es/login" ]]; then
+    "https://$DOMAIN/api/operations" \
+    | tr -d '\r' | awk 'tolower($1) == "location:" { print $2; exit }')"
+  if [[ "$public_redirect_location" != "/es/login" ]]; then
     echo "[work-manager-live] public HTTPS redirect origin is stale or misrouted: location=$public_redirect_location" >&2
     exit 1
   fi
-  echo "[work-manager-live] public HTTPS probe and redirect origin verified: https://$DOMAIN/es/login"
+  echo "[work-manager-live] public HTTPS probe and same-origin redirect verified: https://$DOMAIN/es/login"
 elif [[ "${KCC_PUBLIC_PROBE_REQUIRED:-0}" == "1" ]]; then
   echo "[work-manager-live] public HTTPS probe failed for https://$DOMAIN/es/login" >&2
   exit 1
