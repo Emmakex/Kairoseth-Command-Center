@@ -110,6 +110,7 @@ jobs:
           grep -Fq 'caddy reload --config /etc/caddy/Caddyfile' "$script"
           grep -Fq 'Agent Bridge session edge route is stale or misrouted' "$script"
           grep -Fq 'Agent Bridge runtime edge route is stale or misrouted' "$script"
+          grep -Fq 'public redirect origin is stale or misrouted' "$script"
 
       - name: Build and start isolated live topology
         shell: bash
@@ -148,6 +149,15 @@ jobs:
           docker run --rm --network kairoseth-public-edge curlimages/curl:8.16.0 \
             --retry 15 --retry-delay 2 --retry-connrefused --max-time 60 -fsS \
             http://work-manager-edge/es/login >/dev/null
+
+          redirect_location="$(docker run --rm --network kairoseth-public-edge curlimages/curl:8.16.0 \
+            -sS -o /dev/null -w '%{redirect_url}' -X POST \
+            -H 'Host: work-manager.kairoseth.com' \
+            -H 'X-Forwarded-Proto: https' \
+            -H 'content-type: application/x-www-form-urlencoded' \
+            --data 'locale=es&scope=private&operation=quick-capture&kind=task&title=Redirect%20acceptance' \
+            http://work-manager-edge/api/operations)"
+          [[ "$redirect_location" == "https://work-manager.kairoseth.com/es/login" ]]
 
           runtime_code="$(docker run --rm --network kairoseth-public-edge curlimages/curl:8.16.0 \
             -sS -o /dev/null -w '%{http_code}' -X POST \
