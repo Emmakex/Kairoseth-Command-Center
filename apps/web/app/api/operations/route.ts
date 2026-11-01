@@ -12,7 +12,7 @@ function scopeValue(value: FormDataEntryValue | null): 'workspace' | 'private' {
   return value === 'private' ? 'private' : 'workspace';
 }
 
-function dashboardUrl(_request: NextRequest, locale: 'es' | 'en', scope: 'workspace' | 'private', result: string) {
+function dashboardUrl(locale: 'es' | 'en', scope: 'workspace' | 'private', result: string) {
   const url = sameOriginUrl(`/${locale}`);
   url.searchParams.set('scope', scope);
   url.searchParams.set('result', result);
@@ -49,14 +49,14 @@ export async function POST(request: NextRequest) {
   if (form.get('operation') === 'task-reminders') {
     const session = await getSession(token);
     if (!session) {
-      return sameOriginRedirect(dashboardUrl(request, locale, scope, 'error'));
+      return sameOriginRedirect(dashboardUrl(locale, scope, 'error'));
     }
     timeZone = session.user.timezone;
   }
 
   const mutation = parseOperationalMutation(form, { ...(timeZone ? { timeZone } : {}) });
   if (!mutation) {
-    return sameOriginRedirect(dashboardUrl(request, locale, scope, 'invalid'));
+    return sameOriginRedirect(dashboardUrl(locale, scope, 'invalid'));
   }
 
   try {
@@ -77,11 +77,11 @@ export async function POST(request: NextRequest) {
 
     if (!response.ok) {
       const result = response.status === 403 ? 'forbidden' : response.status === 404 ? 'not-found' : 'error';
-      return sameOriginRedirect(dashboardUrl(request, locale, scope, result));
+      return sameOriginRedirect(dashboardUrl(locale, scope, result));
     }
 
-    return sameOriginRedirect(dashboardUrl(request, locale, scope, 'saved'));
+    return sameOriginRedirect(dashboardUrl(locale, scope, 'saved'));
   } catch {
-    return sameOriginRedirect(dashboardUrl(request, locale, scope, 'error'));
+    return sameOriginRedirect(dashboardUrl(locale, scope, 'error'));
   }
 }
