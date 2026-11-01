@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { apiBaseUrl, getSession, SESSION_COOKIE } from '../../../lib/api';
 import { parseOperationalMutation } from '../../../lib/operations';
+import { publicRequestUrl } from '../../../lib/public-url';
 
 function localeValue(value: FormDataEntryValue | null): 'es' | 'en' {
   return value === 'en' ? 'en' : 'es';
@@ -12,7 +13,7 @@ function scopeValue(value: FormDataEntryValue | null): 'workspace' | 'private' {
 }
 
 function dashboardUrl(request: NextRequest, locale: 'es' | 'en', scope: 'workspace' | 'private', result: string) {
-  const url = new URL(`/${locale}`, request.url);
+  const url = publicRequestUrl(request, `/${locale}`);
   url.searchParams.set('scope', scope);
   url.searchParams.set('result', result);
   return url;
@@ -34,14 +35,14 @@ export async function POST(request: NextRequest) {
   try {
     form = await request.formData();
   } catch {
-    return NextResponse.redirect(new URL('/es?result=invalid', request.url), 303);
+    return NextResponse.redirect(publicRequestUrl(request, '/es?result=invalid'), 303);
   }
 
   const locale = localeValue(form.get('locale'));
   const scope = scopeValue(form.get('scope'));
   const token = request.cookies.get(SESSION_COOKIE)?.value;
   if (!token) {
-    return NextResponse.redirect(new URL(`/${locale}/login`, request.url), 303);
+    return NextResponse.redirect(publicRequestUrl(request, `/${locale}/login`), 303);
   }
 
   let timeZone: string | undefined;
@@ -71,7 +72,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (response.status === 401) {
-      return clearSession(NextResponse.redirect(new URL(`/${locale}/login`, request.url), 303));
+      return clearSession(NextResponse.redirect(publicRequestUrl(request, `/${locale}/login`), 303));
     }
 
     if (!response.ok) {
