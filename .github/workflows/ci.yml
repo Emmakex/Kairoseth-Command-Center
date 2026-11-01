@@ -124,7 +124,7 @@ jobs:
           " >/dev/null
 
           es_page="$(curl --fail --silent \
-            'http://localhost:3000/es?scope=workspace' \
+            'http://localhost:3000/es?scope=workspace&view=activity' \
             -H "Cookie: kcc_session=$access_token")"
           printf '%s' "$es_page" | grep -F 'Actividad de integraciones' >/dev/null
           printf '%s' "$es_page" | grep -F 'Integration activity smoke' >/dev/null
@@ -132,14 +132,14 @@ jobs:
           printf '%s' "$es_page" | grep -F 'Correcto' >/dev/null
 
           en_page="$(curl --fail --silent \
-            'http://localhost:3000/en?scope=workspace' \
+            'http://localhost:3000/en?scope=workspace&view=activity' \
             -H "Cookie: kcc_session=$access_token")"
           printf '%s' "$en_page" | grep -F 'Integration activity' >/dev/null
           printf '%s' "$en_page" | grep -F 'Integration activity smoke' >/dev/null
           printf '%s' "$en_page" | grep -F 'Successful' >/dev/null
 
           private_page="$(curl --fail --silent \
-            'http://localhost:3000/es?scope=private' \
+            'http://localhost:3000/es?scope=private&view=activity' \
             -H "Cookie: kcc_session=$access_token")"
           if printf '%s' "$private_page" | grep -F 'ci:integration-activity:9001' >/dev/null; then
             echo 'Workspace integration activity leaked into private view' >&2
