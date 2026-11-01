@@ -1,8 +1,9 @@
-import { NextResponse } from 'next/server';
+import type { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { apiBaseUrl, SESSION_COOKIE } from '../../../../lib/api';
 import { sealGitHubWebhookSecret } from '../../../../lib/github-webhook-secret';
 import { parseGitHubSetupMutation } from '../../../../lib/github-setup';
+import { sameOriginRedirect, sameOriginUrl } from '../../../../lib/public-url';
 
 const WEBHOOK_REVEAL_COOKIE = 'kcc_github_webhook_reveal';
 
@@ -10,16 +11,12 @@ function safeLocale(value: FormDataEntryValue | null): 'es' | 'en' {
   return value === 'en' ? 'en' : 'es';
 }
 
-function relativeRedirect(location: string) {
-  return new NextResponse(null, {
-    status: 303,
-    headers: { location },
-  });
-}
-
-function dashboardRedirect(locale: 'es' | 'en', result: string) {
-  const params = new URLSearchParams({ scope: 'workspace', view: 'settings', result });
-  return relativeRedirect(`/${locale}?${params.toString()}`);
+function dashboardUrl(locale: 'es' | 'en', result: string) {
+  const url = sameOriginUrl(`/${locale}`);
+  url.searchParams.set('scope', 'workspace');
+  url.searchParams.set('view', 'settings');
+  url.searchParams.set('result', result);
+  return url;
 }
 
 function clearSession(response: NextResponse) {
@@ -48,7 +45,9 @@ function webhookRevealResponse(
   const sealed = sealGitHubWebhookSecret(sessionToken, { path, secret: body.secret });
   if (!sealed) return null;
 
-  const response = relativeRedirect(`/api/integrations/github/webhook-secret?locale=${locale}`);
+  const url = sameOriginUrl('/api/integrations/github/webhook-secret');
+  url.searchParams.set('locale', locale);
+  const response = sameOriginRedirect(url);
   response.cookies.set(WEBHOOK_REVEAL_COOKIE, sealed, {
     httpOnly: true,
     sameSite: 'strict',
@@ -66,15 +65,15 @@ export async function POST(request: NextRequest) {
   try {
     form = await request.formData();
   } catch {
-    return relativeRedirect('/es?scope=workspace&view=settings&result=invalid');
+    return sameOriginRedirect('/es?scope=workspace&view=settings&result=invalid');
   }
 
   const locale = safeLocale(form.get('locale'));
   const token = request.cookies.get(SESSION_COOKIE)?.value;
-  if (!token) return relativeRedirect(`/${locale}/login`);
+  if (!token) return sameOriginRedirect(`/${locale}/login`);
 
   const mutation = parseGitHubSetupMutation(form);
-  if (!mutation) return dashboardRedirect(locale, 'invalid');
+  if (!mutation) return sameOriginRedirect(dashboardUrl(locale, 'invalid'));
 
   try {
     const response = await fetch(`${apiBaseUrl()}${mutation.path}`, {
@@ -89,7 +88,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (response.status === 401) {
-      return clearSession(relativeRedirect(`/${locale}/login`));
+      return clearSession(sameOriginRedirect(`/${locale}/login`));
     }
     if (!response.ok) {
       const result =
@@ -102,17 +101,17 @@ export async function POST(request: NextRequest) {
               : response.status === 409
                 ? 'conflict'
                 : 'error';
-      return dashboardRedirect(locale, result);
+      return sameOriginRedirect(dashboardUrl(locale, result));
     }
 
     if (mutation.revealWebhookSecret) {
       const payload = (await response.json()) as unknown;
       const reveal = webhookRevealResponse(locale, token, payload);
-      return reveal ?? dashboardRedirect(locale, 'error');
+      return reveal ?? sameOriginRedirect(dashboardUrl(locale, 'error'));
     }
 
-    return dashboardRedirect(locale, 'saved');
+    return sameOriginRedirect(dashboardUrl(locale, 'saved'));
   } catch {
-    return dashboardRedirect(locale, 'error');
+    return sameOriginRedirect(dashboardUrl(locale, 'error'));
   }
 }
