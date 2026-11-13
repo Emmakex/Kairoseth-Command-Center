@@ -80,8 +80,10 @@ services:
     security_opt:
       - no-new-privileges:true
     networks:
-      - data
-      - app
+      data: {}
+      app:
+        aliases:
+          - work-manager-api-internal
 
   worker:
     build:
@@ -138,7 +140,9 @@ services:
     security_opt:
       - no-new-privileges:true
     networks:
-      - app
+      app:
+        aliases:
+          - work-manager-web-internal
 
   edge:
     image: caddy:2-alpine
