@@ -51,8 +51,18 @@ for attempt in {1..30}; do
 done
 
 # MongoDB must remain internal-only in the production-oriented profile.
-if [ -n "$("${compose[@]}" port mongo 27017 2>/dev/null || true)" ]; then
-  echo "MongoDB unexpectedly publishes port 27017." >&2
+# Inspect actual host bindings; 'docker compose port' may emit diagnostics even
+# when no port is published, so non-empty stdout is not a reliable assertion.
+mongo_cid="$("${compose[@]}" ps -q mongo)"
+if [ -z "$mongo_cid" ]; then
+  echo "MongoDB container missing from standalone topology." >&2
+  exit 1
+fi
+mongo_bindings="$(docker inspect --format '{{json .HostConfig.PortBindings}}' "$mongo_cid")"
+mongo_publish_all="$(docker inspect --format '{{.HostConfig.PublishAllPorts}}' "$mongo_cid")"
+if [ "$mongo_publish_all" != "false" ] ||
+   { [ "$mongo_bindings" != "null" ] && [ "$mongo_bindings" != "{}" ]; }; then
+  echo "MongoDB unexpectedly publishes host ports." >&2
   exit 1
 fi
 
