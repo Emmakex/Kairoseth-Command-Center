@@ -1,9 +1,25 @@
 name: work-manager-live
 
+# Bound logs without changing the host-wide Docker daemon. Compose will apply
+# these limits when each service is recreated during a controlled deployment.
+x-bounded-logging: &bounded-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+# MongoDB is more verbose: retain a larger, still bounded diagnostic window.
+x-mongo-logging: &mongo-logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "5"
+
 services:
   mongo:
     image: ${KCC_LIVE_MONGO_IMAGE:-mongo:8.0}
     restart: unless-stopped
+    logging: *mongo-logging
     command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
     volumes:
       - work-manager-live-mongo-data:/data/db
@@ -25,6 +41,7 @@ services:
       dockerfile: deployment/docker/api.Dockerfile
     image: work-manager/api:${KCC_DEPLOYMENT_REVISION:-local}
     restart: unless-stopped
+    logging: *bounded-logging
     labels:
       com.kairoseth.work-manager.live: "true"
       com.kairoseth.work-manager.revision: "${KCC_DEPLOYMENT_REVISION:-local}"
@@ -72,6 +89,7 @@ services:
       dockerfile: deployment/docker/worker.Dockerfile
     image: work-manager/worker:${KCC_DEPLOYMENT_REVISION:-local}
     restart: unless-stopped
+    logging: *bounded-logging
     labels:
       com.kairoseth.work-manager.live: "true"
       com.kairoseth.work-manager.revision: "${KCC_DEPLOYMENT_REVISION:-local}"
@@ -96,6 +114,7 @@ services:
       dockerfile: deployment/docker/web.Dockerfile
     image: work-manager/web:${KCC_DEPLOYMENT_REVISION:-local}
     restart: unless-stopped
+    logging: *bounded-logging
     labels:
       com.kairoseth.work-manager.live: "true"
       com.kairoseth.work-manager.revision: "${KCC_DEPLOYMENT_REVISION:-local}"
@@ -124,6 +143,7 @@ services:
   edge:
     image: caddy:2-alpine
     restart: unless-stopped
+    logging: *bounded-logging
     labels:
       com.kairoseth.work-manager.live: "true"
       com.kairoseth.work-manager.revision: "${KCC_DEPLOYMENT_REVISION:-local}"
