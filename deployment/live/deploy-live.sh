@@ -148,6 +148,13 @@ wait_healthy api
 wait_healthy web
 wait_healthy edge
 
+# Do not accept a healthy web service if Caddy resolves a different
+# project's generic "web" or "api" alias on the shared public-edge network.
+# Probe the exact internal aliases from the edge container itself.
+compose exec -T edge sh -c 'wget -q -O /dev/null http://work-manager-web-internal:3000/es/login'
+compose exec -T edge sh -c 'wget -q -O /dev/null http://work-manager-api-internal:4000/ready'
+echo "[work-manager-live] exclusive internal DNS and upstreams verified"
+
 # The live Caddyfile is bind-mounted. Docker Compose does not recreate a running
 # edge container merely because the mounted file contents changed, so validate
 # and reload explicitly before accepting the deployment.

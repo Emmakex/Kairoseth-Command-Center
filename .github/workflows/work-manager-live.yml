@@ -91,6 +91,10 @@ jobs:
           grep -Fq 'name: kairoseth-public-edge' "$RUNNER_TEMP/work-manager-live-compose.yml"
           grep -Fq 'work-manager-edge' "$RUNNER_TEMP/work-manager-live-compose.yml"
           grep -Fq 'KCC_AUTH_MODE: local' "$RUNNER_TEMP/work-manager-live-compose.yml"
+          grep -Fq 'work-manager-api-internal' "$RUNNER_TEMP/work-manager-live-compose.yml"
+          grep -Fq 'work-manager-web-internal' "$RUNNER_TEMP/work-manager-live-compose.yml"
+          grep -Fq 'reverse_proxy work-manager-api-internal:4000' deployment/live/Caddyfile
+          grep -Fq 'reverse_proxy work-manager-web-internal:3000' deployment/live/Caddyfile
 
       - name: Validate internal Caddy configuration
         shell: bash
@@ -145,6 +149,11 @@ jobs:
             done
             [[ "$healthy" == true ]]
           done
+
+          # Confirm Caddy's exact backends, not a generic alias that may
+          # resolve to a separate app on the shared public-edge network.
+          compose exec -T edge sh -c 'wget -q -O /dev/null http://work-manager-web-internal:3000/es/login'
+          compose exec -T edge sh -c 'wget -q -O /dev/null http://work-manager-api-internal:4000/ready'
 
           docker run --rm --network kairoseth-public-edge curlimages/curl:8.16.0 \
             --retry 15 --retry-delay 2 --retry-connrefused --max-time 60 -fsS \
